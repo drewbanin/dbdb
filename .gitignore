@@ -1,0 +1,7 @@
+build/
+dbdb.egg-info
+dist/
+env/
+*.dumb
+*.pyc
+__pycache__
