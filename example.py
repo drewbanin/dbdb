@@ -15,12 +15,13 @@ from dbdb.files.types import (
 )
 
 
+sample_data = [2, 7, 3, 9, 1]
 col1 = Column(
     name='my_number',
     data_type=DataType.INT8,
     encoding=DataEncoding.RAW,
     is_sorted=DataSorting.SORTED,
-    data=list(range(5))
+    data=sample_data
 )
 
 col2 = Column(
@@ -28,7 +29,7 @@ col2 = Column(
     data_type=DataType.BOOL,
     encoding=DataEncoding.RAW,
     is_sorted=DataSorting.UNSORTED,
-    data=list(i % 2 for i in range(5))
+    data=list(i % 2 for i in sample_data)
 )
 
 col3 = Column(
@@ -47,7 +48,7 @@ col3 = Column(
 )
 
 col4 = Column(
-    name='my_time',
+    name='my_string',
     data_type=DataType.STR,
     encoding=DataEncoding.RAW,
     is_sorted=DataSorting.UNSORTED,

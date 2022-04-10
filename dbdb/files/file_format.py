@@ -15,6 +15,10 @@ from dbdb.files.types import (
 from dbdb.files.constants import MAGIC_NUMBER
 
 
+def sort_together(sort_index, to_sort):
+    return [i for _, i in sorted(zip(sort_index, to_sort))]
+
+
 def chomp(pack_s, buffer, unpack_single=True):
     size = struct.calcsize(pack_s)
     res = struct.unpack(pack_s, buffer[:size])
@@ -24,7 +28,16 @@ def chomp(pack_s, buffer, unpack_single=True):
 
 
 class Column(object):
-    def __init__(self, name, data_type, encoding, is_sorted, data=None, min_val=None, max_val=None):
+    def __init__(
+        self,
+        name,
+        data_type,
+        encoding,
+        is_sorted,
+        data=None,
+        min_val=None,
+        max_val=None
+    ):
         self.name = name
         self.data_type = data_type
         self.encoding = encoding
@@ -33,6 +46,10 @@ class Column(object):
         self.data = data
         self.min_val = min_val
         self.max_val = max_val
+
+    def sort_by(self, sort_index):
+        # this mutates the order of self.data
+        self.data = sort_together(sort_index, self.data)
 
     def size(self):
         return len(self.data)
@@ -147,6 +164,21 @@ class Column(object):
 class Table(object):
     def __init__(self, columns):
         self.columns = columns
+
+        # find the sort column if one is specified
+        sort_column = None
+        for i, column in enumerate(columns):
+            do_sort = column.is_sorted == DataSorting.SORTED
+            if do_sort and sort_column:
+                raise RuntimeError("Cannot sort by more than one column")
+            elif do_sort:
+                sort_column = column
+
+        numbers = list(range(len(sort_column.data)))
+        sort_index = sort_together(sort_column.data, numbers)
+
+        for column in columns:
+            column.sort_by(sort_index)
 
     def describe(self):
         for col in self.columns:
