@@ -43,7 +43,9 @@ setup(
     },
     install_requires=[
         # TODO
-        'hexdump==3.3'
+        'hexdump==3.3',
+        'networkx==2.8',
+        'pyparsing==3.0.8',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

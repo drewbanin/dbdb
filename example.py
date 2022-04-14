@@ -14,6 +14,8 @@ from dbdb.files.types import (
         DataSorting
 )
 
+from dbdb.lang import lang
+
 
 sample_data = [2, 7, 3, 9, 1]
 col1 = Column(
@@ -71,6 +73,7 @@ def to_hex(buf_s, line_width=16):
 
 
 def test():
+    print("Serialize")
     table.describe()
     byte_array = table.serialize()
 
@@ -80,8 +83,26 @@ def test():
     with open('my_table.dumb', 'wb') as fh:
         fh.write(byte_array)
 
+    print()
+    print("Deserialize")
     deserialized = table.deserialize(byte_array)
     deserialized.describe()
+
+    print()
+    print("Query:")
+    query = """
+    select
+        my_number,
+        is_odd
+    from my_table
+    limit 2
+    """.rstrip()
+    print(query)
+
+    struct_query = lang.parse_query(query)
+    print()
+    print("Parsed:")
+    struct_query.describe()
 
 
 if __name__ == '__main__':
