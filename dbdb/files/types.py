@@ -62,6 +62,11 @@ class DataEncoding(BinEnum):
     DICTIONARY = 4
 
 
+class DataCompression(BinEnum):
+    RAW = 1
+    ZLIB = 2
+
+
 class DataSorting(enum.Flag):
     UNSORTED = False
     SORTED = True

@@ -8,6 +8,7 @@ import struct
 from dbdb.files.types import (
     DataType,
     DataEncoding,
+    DataCompression,
     DataSorting
 )
 
@@ -27,7 +28,7 @@ def chomp(pack_s, buffer, unpack_single=True):
     return res, buffer[size:]
 
 
-def pack(self, buffers):
+def pack(buffers):
     to_ret = bytearray()
 
     for buf in buffers:
@@ -44,8 +45,9 @@ class ColumnInfo(object):
 
         encoding=None,
         sorting=None,
+        compression=None,
         column_width=None,
-        column_offset=None
+        column_data_size=None
     ):
         self.column_type = column_type
 
@@ -57,29 +59,37 @@ class ColumnInfo(object):
             self.column_width = 0
 
         self.encoding = encoding or DataEncoding.RAW
+        self.compression = compression or DataCompression.RAW
         self.sorting = sorting or DataSorting.UNSORTED
 
-        # TODO: Column compression?
-
-        self.column_offset = column_offset
+        self.column_data_size = column_data_size
         self.column_name = column_name
 
     def serialize(self):
+        if self.column_data_size is None:
+            raise RuntimeError(
+                f"Cannot serialize table header for column {self.column_name}"
+                " because column_data_size has not been set!"
+            )
+
         return pack([
             # data type
-            struct.pack(">c", self.column_type.as_byte()),
+            struct.pack(">B", self.column_type.value),
 
             # data type width
             struct.pack(">i", self.column_width),
 
             # column encoding
-            struct.pack(">c", self.encoding.as_byte()),
+            struct.pack(">B", self.encoding.value),
+
+            # column compression
+            struct.pack(">B", self.compression.value),
 
             # Column sorting
             struct.pack(">?", self.sorting.value),
 
             # column data offset in file
-            struct.pack(">i", self.column_offset),
+            struct.pack(">i", self.column_data_size),
 
             # column name
             struct.pack(">16s", bytes(self.column_name, 'ascii')),
@@ -88,34 +98,40 @@ class ColumnInfo(object):
     @classmethod
     def deserialize(cls, buffer):
         # data type
-        column_type, buffer = chomp(">c", buffer)
+        column_type, buffer = chomp(">B", buffer)
 
         # data type width
-        column_width = chomp(">i", buffer)
+        column_width, buffer = chomp(">i", buffer)
 
         # column encoding
-        encoding, buffer = chomp(">c", buffer)
+        encoding, buffer = chomp(">B", buffer)
+
+        # column compression
+        compression, buffer = chomp(">B", buffer)
 
         # Column sorting
         sorting, buffer = chomp(">?", buffer)
 
         # column data offset in file
-        column_offset, buffer = chomp(">i", buffer)
+        column_data_size, buffer = chomp(">i", buffer)
 
         # column name
         column_name, buffer = chomp(">16s", buffer)
         column_name = column_name.decode('ascii').strip('\x00')
 
-        return cls(
+        column_info = cls(
             column_type=DataType(column_type),
             column_width=column_width,
             encoding=DataEncoding(encoding),
+            compression=DataCompression(compression),
             sorting=DataSorting(sorting),
-            column_offset=column_offset,
+            column_data_size=column_data_size,
             column_name=column_name
         )
 
-    def serialize_stats(self, min_val, max_val):
+        return column_info, buffer
+
+    def _serialize_stats(self):
         if self.column_type.supports_column_stats():
             p_min_max = struct.pack(">ii", min_val, max_val)
         else:
@@ -136,8 +152,6 @@ class ColumnInfo(object):
 class ColumnData(object):
     def __init__(self, data):
         self.data = data
-
-        self.serialize_buffer = bytearray()
 
     def sort_by(self, sort_index):
         # this mutates the order of self.data
@@ -160,7 +174,7 @@ class ColumnData(object):
     def deserialize(cls, column_info, num_records, buffer):
         # decompressed = compressor.decompress(column_info, decoded)
         decoded = encoder.decode(column_info, num_records, buffer)
-        return decoded
+        return cls(decoded)
 
     def describe(self):
         print(f"  - Size={self.size()}")
@@ -181,23 +195,53 @@ class Column(object):
     def size(self):
         return self.column_data.size()
 
-    def serialize_data(self):
-        return self.column_data.serialize(self.column_info)
+    def finalize(self, column_data_size):
+        self.column_info.column_data_size = column_data_size
+
+    def serialize_table_header(self):
+        return self.column_info.serialize()
 
     def serialize_block_header(self):
-        packed_bytes = bytearray()
+        return bytearray()
+        # packed_bytes = bytearray()
 
         # Column start byte - not used, but helpful in hexdump
-        p_column_ident = struct.pack(">1s", constants.COLUMN_IDENT)
-        packed_bytes.extend(p_column_ident)
+        # p_column_ident = struct.pack(">1s", constants.COLUMN_IDENT)
+        # packed_bytes.extend(p_column_ident)
 
+        # TODO : Include column stats! Put this somewhere else
+        # so that we can call the same func in page data...
         # Min and max of full dataset
-        min_val = min(self.data)
-        max_val = max(self.data)
-        p_min_max = self._serialize_stats(min_val, max_val)
-        packed_bytes.extend(p_min_max)
+        # min_val = min(self.column_data.data)
+        # max_val = max(self.column_data.data)
+        # p_min_max = self._serialize_stats(min_val, max_val)
+        # packed_bytes.extend(p_min_max)
+        # return packed_bytes
 
-        return packed_bytes
+    def serialize_data_pages(self):
+        return self.column_data.serialize(self.column_info)
+
+    def serialize_data(self):
+        buffer = bytearray()
+        buffer.extend(self.serialize_block_header())
+        buffer.extend(self.serialize_data_pages())
+        return buffer
+
+    @classmethod
+    def deserialize_table_header(cls, buffer):
+        column_info, buffer = ColumnInfo.deserialize(buffer)
+        return column_info, buffer
+
+    def deserialize_block_header(self, buffer):
+        pass
+
+    @classmethod
+    def deserialize_data(self, column_info, num_records, buffer):
+        return ColumnData.deserialize(
+            column_info,
+            num_records,
+            buffer
+        )
 
     def describe(self):
         self.column_info.describe()
@@ -250,9 +294,6 @@ class Table(object):
         return struct.pack(">4s", constants.MAGIC_NUMBER)
 
     def serialize_header(self):
-        # TODO: You stopped here. Columns are encodable, we just need to
-        # wrap up the column headers and figure out what the table header
-        # looks like...
         packed_bytes = bytearray()
 
         num_columns = len(self.columns)
@@ -266,18 +307,21 @@ class Table(object):
         packed_bytes.extend(struct.pack(">i", num_rows))
 
         for column in self.columns:
-            header_bytes = column.serialize_header()
+            header_bytes = column.serialize_table_header()
             packed_bytes.extend(header_bytes)
 
         return packed_bytes
 
     def serialize(self):
-        # TODO : Prep table (encode + compress) first so that
-        #        we can actually know what the column offset is
-
-        raw_bytes = {}
-        for column in self.columns:
-            buffer = column.serialize_data()
+        # Serialize data buffers before we serialize the headers so that
+        # we can determine column offsets correctly
+        data_buffer = bytearray()
+        for i, column in enumerate(self.columns):
+            # includes block header + page data
+            column_buffer = column.serialize_data()
+            buflen = len(column_buffer)
+            column.finalize(buflen)
+            data_buffer.extend(column_buffer)
 
         packed_bytes = pack([
             # magic number
@@ -287,12 +331,7 @@ class Table(object):
             self.serialize_header()
         ])
 
-        for column in self.columns:
-            block_header = column.serialize_block_header()
-            packed_bytes.extend(block_header)
-
-            column_bytes = column.serialize_column()
-            packed_bytes.extend(column_bytes)
+        packed_bytes.extend(data_buffer)
 
         return packed_bytes
 
@@ -308,24 +347,40 @@ class Table(object):
         return num_columns, num_rows, buffer
 
     @classmethod
+    def deserialize_column_headers(cls, num_columns, buffer):
+        column_info_list = []
+        for i in range(num_columns):
+            column_info, buffer = Column.deserialize_table_header(buffer)
+            column_info_list.append(column_info)
+
+        return column_info_list, buffer
+
+    @classmethod
     def deserialize(cls, buffer):
         num_columns, num_rows, buffer = cls.deserialize_header(buffer)
+        column_info_list, buffer = cls.deserialize_column_headers(num_columns, buffer)
 
-        column_header_info = []
-        # We only have partial info so far...
-        # Alternatively, could jump ahead to column data?
-        # Maybe with a pointer into the buffer?
-        # not sure...
-        for i in range(num_columns):
-            column_info, buffer = Column.deserialize_header(buffer)
-            column_header_info.append(column_info)
+        # buffer is now at the start of the data pages. Find the relevant span
+        # in the buffer by picking the bytes between the start of the buffer
+        # and the beginning of the next data page
+        columns = []
+        start = 0
+        for column_info in column_info_list:
+            end = start + column_info.column_data_size
 
-        for column_info in column_header_info:
-            column_data, buffer = Column.deserialize_column(
-                column,
+            data_buffer = buffer[start:end]
+
+            column_data = Column.deserialize_data(
+                column_info,
                 num_rows,
-                buffer
+                data_buffer
             )
-            column.data = column_data
+
+            columns.append(Column(
+                column_info=column_info,
+                column_data=column_data
+            ))
+
+            start = end
 
         return Table(columns)

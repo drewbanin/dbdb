@@ -1,12 +1,91 @@
 
 from dbdb.files.types import DataEncoding, DataType
+from dbdb.files import compressor
 from itertools import chain
 import struct
 
 
 # In bytes
 # PAGE_SIZE = 8000
-PAGE_SIZE = 50
+PAGE_SIZE = 8000
+
+
+def rle_encode(iterable, max_repeats=255):
+    # Returns a bytearray containing a representation of the RLE
+    # encoded data.
+
+    index = 0
+    encoded = []
+    while index < len(iterable):
+        repeated = 1
+        this_element = iterable[index]
+
+        for j, next_element in enumerate(iterable[index + 1:]):
+            if next_element == this_element and repeated < max_repeats:
+                repeated += 1
+            else:
+                break
+
+        index = index + repeated
+        encoded.append((repeated, this_element))
+    return encoded
+
+
+def encode_null_bitmap(data):
+    # Big idea: create a bitmap where each bit indicates if the value is
+    # null or present. Null elements are popped out of the dataset and are
+    # not represented in the data page in this file format
+
+    bitmap = bytearray()
+    without_nulls = []
+
+    # TODO: Actually RLE this data... that feels hard and confusing haha
+    # null_bitfield = [0 if el is None else 1 for el in data]
+
+    byte_size = 8
+    for byte_index in range(0, len(data), byte_size):
+        block = data[byte_index:byte_index+byte_size]
+
+        byte = 0
+        for bit_index, element in enumerate(block):
+            present = (element is not None)
+            if present:
+                place = 2 ** bit_index
+                byte = byte | place
+                without_nulls.append(element)
+
+        (byte_p,) = struct.pack(">B", byte)
+        bitmap.append(byte_p)
+
+    return bitmap, without_nulls
+
+
+def decode_null_bitmap(bitfield_buffer, data, num_records):
+    with_nulls = []
+
+    bitfield_bytes = struct.iter_unpack(">B", bitfield_buffer)
+
+    byte_size = 8
+    element_index = 0
+    elements_created = 0
+    for (byte,) in bitfield_bytes:
+        for bit_index in range(byte_size):
+            place = 2 ** bit_index
+            present = (byte & place)
+
+            elements_created += 1
+            if present:
+                with_nulls.append(data[element_index])
+                element_index += 1
+            else:
+                with_nulls.append(None)
+
+            # Make sure that we don't encode Nulls at the end of the buffer
+            # for unset bits
+            if elements_created >= num_records:
+                break
+
+    return with_nulls
 
 
 class DataEncoder:
@@ -17,7 +96,7 @@ class DataEncoder:
     def col_type(self):
         return self.column_info.column_type
 
-    def as_pages(self, data):
+    def chunk_to_pages(self, data):
         column_size = DataType.size(
             self.column_info.column_type,
             self.column_info.column_width
@@ -44,8 +123,10 @@ class DataEncoder:
             page_start = i + 4
             page_end = page_start + page_size
             # Read page_size_p bytes from buffer. This is a page
-            page_data = buffer[page_start:page_end]
-            page_buffers.append(page_data)
+            compressed_page_data = buffer[page_start:page_end]
+
+            decompressed = self.decompress_page(compressed_page_data)
+            page_buffers.append(decompressed)
 
             i = page_end
 
@@ -57,6 +138,14 @@ class DataEncoder:
     def _decode(self, page):
         raise NotImplementedError()
 
+    def compress_page(self, page):
+        compression_type = self.column_info.compression
+        return compressor.compress(compression_type, page)
+
+    def decompress_page(self, page):
+        compression_type = self.column_info.compression
+        return compressor.decompress(compression_type, page)
+
     def format_page(self, pages):
         # Pages is a list of bytearrays
         # Write page header here....
@@ -64,26 +153,73 @@ class DataEncoder:
         buffer = bytearray()
 
         for page in pages:
-            page_size = len(page)
+            # Compress first so that we know the page size
+            compressed = self.compress_page(page)
+
+            page_size = len(compressed)
             page_size_p = struct.pack('>i', page_size)
             buffer.extend(page_size_p)
-
-            buffer.extend(page)
+            buffer.extend(compressed)
 
         return buffer
+
+    def encode_bitfield(self, bitfield_buffer, data_buffer):
+        # bitfield_buffer is a packed bytearray of present bits
+        # data_buffer is a packed bytearray of data
+        # Idea: store an int32 (dumb) representing the bitfield...
+        #   how many slots does that give us? int32 = 32 bits... so that's not good...
+        #   but: we do want to RLE encode this data... but in the worst case there is
+        #   going to be one bit per entry.... so i guess the number of bytes needed
+        #   is actually going to be $data_length / 8? I guess we can swing that... sucks tho
+        # Alternatively: can just store the lenght of the bitfield in bytes as a header. prolly
+        # the right move for the time being.... costs 4 bytes but is way simpler...
+        buffer = bytearray()
+
+        bitfield_size = len(bitfield_buffer)
+        bitfield_size_p = struct.pack(">i", bitfield_size)
+
+        buffer.extend(bitfield_size_p)
+        buffer.extend(bitfield_buffer)
+        buffer.extend(data_buffer)
+        return buffer
+
+    def decode_bitfield(self, buffer):
+        # first int32 is size of bitfield
+        # then bitfield
+        # then data
+
+        (bitfield_size,) = struct.unpack_from(">i", buffer, 0)
+        bitfield_buffer = buffer[4:4+bitfield_size]
+        data_buffer = buffer[4+bitfield_size:]
+
+        return bitfield_buffer, data_buffer
 
     def encode(self, data):
         self.validate()
 
-        pages = self.as_pages(data)
-        return self.format_page([self._encode(page) for page in pages])
+        chunked = self.chunk_to_pages(data)
+
+        pages = []
+        for page_data in chunked:
+            bitfield, present_data = encode_null_bitmap(page_data)
+            encoded = self._encode(present_data)
+            encoded_with_bitfield = self.encode_bitfield(bitfield, encoded)
+            pages.append(encoded_with_bitfield)
+
+        return self.format_page(pages)
 
     def decode(self, num_records, buffer):
         self.validate()
 
         pages = self.from_pages(buffer)
-        flat = chain.from_iterable([self._decode(page) for page in pages])
-        return list(flat)
+        flat = []
+        for page in pages:
+            bitfield_buffer, data_buffer = self.decode_bitfield(page)
+            decoded = self._decode(data_buffer)
+            with_nulls = decode_null_bitmap(bitfield_buffer, decoded, num_records)
+            flat.extend(with_nulls)
+
+        return flat
 
     def valid_type(self):
         return True
@@ -147,6 +283,7 @@ class RunLengthEncoder(DataEncoder):
             self.column_info.column_type,
             self.column_info.column_width
         )
+
         pack_f = f'>B{pack_string}'
 
         # Loop over page and encode values
@@ -159,7 +296,12 @@ class RunLengthEncoder(DataEncoder):
 
             for j in range(1, num_records - i):
                 next_element = data[i + j]
-                if next_element == this_element:
+                # Store up to 255 repeated values... if we uncapped this
+                # then the number of repeated elements in the RLE encoding
+                # would exceed the amount of data we can store in the counter
+                # byte. That would be ok if we used an int32, but it would take
+                # up more space than we want, especially for random data
+                if next_element == this_element and repeated < 255:
                     repeated += 1
                 else:
                     break
