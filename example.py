@@ -3,10 +3,14 @@
 import datetime
 import time
 import hexdump
+import random
+
 
 from dbdb.files.file_format import (
     Table,
     Column,
+    ColumnInfo,
+    ColumnData
 )
 from dbdb.files.types import (
         DataType,
@@ -17,51 +21,47 @@ from dbdb.files.types import (
 from dbdb.lang import lang
 
 
-sample_data = [2, 7, 3, 9, 1]
-col1 = Column(
-    name='my_number',
-    data_type=DataType.INT8,
-    encoding=DataEncoding.RAW,
-    is_sorted=DataSorting.SORTED,
+sample_data = list(range(100))
+col1 = Column.new(
+    column_name='my_number',
+    column_type=DataType.INT8,
+    encoding=DataEncoding.RUN_LENGTH,
+    sorting=DataSorting.SORTED,
     data=sample_data
 )
 
-col2 = Column(
-    name='is_odd',
-    data_type=DataType.BOOL,
+col2 = Column.new(
+    column_name='is_odd',
+    column_type=DataType.BOOL,
     encoding=DataEncoding.RAW,
-    is_sorted=DataSorting.UNSORTED,
+    sorting=DataSorting.UNSORTED,
     data=list(i % 2 for i in sample_data)
 )
 
-col3 = Column(
-    name='my_time',
-    data_type=DataType.DATE,
-    encoding=DataEncoding.RAW,
-    is_sorted=DataSorting.UNSORTED,
-    data=[
-        int(time.mktime(datetime.date(2022, 1, 1).timetuple())),
-        int(time.mktime(datetime.date(2022, 1, 2).timetuple())),
-        int(time.mktime(datetime.date(2022, 1, 3).timetuple())),
-        int(time.mktime(datetime.date(2022, 1, 4).timetuple())),
-        int(time.mktime(datetime.date(2022, 1, 5).timetuple())),
 
-    ]
+def make_date(i):
+    day = datetime.date(2022, 1, 1) + datetime.timedelta(i)
+    return int(time.mktime(day.timetuple()))
+
+
+col3 = Column.new(
+    column_name='my_time',
+    column_type=DataType.DATE,
+    encoding=DataEncoding.DELTA,
+    sorting=DataSorting.UNSORTED,
+    data=[make_date(i) for i in sample_data],
 )
 
-col4 = Column(
-    name='my_string',
-    data_type=DataType.STR,
-    encoding=DataEncoding.RAW,
-    is_sorted=DataSorting.UNSORTED,
-    data=[
-        "abc",
-        "def",
-        "ghi",
-        "jkl",
-        "mno",
-    ]
+words = ['abc', 'def', 'ghi']
+col4 = Column.new(
+    column_name='my_string',
+    column_type=DataType.STR,
+    column_width=5,
+    encoding=DataEncoding.DICTIONARY,
+    sorting=DataSorting.UNSORTED,
+    data=[random.choice(words) for i in sample_data],
 )
+
 
 table = Table(
     columns=[col1, col2, col3, col4],

@@ -5,14 +5,14 @@ Describe file format here...
 
 
 import struct
-import hexdump
 from dbdb.files.types import (
     DataType,
     DataEncoding,
     DataSorting
 )
 
-from dbdb.files.constants import MAGIC_NUMBER
+from dbdb.files import constants
+from dbdb.files import encoder, compressor
 
 
 def sort_together(sort_index, to_sort):
@@ -27,25 +27,117 @@ def chomp(pack_s, buffer, unpack_single=True):
     return res, buffer[size:]
 
 
-class Column(object):
+def pack(self, buffers):
+    to_ret = bytearray()
+
+    for buf in buffers:
+        to_ret.extend(buf)
+
+    return to_ret
+
+
+class ColumnInfo(object):
     def __init__(
         self,
-        name,
-        data_type,
-        encoding,
-        is_sorted,
-        data=None,
-        min_val=None,
-        max_val=None
-    ):
-        self.name = name
-        self.data_type = data_type
-        self.encoding = encoding
-        self.is_sorted = is_sorted
+        column_type,
+        column_name,
 
+        encoding=None,
+        sorting=None,
+        column_width=None,
+        column_offset=None
+    ):
+        self.column_type = column_type
+
+        if self.column_type == DataType.STR and column_width > 0:
+            self.column_width = column_width
+        elif self.column_type == DataType.STR:
+            self.column_width = DataType.DEFAULT_STRING_SIZE
+        else:
+            self.column_width = 0
+
+        self.encoding = encoding or DataEncoding.RAW
+        self.sorting = sorting or DataSorting.UNSORTED
+
+        # TODO: Column compression?
+
+        self.column_offset = column_offset
+        self.column_name = column_name
+
+    def serialize(self):
+        return pack([
+            # data type
+            struct.pack(">c", self.column_type.as_byte()),
+
+            # data type width
+            struct.pack(">i", self.column_width),
+
+            # column encoding
+            struct.pack(">c", self.encoding.as_byte()),
+
+            # Column sorting
+            struct.pack(">?", self.sorting.value),
+
+            # column data offset in file
+            struct.pack(">i", self.column_offset),
+
+            # column name
+            struct.pack(">16s", bytes(self.column_name, 'ascii')),
+        ])
+
+    @classmethod
+    def deserialize(cls, buffer):
+        # data type
+        column_type, buffer = chomp(">c", buffer)
+
+        # data type width
+        column_width = chomp(">i", buffer)
+
+        # column encoding
+        encoding, buffer = chomp(">c", buffer)
+
+        # Column sorting
+        sorting, buffer = chomp(">?", buffer)
+
+        # column data offset in file
+        column_offset, buffer = chomp(">i", buffer)
+
+        # column name
+        column_name, buffer = chomp(">16s", buffer)
+        column_name = column_name.decode('ascii').strip('\x00')
+
+        return cls(
+            column_type=DataType(column_type),
+            column_width=column_width,
+            encoding=DataEncoding(encoding),
+            sorting=DataSorting(sorting),
+            column_offset=column_offset,
+            column_name=column_name
+        )
+
+    def serialize_stats(self, min_val, max_val):
+        if self.column_type.supports_column_stats():
+            p_min_max = struct.pack(">ii", min_val, max_val)
+        else:
+            p_min_max = struct.pack(">8x")
+
+        return p_min_max
+
+    def is_sorted(self):
+        return self.sorting == DataSorting.SORTED
+
+    def describe(self):
+        print(f"Column {self.column_name}")
+        print(f"  - Type={self.column_type} ({self.column_type.value})")
+        print(f"  - Encoding={self.encoding} ({self.encoding.value})")
+        print(f"  - Sorted?={self.sorting} ({self.sorting.value})")
+
+
+class ColumnData(object):
+    def __init__(self, data):
         self.data = data
-        self.min_val = min_val
-        self.max_val = max_val
+
+        self.serialize_buffer = bytearray()
 
     def sort_by(self, sort_index):
         # this mutates the order of self.data
@@ -54,145 +146,113 @@ class Column(object):
     def size(self):
         return len(self.data)
 
-    def serialize_header(self):
+    def serialize(self, column_info):
+        # Can we compress here? Does that have to happen inside the encoder?
+        # Don't think i can just compress this blob b/c i won't know where
+        # the page starts and ends! I think that I should compress/decompress
+        # each page, but retain the uncompressed column header
+        encoded = encoder.encode(column_info, self.data)
+
+        # compressed = compressor.compress(column_info, encoded)
+        return encoded
+
+    @classmethod
+    def deserialize(cls, column_info, num_records, buffer):
+        # decompressed = compressor.decompress(column_info, decoded)
+        decoded = encoder.decode(column_info, num_records, buffer)
+        return decoded
+
+    def describe(self):
+        print(f"  - Size={self.size()}")
+        print(f"  - Data={list(self.data[0:10])}")
+
+
+class Column(object):
+    def __init__(self, column_info, column_data):
+        self.column_info = column_info
+        self.column_data = column_data
+
+    def is_sorted(self):
+        return self.column_info.is_sorted()
+
+    def sort_by(self, sort_index):
+        self.column_data.sort_by(sort_index)
+
+    def size(self):
+        return self.column_data.size()
+
+    def serialize_data(self):
+        return self.column_data.serialize(self.column_info)
+
+    def serialize_block_header(self):
         packed_bytes = bytearray()
 
-        p_column_name = struct.pack(">16s", bytes(self.name, 'ascii'))
-        packed_bytes.extend(p_column_name)
+        # Column start byte - not used, but helpful in hexdump
+        p_column_ident = struct.pack(">1s", constants.COLUMN_IDENT)
+        packed_bytes.extend(p_column_ident)
 
-        p_column_type = struct.pack(">c", self.data_type.as_byte())
-        packed_bytes.extend(p_column_type)
-
-        p_column_encoding = struct.pack(">c", self.encoding.as_byte())
-        packed_bytes.extend(p_column_encoding)
-
-        p_is_sorted = struct.pack(">?", self.is_sorted.value)
-        packed_bytes.extend(p_is_sorted)
-
-        if self.data_type in (DataType.INT8, DataType.INT32):
-            min_val = min(self.data)
-            p_min_val = struct.pack(">i", min_val)
-            packed_bytes.extend(p_min_val)
-
-            max_val = max(self.data)
-            p_max_val = struct.pack(">i", max_val)
-            packed_bytes.extend(p_max_val)
-        else:
-            p_min_max_vals = struct.pack('>8x')
-            packed_bytes.extend(p_min_max_vals)
+        # Min and max of full dataset
+        min_val = min(self.data)
+        max_val = max(self.data)
+        p_min_max = self._serialize_stats(min_val, max_val)
+        packed_bytes.extend(p_min_max)
 
         return packed_bytes
 
+    def describe(self):
+        self.column_info.describe()
+        self.column_data.describe()
+
     @classmethod
-    def deserialize_header(cls, buffer):
-        name, buffer = chomp('>16s', buffer)
-        data_type, buffer = chomp('>B', buffer)
-        encoding, buffer = chomp('>B', buffer)
-        is_sorted, buffer = chomp('>?', buffer)
+    def new(cls, **kwargs):
+        data = kwargs.pop('data', None)
 
-        # Only valid if sortable, still want to eat bytes though
-        if data_type in (DataType.INT8, DataType.INT32):
-            min_val, buffer = chomp('>i', buffer)
-            max_val, buffer = chomp('>i', buffer)
-        else:
-            _, buffer = chomp('>8x', buffer)
-            min_val = 0
-            max_val = 0
-
-        column = cls(
-            name.decode('ascii').strip('\x00'),
-            DataType(data_type),
-            DataEncoding(encoding),
-            DataSorting(is_sorted),
-            data=None,
-            min_val=min_val,
-            max_val=max_val
+        return cls(
+            column_info=ColumnInfo(**kwargs),
+            column_data=ColumnData(data)
         )
-
-        return column, buffer
-
-    def serialize_column(self):
-        size = len(self.data)
-
-        if self.data_type == DataType.BOOL:
-            packed = struct.pack(f'>{size}?', *self.data)
-        elif self.data_type == DataType.INT8:
-            packed = struct.pack(f'>{size}B', *self.data)
-        elif self.data_type == DataType.INT32:
-            packed = struct.pack(f'>{size}i', *self.data)
-        elif self.data_type == DataType.DATE:
-            packed = struct.pack(f'>{size}i', *self.data)
-        elif self.data_type == DataType.STR:
-            # strings, being annoying
-            # for now, pad all strings to 8 bytes (lol)
-            packed = bytearray()
-            for string in self.data:
-                buf = struct.pack('>8s', string.encode())
-                packed.extend(buf)
-
-        else:
-            raise RuntimeError(f"Could not encode type: {self.data_type}")
-
-        return packed
-
-    @classmethod
-    def deserialize_column(cls, column, num_rows, buffer):
-        size = num_rows
-        if column.data_type == DataType.BOOL:
-            data, buffer = chomp(f'>{size}?', buffer, False)
-        elif column.data_type == DataType.INT8:
-            data, buffer = chomp(f'>{size}B', buffer, False)
-        elif column.data_type == DataType.INT32:
-            data, buffer = chomp(f'>{size}i', buffer, False)
-        elif column.data_type == DataType.DATE:
-            data, buffer = chomp(f'>{size}i', buffer, False)
-        elif column.data_type == DataType.STR:
-            # strings, being annoying
-            # for now, unpack all strings to 8 bytes (lol)
-            #   and stop @ 0x00
-            data = []
-            for i in range(size):
-                val, buffer = chomp('>8s', buffer)
-                val_s = val.decode().strip("\x00")
-                data.append(val_s)
-        else:
-            raise RuntimeError(f"Could not encode type: {column.data_type}")
-
-        return data, buffer
 
 
 class Table(object):
     def __init__(self, columns):
         self.columns = columns
 
+        sort_column = self.get_sort_column(columns)
+        self.sort_columns_in_place(sort_column)
+
+    def sort_columns_in_place(self, sort_column):
+        if sort_column is None:
+            return
+
+        numbers = list(range(sort_column.size()))
+        sort_index = sort_together(sort_column.column_data.data, numbers)
+
+        for column in self.columns:
+            column.sort_by(sort_index)
+
+    def get_sort_column(self, columns):
         # find the sort column if one is specified
         sort_column = None
         for i, column in enumerate(columns):
-            do_sort = column.is_sorted == DataSorting.SORTED
+            do_sort = column.is_sorted()
             if do_sort and sort_column:
                 raise RuntimeError("Cannot sort by more than one column")
             elif do_sort:
                 sort_column = column
 
-        numbers = list(range(len(sort_column.data)))
-        sort_index = sort_together(sort_column.data, numbers)
-
-        for column in columns:
-            column.sort_by(sort_index)
+        return sort_column
 
     def describe(self):
         for col in self.columns:
-            print(f"Column {col.name}")
-            print(f"  - Type={col.data_type} ({col.data_type.value})")
-            print(f"  - Encoding={col.encoding} ({col.encoding.value})")
-            print(f"  - Sorted?={col.is_sorted} ({col.is_sorted.value})")
-            print(f"  - Size={col.size()}")
-            print(f"  - Data={list(col.data[0:10])}")
+            col.describe()
 
     def magic_number(self):
-        return struct.pack(">4s", MAGIC_NUMBER)
+        return struct.pack(">4s", constants.MAGIC_NUMBER)
 
     def serialize_header(self):
+        # TODO: You stopped here. Columns are encodable, we just need to
+        # wrap up the column headers and figure out what the table header
+        # looks like...
         packed_bytes = bytearray()
 
         num_columns = len(self.columns)
@@ -212,11 +272,25 @@ class Table(object):
         return packed_bytes
 
     def serialize(self):
-        packed_bytes = bytearray()
-        packed_bytes.extend(self.magic_number())
-        packed_bytes.extend(self.serialize_header())
+        # TODO : Prep table (encode + compress) first so that
+        #        we can actually know what the column offset is
+
+        raw_bytes = {}
+        for column in self.columns:
+            buffer = column.serialize_data()
+
+        packed_bytes = pack([
+            # magic number
+            self.magic_number(),
+
+            # table header
+            self.serialize_header()
+        ])
 
         for column in self.columns:
+            block_header = column.serialize_block_header()
+            packed_bytes.extend(block_header)
+
             column_bytes = column.serialize_column()
             packed_bytes.extend(column_bytes)
 
@@ -226,7 +300,7 @@ class Table(object):
     def deserialize_header(cls, buffer):
         magic_number, buffer = chomp('>4s', buffer)
 
-        if magic_number != MAGIC_NUMBER:
+        if magic_number != constants.MAGIC_NUMBER:
             raise RuntimeError(f"Bad magic number: {magic_number}")
 
         num_columns, buffer = chomp('>i', buffer)
@@ -237,12 +311,16 @@ class Table(object):
     def deserialize(cls, buffer):
         num_columns, num_rows, buffer = cls.deserialize_header(buffer)
 
-        columns = []
+        column_header_info = []
+        # We only have partial info so far...
+        # Alternatively, could jump ahead to column data?
+        # Maybe with a pointer into the buffer?
+        # not sure...
         for i in range(num_columns):
-            column, buffer = Column.deserialize_header(buffer)
-            columns.append(column)
+            column_info, buffer = Column.deserialize_header(buffer)
+            column_header_info.append(column_info)
 
-        for column in columns:
+        for column_info in column_header_info:
             column_data, buffer = Column.deserialize_column(
                 column,
                 num_rows,
