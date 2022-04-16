@@ -43,7 +43,7 @@ class DataType(BinEnum):
         elif data_type == DataType.STR:
             pack_f = f'{packed_size}s'
         elif data_type == DataType.DATE:
-            pack_f = 'i'
+            pack_f = 'I'
 
         return pack_f
 

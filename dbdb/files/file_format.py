@@ -166,6 +166,8 @@ class ColumnData(object):
     def size(self):
         return len(self.data)
 
+    # TODO : Handle struct errors here (eg. value too large)
+    #        or value of wrong type
     def serialize(self, column_info):
         return encoder.encode(column_info, self.data)
 
@@ -412,10 +414,8 @@ class Table(object):
         yield from encoder.iter_decode(fh, column, num_records, start, end)
 
 
-# How do we get this to only read the header? I suppose that's a fixed size,
-# so we can just read that many bytes from the file? that works....
-def read_pages(table_ref, columns):
-    with open(table_ref, 'rb') as fh:
+def read_pages(reader, columns):
+    with reader.open() as fh:
         column_info_list, num_rows = Table.read_header(fh)
 
         start = 0

@@ -8,12 +8,15 @@ from dbdb.operators.file_operator import (
 
 config = TableScanConfig(
     table_ref='my_table.dumb',
-    columns=['my_number', 'my_time'],
-    limit=5
-
+    columns=['my_time'],
+    limit=5,
+    #order=(0, -1)
 )
+
 operator = TableScan(config)
 
 for row in operator.run():
     print(row)
 
+
+print(operator.cache)

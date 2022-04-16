@@ -226,14 +226,22 @@ class DataEncoder:
         return flat
 
     def iter_pages(self, fh, start, end):
-        fh.seek(start)
-        while fh.tell() < end:
+        pos = start
+        while pos < end:
+            fh.seek(pos)
             # Read number of bytes in page
             buffer = fh.read(4)
             (page_size, ) = struct.unpack('>i', buffer)
 
             # Advance past page_size
             buffer = fh.read(page_size)
+
+            # Kind of a hack to make sure that other iterators which
+            # use this file handle don't throw us off of our pointer
+            # TODO: Would it be smarter to use one file handler per
+            # column? That might be better if the data is coming from
+            # a remote system over the network....
+            pos = fh.tell()
 
             decompressed = self.decompress_page(buffer)
             yield decompressed
@@ -395,7 +403,6 @@ class DeltaEncoder(DataEncoder):
             buffer.extend(packed)
 
             i += 1
-
         # Observation: our deltas are still ints, so... lol
         # did this help?
         # Think i need to figure out Simple-8b
