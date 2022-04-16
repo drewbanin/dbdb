@@ -419,11 +419,11 @@ def read_pages(reader, columns):
         column_info_list, num_rows = Table.read_header(fh)
 
         start = 0
-        selected = []
+        selected = {}
         for column_info in column_info_list:
             end = start + column_info.column_data_size
             if column_info.column_name in columns:
-                selected.append((start, end, column_info))
+                selected[column_info.column_name] = (start, end, column_info)
 
             start = end
 
@@ -432,7 +432,8 @@ def read_pages(reader, columns):
         # file pointer is now at the end of the column header...
         # start simple, yield one page from each column at a time....
         page_iterators = []
-        for (start, end, column) in selected:
+        for col_name in columns:
+            (start, end, column) = selected[col_name]
             iterator = Table.iter_pages(
                 fh,
                 column,
