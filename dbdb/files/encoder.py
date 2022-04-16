@@ -112,8 +112,6 @@ class DataEncoder:
         return pages
 
     def from_pages(self, buffer):
-        page_buffers = []
-
         i = 0
         while i < len(buffer):
             # Read number of bytes in page
@@ -123,14 +121,15 @@ class DataEncoder:
             page_start = i + 4
             page_end = page_start + page_size
             # Read page_size_p bytes from buffer. This is a page
+
+            # TODO: Will this work with a file pointer? prolly now?
+            # can we read from a buffer?
             compressed_page_data = buffer[page_start:page_end]
 
             decompressed = self.decompress_page(compressed_page_data)
-            page_buffers.append(decompressed)
+            yield decompressed
 
             i = page_end
-
-        return page_buffers
 
     def _encode(self, page):
         raise NotImplementedError()
@@ -211,15 +210,46 @@ class DataEncoder:
     def decode(self, num_records, buffer):
         self.validate()
 
-        pages = self.from_pages(buffer)
         flat = []
-        for page in pages:
+        for page in self.from_pages(buffer):
             bitfield_buffer, data_buffer = self.decode_bitfield(page)
             decoded = self._decode(data_buffer)
-            with_nulls = decode_null_bitmap(bitfield_buffer, decoded, num_records)
+            # TODO : I don't think i did this right... it should be #
+            # of records in a page, not number of records in one column.
+            with_nulls = decode_null_bitmap(
+                bitfield_buffer,
+                decoded,
+                num_records
+            )
             flat.extend(with_nulls)
 
         return flat
+
+    def iter_pages(self, fh, start, end):
+        fh.seek(start)
+        while fh.tell() < end:
+            # Read number of bytes in page
+            buffer = fh.read(4)
+            (page_size, ) = struct.unpack('>i', buffer)
+
+            # Advance past page_size
+            buffer = fh.read(page_size)
+
+            decompressed = self.decompress_page(buffer)
+            yield decompressed
+
+    def iter_decode(self, fh, num_records, start, end):
+        self.validate()
+
+        for page in self.iter_pages(fh, start, end):
+            bitfield_buffer, data_buffer = self.decode_bitfield(page)
+            decoded = self._decode(data_buffer)
+            with_nulls = decode_null_bitmap(
+                bitfield_buffer,
+                decoded,
+                num_records
+            )
+            yield from with_nulls
 
     def valid_type(self):
         return True
@@ -504,3 +534,8 @@ def encode(column_info, data):
 def decode(column_info, num_records, buffer):
     encoder = get_encoder(column_info)
     return encoder.decode(num_records, buffer)
+
+
+def iter_decode(fh, column_info, num_records, start, end):
+    encoder = get_encoder(column_info)
+    yield from encoder.iter_decode(fh, num_records, start, end)

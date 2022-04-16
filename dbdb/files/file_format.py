@@ -65,6 +65,12 @@ class ColumnInfo(object):
         self.column_data_size = column_data_size
         self.column_name = column_name
 
+    @classmethod
+    def serialized_size(cls):
+        # TODO Ideally this is a constant / not hardcoded...
+        # Just calculated as size of stuff in the header...
+        return 28
+
     def serialize(self):
         if self.column_data_size is None:
             raise RuntimeError(
@@ -161,20 +167,18 @@ class ColumnData(object):
         return len(self.data)
 
     def serialize(self, column_info):
-        # Can we compress here? Does that have to happen inside the encoder?
-        # Don't think i can just compress this blob b/c i won't know where
-        # the page starts and ends! I think that I should compress/decompress
-        # each page, but retain the uncompressed column header
-        encoded = encoder.encode(column_info, self.data)
-
-        # compressed = compressor.compress(column_info, encoded)
-        return encoded
+        return encoder.encode(column_info, self.data)
 
     @classmethod
     def deserialize(cls, column_info, num_records, buffer):
-        # decompressed = compressor.decompress(column_info, decoded)
         decoded = encoder.decode(column_info, num_records, buffer)
         return cls(decoded)
+
+    @classmethod
+    def read_page(cls, column_info, num_rows, buffer):
+        decoder = encoder.iter_decode(column_info, num_rows, buffer)
+        for res in decoder:
+            yield res
 
     def describe(self):
         print(f"  - Size={self.size()}")
@@ -384,3 +388,59 @@ class Table(object):
             start = end
 
         return Table(columns)
+
+    @classmethod
+    def read_header(cls, fh):
+        # TODO: Ideally this is a constant / stored somewhere..
+        table_header_size = 12
+        buffer = fh.read(table_header_size)
+        num_columns, num_rows, buffer = cls.deserialize_header(buffer)
+
+        column_header_size = ColumnInfo.serialized_size()
+        bytes_to_read = column_header_size * num_columns
+
+        buffer = fh.read(bytes_to_read)
+        column_info_list, buffer = cls.deserialize_column_headers(
+            num_columns,
+            buffer
+        )
+
+        return column_info_list, num_rows
+
+    @classmethod
+    def iter_pages(cls, fh, column, num_records, start, end):
+        yield from encoder.iter_decode(fh, column, num_records, start, end)
+
+
+# How do we get this to only read the header? I suppose that's a fixed size,
+# so we can just read that many bytes from the file? that works....
+def read_pages(table_ref, columns):
+    with open(table_ref, 'rb') as fh:
+        column_info_list, num_rows = Table.read_header(fh)
+
+        start = 0
+        selected = []
+        for column_info in column_info_list:
+            end = start + column_info.column_data_size
+            if column_info.column_name in columns:
+                selected.append((start, end, column_info))
+
+            start = end
+
+        data_start = fh.tell()
+
+        # file pointer is now at the end of the column header...
+        # start simple, yield one page from each column at a time....
+        page_iterators = []
+        for (start, end, column) in selected:
+            iterator = Table.iter_pages(
+                fh,
+                column,
+                num_rows,
+                data_start + start,
+                data_start + end,
+            )
+
+            page_iterators.append(iterator)
+
+        yield from zip(*page_iterators)
