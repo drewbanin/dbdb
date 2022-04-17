@@ -1,26 +1,65 @@
 
-from collections import namedtuple
 import tabulate
+from typing import NamedTuple
+
+
+class RowTuple:
+    def __init__(self, fields, data):
+        self.fields = fields
+
+        if isinstance(data, RowTuple):
+            self.data = data.data
+        elif isinstance(data, (tuple, list)):
+            self.data = data
+        else:
+            print(type(data))
+            raise RuntimeError("bad input to RowTuple")
+
+    def field(self, name):
+        found = None
+        for i, f in enumerate(self.fields):
+            if f.name == name and found is not None:
+                raise RuntimeError("Ambiguous column")
+            elif f.name == name:
+                found = i
+
+        if found is None:
+            raise RuntimeError(f"field {name} not found in table")
+
+        return self.data[found]
+
+    def index(self, index):
+        return self.data[index]
+
+    def merge(self, other):
+        return RowTuple(
+            fields=self.fields + other.fields,
+            data=tuple(list(self.data) + list(other.data))
+        )
+
+    def as_tuple(self):
+        return tuple(self.data)
 
 
 class Rows:
-    def __init__(self, fields, iterator):
+    def __init__(self, fields, iterator, table):
         self.fields = fields
-        self.Row = namedtuple('Row', self.fields)
-
-        self.data = None
-
         self.iterator = iterator
+        self.table = table
+        self.data = None
 
     def __iter__(self):
         return self
 
     def __next__(self):
         record = next(self.iterator)
-        return self.Row._make(record)
+        return self._make_row(record)
+
+    def _make_row(self, record):
+        return RowTuple(self.fields, record)
 
     def new(self, iterator):
-        return Rows(self.fields, iterator)
+        return Rows(self.fields, iterator, self.table)
 
     def nulls(self):
         return (None,) * len(self.fields)
@@ -35,31 +74,34 @@ class Rows:
                 "Cannot merge rowsets from an empty list"
             )
 
-        combined = row_objs[0].fields
-        for row in row_objs[1:]:
-            combined += row.fields
+        fields = []
+        for row in row_objs:
+            for field in row.fields:
+                scoped = row.table.scope(field)
+                fields.append(scoped)
 
-        return Rows(combined, iterator)
-
-    @classmethod
-    def merge_rows(cls, ltuple, rtuple):
-        fields = ltuple._fields + rtuple._fields
-        Row = namedtuple('Row', fields)
-
-        return Row(*ltuple, *rtuple)
+        return Rows(fields, iterator, table=None)
 
     def materialize(self):
         if not self.data:
-            self.data = [self.Row._make(row) for row in self.iterator]
+            self.data = tuple([self._make_row(row) for row in self.iterator])
 
         return self.data
 
-    def display(self):
+    def display(self, num_rows=10):
         # We need to materialize the iterator otherwise
         # printing the table will consume all rows :/
         data = self.materialize()
+        raw = tuple([r.data for r in data])
+
+        if num_rows is not None:
+            to_print = raw[:num_rows]
+        else:
+            to_print = raw
+
+        print("Table:", self.table)
         tbl = tabulate.tabulate(
-            data,
+            to_print,
             headers=self.fields,
             tablefmt='presto'
         )

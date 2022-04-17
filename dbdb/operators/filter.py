@@ -52,5 +52,4 @@ class FilterOperator(Operator):
 
     def run(self, rows):
         iterator = self.make_iterator(rows)
-
-        return Rows(rows.fields, iterator)
+        return rows.new(iterator)

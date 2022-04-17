@@ -33,13 +33,13 @@ class NestedLoopJoinOperator(JoinOperator):
         for lval in lvals:
             included = False
             for rval in rvals:
-                merged = Rows.merge_rows(lval, rval)
+                merged = lval.merge(rval)
                 if self.config.expression.evaluate(merged):
                     included = True
                     yield merged
 
             if not self.config.inner and not included:
-                yield lval + right_values.nulls()
+                yield lval.as_tuple() + right_values.nulls()
 
 
 class HashJoinOperator(JoinOperator):
@@ -74,11 +74,11 @@ class HashJoinOperator(JoinOperator):
                 included = False
                 for rval in rrows:
                     included = True
-                    merged = Rows.merge_rows(lval, rval)
+                    merged = lval.merge(rval)
                     yield merged
 
                 if not self.config.inner and not included:
-                    yield lval + right_values.nulls()
+                    yield lval.as_tuple() + right_values.nulls()
 
 
 class MergeJoinOperator(JoinOperator):

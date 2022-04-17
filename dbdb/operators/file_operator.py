@@ -13,13 +13,18 @@ class TableScanConfig(OperatorConfig):
         self,
         table_ref,
         columns,
+
         limit=None,
         order=None,
+        table=None,
     ):
         self.table_ref = table_ref
-        self.columns = columns
         self.limit = limit
         self.order = order
+
+        self.table = table
+        self.columns = columns
+
 
 class TableScanOperator(Operator):
     Config = TableScanConfig
@@ -37,11 +42,16 @@ class TableScanOperator(Operator):
         self.cache['rows_seen'] = 0
 
         self.reader = FileReader(self.config.table_ref)
+        column_names = [c.name for c in self.config.columns]
 
         tuples = file_format.read_pages(
             reader=self.reader,
-            columns=self.config.columns
+            columns=column_names
         )
 
         iterator = self.make_iterator(tuples)
-        return Rows(self.config.columns, iterator)
+        return Rows(
+            self.config.columns,
+            iterator,
+            table=self.config.table
+        )

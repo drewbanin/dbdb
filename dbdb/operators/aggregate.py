@@ -1,6 +1,7 @@
 from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.operators import functions
 from dbdb.tuples.rows import Rows
+from dbdb.tuples.identifiers import TableIdentifier
 
 import enum
 import itertools
@@ -14,6 +15,8 @@ class Aggregates(enum.Enum):
     COUNT = enum.auto()
     COUNTD = enum.auto()
     LISTAGG = enum.auto()
+
+    SCALAR = enum.auto()
 
 
 _agg_funcs = {
@@ -42,29 +45,19 @@ Identity = object()
 class AggregateConfig(OperatorConfig):
     def __init__(
         self,
-        aggregates,
-        group_by=None,
-        project=None
+        fields,
     ):
-        self.aggregates = aggregates
-
-        # TODO: Validate & all that (where?)
-        if group_by is None:
-            self.group_by = []
-        else:
-            self.group_by = group_by
-
-        self.project = project
+        self.fields = fields
 
 
 class AggregateOperator(Operator):
     Config = AggregateConfig
 
-    def grouping_set(self, values):
+    def grouping_set(self, exprs, values):
         groups = {}
 
         for value in values:
-            key = tuple(expr_f(value) for expr_f in self.config.group_by)
+            key = tuple(expr_f(value) for _, expr_f, _ in exprs)
             if key not in groups:
                 groups[key] = []
 
@@ -75,16 +68,30 @@ class AggregateOperator(Operator):
     def make_iterator(self, grouping):
         for (key, values) in grouping.items():
             result = []
-            for agg, expr in self.config.aggregates:
-                aggregate_func = lookup(agg)
+            scalar_index = 0
+            for agg_type, expr, project in self.config.fields:
+                if agg_type == Aggregates.SCALAR:
+                    result.append(key[scalar_index])
+                    scalar_index += 1
+                else:
+                    aggregate_func = lookup(agg_type)
+                    # res is a scalar value
+                    res = aggregate_func(expr(val) for val in values)
+                    result.append(res)
 
-                # res is a scalar value
-                res = aggregate_func(expr(val) for val in values)
-                result.append(res)
-
-            yield key + tuple(result)
+            print(tuple(result))
+            yield tuple(result)
 
     def run(self, rows):
-        grouping = self.grouping_set(rows)
+        scalars = [p for p in self.config.fields if p[0] == Aggregates.SCALAR]
+        projection = tuple([project for _, _, project in self.config.fields])
+
+        grouping = self.grouping_set(scalars, rows)
         iterator = self.make_iterator(grouping)
-        return Rows(self.config.project, iterator)
+
+        # This gets a temporary name because we do not know the name
+        # of this table... in fact... there is none!? I might need to
+        # think about that more because fields are still scoped to their
+        # parent locations.. which is kind of confusing.... hm....
+        table_identifier = TableIdentifier.temporary()
+        return Rows(projection, iterator, table_identifier)

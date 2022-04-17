@@ -13,21 +13,29 @@ from dbdb.operators.joins import (
 
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
 from dbdb.tuples.rows import Rows
+from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
 from dbdb.expressions import Expression, Equality, EqualityTypes
 
 import itertools
 
 
+table_identifier = TableIdentifier.new("my_table")
+column_names = FieldIdentifier.columns_from(
+    table_identifier,
+    column_names=['my_number', 'is_odd', 'my_string']
+)
+
 op_scan = TableScanOperator(
     table_ref='my_table.dumb',
-    # columns=['is_odd', 'my_time', 'my_number', 'my_string'],
-    columns=['my_number', 'is_odd', 'my_string'],
+    table=table_identifier,
+    columns=column_names,
 )
+
 
 op_filter = FilterOperator(
     predicates=[
         Equality(
-            lexpr=Expression(lambda r: r.is_odd),
+            lexpr=Expression(lambda r: r.field('is_odd')),
             rexpr=Expression(lambda r: True),
             equality=EqualityTypes.EQ
 
@@ -36,7 +44,10 @@ op_filter = FilterOperator(
 )
 
 op_sort = SortOperator(
-    order=(0, True)
+    order=[
+        (True, lambda row: row.index(1)),
+        (False, lambda row: row.index(2)),
+    ]
 )
 
 op_limit = LimitOperator(
@@ -47,41 +58,18 @@ rows = op_scan.run()
 rows = op_filter.run(rows)
 rows = op_limit.run(rows)
 rows = op_sort.run(rows)
+rows = rows.display(10)
 
-# Need to tee the output if feeding forward one
-# stream into multiple different things.. eg. for
-# when we get to joining stuff later...
-
-# TODO: I need to think about how expressions work...
-# can i make an iterator that returns projected values..?
-
-
-def pluck(iterator, index):
-    yield from (row[index] for row in iterator)
-
-
-def tap(iterator):
-    for val in iterator:
-        print(val)
-        yield val
+def ff(name):
+    return FieldIdentifier.field(name)
 
 aggregate_op = AggregateOperator(
-    group_by=[
-        lambda row: row[2]
-    ],
-    aggregates=[
-        (Aggregates.SUM,    lambda row: row[0]),
-        (Aggregates.COUNTD, lambda row: row[0]),
-        (Aggregates.AVG,    lambda row: row[0]),
-        (Aggregates.MAX,    lambda row: row[0]),
-    ],
-    project=[
-        'my_string',
-
-        'the_sum',
-        'the_countd',
-        'the_avg',
-        'the_max',
+    fields=[
+        (Aggregates.SCALAR, lambda row: row.index(2), ff('my_string')),
+        (Aggregates.SUM,    lambda row: row.index(0), ff('my_sum')),
+        (Aggregates.COUNTD, lambda row: row.index(0), ff('my_countd')),
+        (Aggregates.AVG,    lambda row: row.index(0), ff('my_avg')),
+        (Aggregates.MAX,    lambda row: row.index(0), ff('my_max')),
     ]
 )
 
@@ -90,35 +78,47 @@ aggregate_op = AggregateOperator(
 rows = aggregate_op.run(rows)
 
 project_op = ProjectOperator(
-    columns=[
-        (0, 'my_string'),
-        (1, 'my_sum')
+    project=[
+        (
+            lambda row: row.field('my_string'),
+            'my_string'
+        ),
+        (
+            lambda row: row.field('my_sum'),
+            'my_sum'
+        )
     ],
 )
 
 rows = project_op.run(rows)
 
-debug_iter = iter([
+
+table_identifier = TableIdentifier.new("debug")
+debug_column_names = FieldIdentifier.columns_from(
+    table_identifier,
+    column_names=['f1', 'f2']
+)
+
+debug_iter = iter((
     ('abc', 'haha'),
     ('abc', 'cool'),
     ('def', 'neat'),
     ('xyz', 'nooooo'),
-])
-debug = Rows(['f1', 'f2'], debug_iter)
+))
+debug = Rows(debug_column_names, debug_iter, table_identifier)
 
 rows = rows.display()
 debug = debug.display()
 
 r1, r2 = itertools.tee(rows, 2)
-r1_rows = Rows(['my_string', 'my_sum'], r1)
-r2_rows = Rows(['my_string', 'my_sum'], r2)
-
+r1_rows = Rows([ff('my_string'), ff('my_number')], r1, table_identifier)
+r2_rows = Rows([ff('my_string'), ff('my_number')], r2, table_identifier)
 
 join_op = NestedLoopJoinOperator(
     inner=False,
     expression=Equality(
-        lexpr=Expression(lambda r: r.my_string),
-        rexpr=Expression(lambda r: r.f1),
+        lexpr=Expression(lambda r: r.field('my_string')),
+        rexpr=Expression(lambda r: r.field('f1')),
         equality=EqualityTypes.EQ
     )
 )
@@ -129,10 +129,10 @@ print()
 rows.display()
 
 join_op2 = HashJoinOperator(
-    inner=True,
+    inner=False,
     expression=Equality(
-        lexpr=Expression(lambda r: r.my_string),
-        rexpr=Expression(lambda r: r.f1),
+        lexpr=Expression(lambda r: r.field('my_string')),
+        rexpr=Expression(lambda r: r.field('f1')),
         equality=EqualityTypes.EQ
     )
 )
@@ -140,7 +140,10 @@ join_op2 = HashJoinOperator(
 rows = join_op2.run(r2_rows, debug)
 
 op_sort = SortOperator(
-    order=(0, True)
+    order=[
+        (True, lambda row: row.index(1)),
+        (True, lambda row: row.index(0)),
+    ]
 )
 
 rows = op_sort.run(rows)
