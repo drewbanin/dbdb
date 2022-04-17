@@ -22,48 +22,48 @@ from dbdb.files.types import (
 from dbdb.lang import lang
 
 
-# size = int(1_000_000)
-# for (dataset_name, sample_data) in [
-#     #("monotonic", list(range(size))),
-#     ("constant", list(None if i % 17 == 0 else 1 for i in range(size))),
-#     #("random", list(random.randint(1, 1000) for i in range(size))),
-# ]:
-#     for encoding in [
-#         DataEncoding.RAW,
-#         DataEncoding.DELTA,
-#         DataEncoding.RUN_LENGTH,
-#     ]:
-#         for compression in [
-#             DataCompression.RAW,
-#             DataCompression.ZLIB,
-#         ]:
-# 
-#             col = Column.new(
-#                 column_name='my_number',
-#                 column_type=DataType.INT32,
-#                 encoding=encoding,
-#                 compression=compression,
-#                 sorting=DataSorting.SORTED,
-#                 data=sample_data
-#             )
-# 
-#             start = time.time()
-#             ser = col.column_data.serialize(col.column_info)
-#             deser = col.column_data.deserialize(col.column_info, len(sample_data), ser)
-# 
-#             # size for runlength data is:
-#             #   8 bytes per page (count + value)
-#             #   4 bytes per page (page size)
-#             # so, 12 * # pages
-# 
-#             elapsed = (time.time() - start)
-#             print(dataset_name, encoding, compression)
-#             print(f" - size: {len(ser) / 1000:0.2f} kb ({len(ser)} bytes)")
-#             print(f" - time: {elapsed:0.2f} s")
-#             #print(f" - sample: {deser[0:10]}")
-# 
-# import sys
-# sys.exit()
+size = int(1_000_000)
+for (dataset_name, sample_data) in [
+    #("monotonic", list(range(size))),
+    ("constant", list(None if i % 17 == 0 else 1 for i in range(size))),
+    #("random", list(random.randint(1, 1000) for i in range(size))),
+]:
+    for encoding in [
+        DataEncoding.RAW,
+        DataEncoding.DELTA,
+        DataEncoding.RUN_LENGTH,
+    ]:
+        for compression in [
+            DataCompression.RAW,
+            DataCompression.ZLIB,
+        ]:
+
+            col = Column.new(
+                column_name='my_number',
+                column_type=DataType.INT32,
+                encoding=encoding,
+                compression=compression,
+                sorting=DataSorting.SORTED,
+                data=sample_data
+            )
+
+            start = time.time()
+            ser = col.column_data.serialize(col.column_info)
+            deser = col.column_data.deserialize(col.column_info, len(sample_data), ser)
+
+            # size for runlength data is:
+            #   8 bytes per page (count + value)
+            #   4 bytes per page (page size)
+            # so, 12 * # pages
+
+            elapsed = (time.time() - start)
+            print(dataset_name, encoding, compression)
+            print(f" - size: {len(ser) / 1000:0.2f} kb ({len(ser)} bytes)")
+            print(f" - time: {elapsed:0.2f} s")
+            #print(f" - sample: {deser[0:10]}")
+
+import sys
+sys.exit()
 
 sample_data = list(range(1000000))
 col1 = Column.new(

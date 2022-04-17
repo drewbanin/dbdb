@@ -1,4 +1,6 @@
 from dbdb.operators.base import Operator, OperatorConfig
+from dbdb.tuples.rows import Rows
+
 import itertools
 
 
@@ -42,8 +44,13 @@ class FilterConfig(OperatorConfig):
 class FilterOperator(Operator):
     Config = FilterConfig
 
-    def run(self, tuples):
+    def make_iterator(self, tuples):
         predicates = self.config.predicates
         for row in tuples:
-            if all([p(row) for p in predicates]):
+            if all([p.evaluate(row) for p in predicates]):
                 yield row
+
+    def run(self, rows):
+        iterator = self.make_iterator(rows)
+
+        return Rows(rows.fields, iterator)

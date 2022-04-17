@@ -1,5 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
-import itertools
+from dbdb.tuples.rows import Rows
 
 
 class LimitConfig(OperatorConfig):
@@ -13,14 +13,19 @@ class LimitConfig(OperatorConfig):
 class LimitOperator(Operator):
     Config = LimitConfig
 
-    def run(self, tuples):
+    def make_iterator(self, tuples):
         limit = self.config.limit
 
+        # Do not read _any_ rows if limit is zero
         if limit == 0:
-            return
+            raise StopIteration()
 
         for i, val in enumerate(tuples):
             yield val
 
-            if i >= limit - 1:
+            if i >= limit:
                 break
+
+    def run(self, rows):
+        iterator = self.make_iterator(rows)
+        return rows.new(iterator)

@@ -13,10 +13,14 @@ class SortingConfig(OperatorConfig):
 class SortOperator(Operator):
     Config = SortingConfig
 
-    def run(self, tuples):
-        order_index, reverse = self.config.order
+    def make_iterator(self, tuples):
+        order_index, ascending = self.config.order
         yield from sorted(
             tuples,
             key=lambda t: t[order_index],
-            reverse=reverse,
+            reverse=not ascending,
         )
+
+    def run(self, rows):
+        iterator = self.make_iterator(rows)
+        return rows.new(iterator)

@@ -1,4 +1,6 @@
 
+import tabulate
+
 def pipeline(*iterables):
     stream = iterables[0]
     # Feed forward each iterator into the next iterator
@@ -23,3 +25,18 @@ class Operator:
 
     def run(self):
         raise NotImplementedError()
+
+    def print_cache(self):
+        rows = []
+        keys = sorted(self.cache.keys())
+        for key in keys:
+            rows.append((key, self.cache[key]))
+
+        tbl = tabulate.tabulate(
+            rows,
+            headers=['key', 'value'],
+            tablefmt='presto',
+            floatfmt="0.2f"
+        )
+        print(tbl)
+

@@ -35,10 +35,10 @@ class FileHandleProxy:
 
     def stats(self):
         return {
-            'bytes_read': self.bytes_read,
-            'reads': self.reads,
-            'bytes_total': self.size,
-            'bytes_read_pct': self.bytes_read / self.size,
+            'bytes_read': f"{self.bytes_read:,}",
+            'bytes_read_pct': f"{100 * self.bytes_read / self.size:0.2f}%",
+            'bytes_total': f"{self.size:,}",
+            'reads': f"{self.reads:,}",
         }
 
 

@@ -1,5 +1,6 @@
 from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.operators import functions
+from dbdb.tuples.rows import Rows
 
 import enum
 import itertools
@@ -42,13 +43,18 @@ class AggregateConfig(OperatorConfig):
     def __init__(
         self,
         aggregates,
-        group_by=None
+        group_by=None,
+        project=None
     ):
         self.aggregates = aggregates
+
+        # TODO: Validate & all that (where?)
         if group_by is None:
             self.group_by = []
         else:
             self.group_by = group_by
+
+        self.project = project
 
 
 class AggregateOperator(Operator):
@@ -66,11 +72,7 @@ class AggregateOperator(Operator):
 
         return groups
 
-    def run(self, values):
-        # iterators = itertools.tee(values, len(self.config.aggregates))
-
-        grouping = self.grouping_set(values)
-
+    def make_iterator(self, grouping):
         for (key, values) in grouping.items():
             result = []
             for agg, expr in self.config.aggregates:
@@ -79,4 +81,10 @@ class AggregateOperator(Operator):
                 # res is a scalar value
                 res = aggregate_func(expr(val) for val in values)
                 result.append(res)
+
             yield key + tuple(result)
+
+    def run(self, rows):
+        grouping = self.grouping_set(rows)
+        iterator = self.make_iterator(grouping)
+        return Rows(self.config.project, iterator)

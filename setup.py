@@ -46,6 +46,7 @@ setup(
         'hexdump==3.3',
         'networkx==2.8',
         'pyparsing==3.0.8',
+        'tabulate==0.8.9',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

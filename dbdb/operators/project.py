@@ -1,4 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
+from dbdb.tuples.rows import Rows
 
 
 class ProjectConfig(OperatorConfig):
@@ -12,7 +13,12 @@ class ProjectConfig(OperatorConfig):
 class ProjectOperator(Operator):
     Config = ProjectConfig
 
-    def run(self, tuples):
+    def make_iterator(self, tuples):
         for row in tuples:
-            projected = tuple(row[i] for i in self.config.columns)
+            projected = tuple(row[i] for (i, _) in self.config.columns)
             yield projected
+
+    def run(self, rows):
+        fields = [name for (_, name) in self.config.columns]
+        iterator = self.make_iterator(rows)
+        return Rows(fields, iterator)
