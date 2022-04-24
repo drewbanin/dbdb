@@ -6,12 +6,14 @@ class TableIdentifier:
         self.relation = relation
 
     def scope(self, name):
-        return f'{str(self)}'
+        return FieldIdentifier(self, name)
 
     @classmethod
     def new(cls, ident_str):
         parts = ident_str.split(".")
-        return cls(*parts)
+        rest = 3 - len(parts)
+        args = [None] * rest + parts
+        return cls(*args)
 
     @classmethod
     def temporary(cls):
@@ -33,7 +35,12 @@ class FieldIdentifier(TableIdentifier):
 
     @classmethod
     def field(cls, name):
-        return cls(None, name)
+        if '.' in name:
+            table, ident = name.split(".", 1)
+            table_ident = TableIdentifier(relation=table)
+            return cls(table_ident, name)
+        else:
+            return cls(None, name)
 
     @classmethod
     def columns_from(cls, table_identifier, column_names):
@@ -41,6 +48,34 @@ class FieldIdentifier(TableIdentifier):
             cls(table_identifier, name)
             for name in column_names
         ]
+
+    def is_match(self, candidate):
+        if self.name == candidate:
+            return True
+        elif self.table_identifier is None:
+            return False
+
+        candidate_parts = candidate.split(".")
+
+        if len(candidate_parts) == 2:
+            table, field = candidate_parts
+            return self.name == field and \
+                self.table_identifier.relation == table
+
+        elif len(candidate_parts) == 3:
+            schema, table, field = candidate_parts
+            return self.name == field \
+                and self.table_identifier.relation == table \
+                and self.table_identifier.schema == schema
+
+        elif len(candidate_parts) == 4:
+            database, schema, table, field = candidate_parts
+            return self.name == field \
+                and self.table_identifier.relation == table \
+                and self.table_identifier.schema == schema \
+                and self.table_identifier.database == database
+
+        return False
 
     def __str__(self):
         return f"{self.table_identifier}.{self.name}"

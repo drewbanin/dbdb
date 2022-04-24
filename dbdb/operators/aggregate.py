@@ -79,7 +79,6 @@ class AggregateOperator(Operator):
                     res = aggregate_func(expr(val) for val in values)
                     result.append(res)
 
-            print(tuple(result))
             yield tuple(result)
 
     def run(self, rows):

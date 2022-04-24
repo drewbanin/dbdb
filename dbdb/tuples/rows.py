@@ -12,15 +12,15 @@ class RowTuple:
         elif isinstance(data, (tuple, list)):
             self.data = data
         else:
-            print(type(data))
             raise RuntimeError("bad input to RowTuple")
 
     def field(self, name):
         found = None
-        for i, f in enumerate(self.fields):
-            if f.name == name and found is not None:
+        for i, field in enumerate(self.fields):
+            matched = field.is_match(name)
+            if matched and found is not None:
                 raise RuntimeError("Ambiguous column")
-            elif f.name == name:
+            elif matched:
                 found = i
 
         if found is None:
@@ -33,7 +33,7 @@ class RowTuple:
 
     def merge(self, other):
         return RowTuple(
-            fields=self.fields + other.fields,
+            fields=tuple(list(self.fields) + list(other.fields)),
             data=tuple(list(self.data) + list(other.data))
         )
 
@@ -77,7 +77,7 @@ class Rows:
         fields = []
         for row in row_objs:
             for field in row.fields:
-                scoped = row.table.scope(field)
+                scoped = row.table.scope(field.name)
                 fields.append(scoped)
 
         return Rows(fields, iterator, table=None)
