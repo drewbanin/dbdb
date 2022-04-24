@@ -6,13 +6,13 @@ import hexdump
 import random
 
 
-from dbdb.files.file_format import (
+from dbdb.io.file_format import (
     Table,
     Column,
     ColumnInfo,
     ColumnData
 )
-from dbdb.files.types import (
+from dbdb.io.types import (
         DataType,
         DataEncoding,
         DataCompression,

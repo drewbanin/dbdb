@@ -1,4 +1,4 @@
-from dbdb.files.types import DataCompression, DataType
+from dbdb.io.types import DataCompression, DataType
 import zlib
 
 

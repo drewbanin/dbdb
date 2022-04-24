@@ -1,6 +1,6 @@
 
-from dbdb.files.types import DataEncoding, DataType
-from dbdb.files import compressor
+from dbdb.io.types import DataEncoding, DataType
+from dbdb.io import compressor
 from itertools import chain
 import struct
 

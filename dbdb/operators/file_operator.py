@@ -1,6 +1,6 @@
 
-from dbdb.files import file_format
-from dbdb.files.file_wrapper import FileReader
+from dbdb.io import file_format
+from dbdb.io.file_wrapper import FileReader
 
 from dbdb.operators.base import Operator, OperatorConfig, pipeline
 from dbdb.tuples.rows import Rows

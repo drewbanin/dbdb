@@ -1,5 +1,5 @@
 
-from dbdb.files.file_format import read_pages
+from dbdb.io.file_format import read_pages
 
 from dbdb.operators.file_operator import TableScanOperator
 from dbdb.operators.sorting import SortOperator

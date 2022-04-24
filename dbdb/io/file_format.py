@@ -5,15 +5,15 @@ Describe file format here...
 
 
 import struct
-from dbdb.files.types import (
+from dbdb.io.types import (
     DataType,
     DataEncoding,
     DataCompression,
     DataSorting
 )
 
-from dbdb.files import constants
-from dbdb.files import encoder, compressor
+from dbdb.io import constants
+from dbdb.io import encoder, compressor
 
 
 def sort_together(sort_index, to_sort):
