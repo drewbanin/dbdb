@@ -23,7 +23,7 @@ class LimitOperator(Operator):
         for i, val in enumerate(tuples):
             yield val
 
-            if i >= limit:
+            if i >= limit - 1:
                 break
 
     def run(self, rows):

@@ -1,6 +1,4 @@
 from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.tuples.rows import Rows
-
 import itertools
 
 

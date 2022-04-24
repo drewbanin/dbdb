@@ -1,12 +1,47 @@
 
-class TableIdentifier:
-    def __init__(self, database=None, schema=None, relation=None):
+import itertools
+
+
+class Identifier:
+    pass
+
+
+class TableIdentifier(Identifier):
+    def __init__(self, database=None, schema=None, name=None, alias=None):
         self.database = database
         self.schema = schema
-        self.relation = relation
+        self.name = name
+        self.alias = alias
 
-    def scope(self, name):
-        return FieldIdentifier(self, name)
+    def field(self, field_name):
+        return FieldIdentifier(field_name, self)
+
+    def is_match(self, candidate_parts):
+        # Zip our parts with candidate parts; determine if they match
+        # Reverse both lists so we match from most significant to least
+        # If candidate is None but our part is present, that's a match!
+        our_parts = self.provided_parts()
+        candidate_reversed = candidate_parts[::-1]
+        ours_reversed = our_parts[::-1]
+
+        zipped = itertools.zip_longest(candidate_reversed, ours_reversed)
+        for (candidate, ours) in zipped:
+            if candidate == ours:
+                # Match means keep going
+                continue
+            elif candidate is None:
+                # Unset means we hit the end of the scoped name; it's a match
+                return True
+            else:
+                # Non-match means the candidate is not a match
+                return False
+
+        return True
+
+    def provided_parts(self):
+        parts = [self.database, self.schema, self.name]
+        parts = [p for p in parts if p is not None]
+        return parts
 
     @classmethod
     def new(cls, ident_str):
@@ -17,68 +52,35 @@ class TableIdentifier:
 
     @classmethod
     def temporary(cls):
-        return cls(database=None, schema=None, relation="<temporary>")
+        return cls(database=None, schema=None, name="<temporary>")
 
     def __str__(self):
-        parts = [self.database, self.schema, self.relation]
-        parts = [p for p in parts if p is not None]
+        parts = self.provided_parts()
         return ".".join(parts)
 
     def __repr__(self):
         return self.__str__()
 
 
-class FieldIdentifier(TableIdentifier):
-    def __init__(self, table_identifier, name):
-        self.table_identifier = table_identifier
+class FieldIdentifier(Identifier):
+    def __init__(self, name, parent):
         self.name = name
-
-    @classmethod
-    def field(cls, name):
-        if '.' in name:
-            table, ident = name.split(".", 1)
-            table_ident = TableIdentifier(relation=table)
-            return cls(table_ident, name)
-        else:
-            return cls(None, name)
-
-    @classmethod
-    def columns_from(cls, table_identifier, column_names):
-        return [
-            cls(table_identifier, name)
-            for name in column_names
-        ]
+        self.parent = parent
 
     def is_match(self, candidate):
-        if self.name == candidate:
-            return True
-        elif self.table_identifier is None:
+        candidate_parts = candidate.split(".")
+        assert len(candidate_parts) > 0, f"Got empty candidate: {candidate}"
+
+        candidate_field = candidate_parts.pop()
+        if candidate_field != self.name:
             return False
 
-        candidate_parts = candidate.split(".")
-
-        if len(candidate_parts) == 2:
-            table, field = candidate_parts
-            return self.name == field and \
-                self.table_identifier.relation == table
-
-        elif len(candidate_parts) == 3:
-            schema, table, field = candidate_parts
-            return self.name == field \
-                and self.table_identifier.relation == table \
-                and self.table_identifier.schema == schema
-
-        elif len(candidate_parts) == 4:
-            database, schema, table, field = candidate_parts
-            return self.name == field \
-                and self.table_identifier.relation == table \
-                and self.table_identifier.schema == schema \
-                and self.table_identifier.database == database
-
-        return False
+        return self.parent.is_match(candidate_parts)
 
     def __str__(self):
-        return f"{self.table_identifier}.{self.name}"
+        parent_qualifier = self.parent.provided_parts()
+        qualified = parent_qualifier + [self.name]
+        return ".".join(qualified)
 
     def __repr__(self):
         return self.__str__()

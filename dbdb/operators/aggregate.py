@@ -83,7 +83,7 @@ class AggregateOperator(Operator):
 
     def run(self, rows):
         scalars = [p for p in self.config.fields if p[0] == Aggregates.SCALAR]
-        projection = tuple([project for _, _, project in self.config.fields])
+        field_names = tuple([field for _, _, field in self.config.fields])
 
         grouping = self.grouping_set(scalars, rows)
         iterator = self.make_iterator(grouping)
@@ -93,4 +93,5 @@ class AggregateOperator(Operator):
         # think about that more because fields are still scoped to their
         # parent locations.. which is kind of confusing.... hm....
         table_identifier = TableIdentifier.temporary()
-        return Rows(projection, iterator, table_identifier)
+        fields = [table_identifier.field(f) for f in field_names]
+        return Rows(table_identifier, fields, iterator)

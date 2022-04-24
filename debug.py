@@ -20,10 +20,11 @@ import itertools
 
 
 table_identifier = TableIdentifier.new("my_table")
-column_names = FieldIdentifier.columns_from(
-    table_identifier,
-    column_names=['my_number', 'is_odd', 'my_string']
-)
+column_names = [
+    table_identifier.field('my_number'),
+    table_identifier.field('is_odd'),
+    table_identifier.field('my_string')
+]
 
 op_scan = TableScanOperator(
     table_ref='my_table.dumb',
@@ -51,7 +52,7 @@ op_sort = SortOperator(
 )
 
 op_limit = LimitOperator(
-    limit=1000
+    limit=4
 )
 
 rows = op_scan.run()
@@ -60,16 +61,47 @@ rows = op_limit.run(rows)
 rows = op_sort.run(rows)
 rows = rows.display(10)
 
-def ff(name):
-    return FieldIdentifier.field(name)
+"""
+The way that I'm creating fields is really dumb. I think the general
+organizing principles are kind of ad-hoc and silly and that's leading
+to everything being kind of jank and unpleasant to work with. How do
+we do that part better?
+
+Every field should exist in terms of a table. You cannot have a field
+that exists outside the scope of _some sort_ of relation, even if that
+relation is virtual or tempoary (as in a join-product, or in a select
+body that does not reference a table. This is less-common, but I think
+that creating tables, virtual as they may be, is going to help us with
+staying organized and managing field access paterns...
+"""
 
 aggregate_op = AggregateOperator(
     fields=[
-        (Aggregates.SCALAR, lambda row: row.index(2), ff('my_string')),
-        (Aggregates.SUM,    lambda row: row.index(0), ff('my_sum')),
-        (Aggregates.COUNTD, lambda row: row.index(0), ff('my_countd')),
-        (Aggregates.AVG,    lambda row: row.index(0), ff('my_avg')),
-        (Aggregates.MAX,    lambda row: row.index(0), ff('my_max')),
+        (
+            Aggregates.SCALAR,
+            lambda row: row.index(2),
+            'my_string'
+        ),
+        (
+            Aggregates.SUM,
+            lambda row: row.index(0),
+            'my_sum'
+        ),
+        (
+            Aggregates.COUNTD,
+            lambda row: row.index(0),
+            'my_countd'
+        ),
+        (
+            Aggregates.AVG,
+            lambda row: row.index(0),
+            'my_avg'
+        ),
+        (
+            Aggregates.MAX,
+            lambda row: row.index(0),
+            'my_max'
+        ),
     ]
 )
 
@@ -93,11 +125,11 @@ project_op = ProjectOperator(
 rows = project_op.run(rows)
 
 
-table_identifier = TableIdentifier.new("debug")
-debug_column_names = FieldIdentifier.columns_from(
-    table_identifier,
-    column_names=['f1', 'f2']
-)
+debug_identifier = TableIdentifier.new("debug")
+debug_column_names = [
+    debug_identifier.field('my_string'),
+    debug_identifier.field('f2')
+]
 
 debug_iter = iter((
     ('abc', 'haha'),
@@ -105,20 +137,35 @@ debug_iter = iter((
     ('def', 'neat'),
     ('xyz', 'nooooo'),
 ))
-debug = Rows(debug_column_names, debug_iter, table_identifier)
+debug = Rows(debug_identifier, debug_column_names, debug_iter)
 
 rows = rows.display()
 debug = debug.display()
 
 r1, r2 = itertools.tee(rows, 2)
-r1_rows = Rows([ff('my_string'), ff('my_number')], r1, table_identifier)
-r2_rows = Rows([ff('my_string'), ff('my_number')], r2, table_identifier)
+r1_rows = Rows(
+    table_identifier,
+    [
+        table_identifier.field('my_string'),
+        table_identifier.field('my_number')
+    ],
+    r1
+)
+r2_rows = Rows(
+    table_identifier,
+    [
+        table_identifier.field('my_string'),
+        table_identifier.field('my_number')
+    ],
+    r2
+)
+
 
 join_op = NestedLoopJoinOperator(
     inner=False,
     expression=Equality(
-        lexpr=Expression(lambda r: r.field('my_string')),
-        rexpr=Expression(lambda r: r.field('f1')),
+        lexpr=Expression(lambda r: r.field('my_table.my_string')),
+        rexpr=Expression(lambda r: r.field('debug.my_string')),
         equality=EqualityTypes.EQ
     )
 )
@@ -129,10 +176,10 @@ print()
 rows.display()
 
 join_op2 = HashJoinOperator(
-    inner=False,
+    inner=True,
     expression=Equality(
-        lexpr=Expression(lambda r: r.field('my_string')),
-        rexpr=Expression(lambda r: r.field('f1')),
+        lexpr=Expression(lambda r: r.field('my_table.my_string')),
+        rexpr=Expression(lambda r: r.field('debug.my_string')),
         equality=EqualityTypes.EQ
     )
 )

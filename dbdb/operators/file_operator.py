@@ -51,7 +51,7 @@ class TableScanOperator(Operator):
 
         iterator = self.make_iterator(tuples)
         return Rows(
+            self.config.table,
             self.config.columns,
             iterator,
-            table=self.config.table
         )

@@ -1,3 +1,4 @@
+from dbdb.tuples.identifiers import TableIdentifier
 
 import tabulate
 from typing import NamedTuple
@@ -42,10 +43,10 @@ class RowTuple:
 
 
 class Rows:
-    def __init__(self, fields, iterator, table):
+    def __init__(self, table, fields, iterator):
+        self.table = table
         self.fields = fields
         self.iterator = iterator
-        self.table = table
         self.data = None
 
     def __iter__(self):
@@ -59,7 +60,7 @@ class Rows:
         return RowTuple(self.fields, record)
 
     def new(self, iterator):
-        return Rows(self.fields, iterator, self.table)
+        return Rows(self.table, self.fields, iterator)
 
     def nulls(self):
         return (None,) * len(self.fields)
@@ -77,10 +78,11 @@ class Rows:
         fields = []
         for row in row_objs:
             for field in row.fields:
-                scoped = row.table.scope(field.name)
+                scoped = row.table.field(field.name)
                 fields.append(scoped)
 
-        return Rows(fields, iterator, table=None)
+        table = TableIdentifier.temporary()
+        return Rows(table, fields, iterator)
 
     def materialize(self):
         if not self.data:

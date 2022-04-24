@@ -29,8 +29,8 @@ class ProjectOperator(Operator):
         fields = []
         projections = self.config.project
         for _, alias in projections:
-            field = FieldIdentifier(table_identifier=None, name=alias)
+            field = FieldIdentifier(alias, rows.table)
             fields.append(field)
 
         iterator = self.make_iterator(rows)
-        return Rows(fields, iterator, rows.table)
+        return Rows(rows.table, fields, iterator)
