@@ -2,6 +2,23 @@ from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows
 from dbdb.expressions import EqualityTypes
 
+from enum import Enum
+
+
+class JoinTypes(Enum):
+    NestedLoop = 1
+    HashJoin = 2
+
+    def create(self, *args, **kwargs):
+        if self == JoinTypes.NestedLoop:
+            JoinClass = NestedLoopJoinOperator
+        elif self == JoinTypes.HashJoin:
+            JoinClass = HashJoinOperator
+        else:
+            raise NotImplementedError()
+
+        return JoinClass(*args, **kwargs)
+
 
 class JoinConfig(OperatorConfig):
     def __init__(

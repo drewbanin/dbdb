@@ -34,18 +34,18 @@ It's fine for now, but let's circle back here...
 class FilterConfig(OperatorConfig):
     def __init__(
         self,
-        predicates,
+        predicate,
     ):
-        self.predicates = predicates
+        self.predicate = predicate
 
 
 class FilterOperator(Operator):
     Config = FilterConfig
 
     def make_iterator(self, tuples):
-        predicates = self.config.predicates
+        predicate = self.config.predicate
         for row in tuples:
-            if all([p.evaluate(row) for p in predicates]):
+            if predicate.evaluate(row):
                 yield row
 
     def run(self, rows):

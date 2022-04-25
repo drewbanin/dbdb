@@ -110,3 +110,11 @@ class Rows:
         print(tbl)
 
         return self.new(iter(data))
+
+    @classmethod
+    def from_literals(cls, table, fields, data):
+        return cls(
+            table=table,
+            fields=fields,
+            iterator=iter(data)
+        )

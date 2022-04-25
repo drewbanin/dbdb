@@ -5,3 +5,4 @@ env/
 *.dumb
 *.pyc
 __pycache__
+*.png

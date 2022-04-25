@@ -84,3 +84,33 @@ class FieldIdentifier(Identifier):
 
     def __repr__(self):
         return self.__str__()
+
+
+class GlobIdentifier(FieldIdentifier):
+    def __init__(self, name, parent=None):
+        self.name = name
+        self.parent = parent
+
+    def is_match(self, candidate):
+        candidate_parts = candidate.split(".")
+        assert len(candidate_parts) > 0, f"Got empty candidate: {candidate}"
+
+        # Pop * off of candidate
+        candidate_parts.pop()
+
+        if self.parent:
+            return self.parent.is_match(candidate_parts)
+        else:
+            return True
+
+    def __str__(self):
+        if self.parent:
+            parent_qualifier = self.parent.provided_parts()
+            qualified = parent_qualifier + [self.name]
+        else:
+            qualified = '*'
+
+        return ".".join(qualified)
+
+    def __repr__(self):
+        return self.__str__()

@@ -55,3 +55,20 @@ class TableScanOperator(Operator):
             self.config.columns,
             iterator,
         )
+
+
+class TableGenOperator(OperatorConfig):
+    def __init__(
+        self,
+        table,
+        rows,
+    ):
+        self.table = table
+        self.rows = rows
+
+
+class TableGenOperator(Operator):
+    Config = TableGenOperator
+
+    def run(self):
+        return self.config.rows

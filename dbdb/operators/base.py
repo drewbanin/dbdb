@@ -1,5 +1,7 @@
 
 import tabulate
+import uuid
+
 
 def pipeline(*iterables):
     stream = iterables[0]
@@ -20,6 +22,7 @@ class Operator:
     Config = OperatorConfig
 
     def __init__(self, **config):
+        self.operator_id = uuid.uuid4()
         self.cache = {}
         self.config = self.Config(**config)
 
@@ -40,3 +43,8 @@ class Operator:
         )
         print(tbl)
 
+    def __hash__(self):
+        return hash(str(self.operator_id))
+
+    def __eq__(self, other):
+        return False
