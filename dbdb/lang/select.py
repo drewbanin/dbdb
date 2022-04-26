@@ -23,7 +23,6 @@ class Select:
         where=None,
         source=None,
         joins=None,
-        group_by=None,
         having=None,
         order_by=None,
         limit=None,
@@ -32,23 +31,16 @@ class Select:
         self.where = where
         self.source = source
         self.joins = joins or []
-        self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
 
     def make_plan(self):
-        # TODO : Give this thing an as_operator() (and potentially make it so that
-        # operators mutate the DAG directly...? so that we can compose this with
-        # CTEs and subqueries and stuff. Like... a projection should be able to
-        # be a subquery... lol but then i need to add support for correlated subqs
-        # ok... maybe just add support in the FROM clause? That's fine & reasonable...
         """
         Order of operations:
         1. Table scan from FROM clause
         2. Apply JOINs
         3. Apply WHERE
-        4. Apply GROUP and aggregates
-        5. Apply projections
+        5. Apply projections (including aggregates)
         6. Apply ORDER clause
         7. Apply LIMIT
         """
@@ -81,10 +73,6 @@ class Select:
             plan.add_edge(table_op, filter_op, input_arg="rows")
             table_op = filter_op
 
-        # GROUP BY
-        if self.group_by:
-            pass
-
         # Projections
         project_op = self.projections.as_operator()
         plan.add_node(project_op, label="Project")
@@ -104,6 +92,16 @@ class Select:
             table_op = limit_op
 
         return plan
+
+    def __str__(self):
+        return f"""
+        Projections: {self.projections}
+        Filters: {self.where}
+        Source: {self.source}
+        Joins: {self.joins}
+        Order: {self.order_by}
+        Limit: {self.limit}
+        """
 
 
 class SelectClause:
