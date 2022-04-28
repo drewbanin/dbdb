@@ -20,6 +20,14 @@ class TableIdentifier(Identifier):
         # Zip our parts with candidate parts; determine if they match
         # Reverse both lists so we match from most significant to least
         # If candidate is None but our part is present, that's a match!
+
+        # If a field is aliased, it can no longer be addressed by its name
+        can_alias = self.alias is not None and len(candidate_parts) > 0
+        if can_alias and candidate_parts[0] == self.alias:
+            return True
+        elif can_alias:
+            return False
+
         our_parts = self.provided_parts()
         candidate_reversed = candidate_parts[::-1]
         ours_reversed = our_parts[::-1]
@@ -44,11 +52,11 @@ class TableIdentifier(Identifier):
         return parts
 
     @classmethod
-    def new(cls, ident_str):
+    def new(cls, ident_str, alias=None):
         parts = ident_str.split(".")
         rest = 3 - len(parts)
         args = [None] * rest + parts
-        return cls(*args)
+        return cls(*args, alias=alias)
 
     @classmethod
     def temporary(cls):

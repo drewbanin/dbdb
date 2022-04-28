@@ -20,7 +20,7 @@ class RowTuple:
         for i, field in enumerate(self.fields):
             matched = field.is_match(name)
             if matched and found is not None:
-                raise RuntimeError("Ambiguous column")
+                raise RuntimeError(f"Ambiguous column: {name}")
             elif matched:
                 found = i
 

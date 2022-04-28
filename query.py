@@ -9,7 +9,7 @@ from dbdb.operators.project import ProjectOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
     HashJoinOperator,
-    JoinTypes
+    JoinStrategy
 )
 
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
@@ -35,28 +35,24 @@ from dbdb.lang.select import (
 
 sql = """
 select
-  my_table.my_string as my_field,
-  avg(debug.my_number + 10) as my_avg
+  my_table.my_string * 2,
+  avg(my_table.is_odd + 10) as my_avg
 
 from my_table
-inner join debug on debug.my_string = my_table.my_string
-left outer join debug on debug.my_string = my_table.my_string or 1=1
-where is_odd = true
-  and is_odd is not false
+inner join my_table as debug on debug.my_string = my_table.my_string
+where debug.is_odd = true
+  and debug.is_odd is not false
+group by 1
 order by my_table.my_string, 2
 limit 3
 """
 
+
 import dbdb.lang.lang
 
-res = dbdb.lang.lang.parse_query(sql)
-print(res)
+query = dbdb.lang.lang.parse_query(sql)
 
-res.pprint()
-
-import sys
-sys.exit(0)
-
+"""
 my_table = TableIdentifier.new("my_table")
 
 debug_identifier = TableIdentifier.new("debug")
@@ -134,6 +130,7 @@ query = Select(
         limit=3
     )
 )
+"""
 
 plan = query.make_plan()
 print(plan)

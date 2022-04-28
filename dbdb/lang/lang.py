@@ -3,6 +3,17 @@ import pyparsing as pp
 from pyparsing import common as ppc
 
 
+from dbdb.tuples.identifiers import (
+    TableIdentifier,
+    FieldIdentifier,
+    GlobIdentifier
+)
+
+from dbdb.operators.joins import JoinType
+
+pp.ParserElement.enable_packrat()
+
+
 class SelectQuery(object):
     def __init__(self):
         self.projections = []
@@ -30,79 +41,379 @@ class SelectQuery(object):
         print(f"       Limit: {self.limit}")
 
 
-IDENT = (
-    pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
-)("ident*")
+def handle_is(string, loc, toks):
+    return "IS"
 
-QUALIFIED_IDENT = pp.Group(
-    pp.delimitedList(IDENT, delim=".", max=2)
-)("qualified_ident")
+def handle_is_not(string, loc, toks):
+    return "IS_NOT"
 
-AS = pp.CaselessKeyword("AS")
-ON = pp.CaselessKeyword("ON")
 
 LPAR = pp.Literal('(')
 RPAR = pp.Literal(')')
 
-STR_LITERAL = pp.QuotedString(quote_char="'")
-NUMBER_LITERAL = ppc.number
-LITERAL = STR_LITERAL | NUMBER_LITERAL
-
+FROM = pp.CaselessKeyword("FROM")
+AS = pp.CaselessKeyword("AS")
+ON = pp.CaselessKeyword("ON")
 AND = pp.CaselessKeyword("AND")
 OR = pp.CaselessKeyword("OR")
 
-IS = pp.CaselessKeyword("IS")
-IS_NOT = IS + pp.CaselessKeyword("NOT")
+IS = pp.CaselessKeyword("IS").setParseAction(handle_is)
+IS_NOT = (IS + pp.CaselessKeyword("NOT")).setParseAction(handle_is_not)
 
 WHERE = pp.CaselessKeyword("WHERE")
+GROUP_BY = (pp.CaselessKeyword("GROUP") + pp.CaselessKeyword("BY"))
 ORDER_BY = (pp.CaselessKeyword("ORDER") + pp.CaselessKeyword("BY"))
+LIMIT = pp.CaselessKeyword("LIMIT")
 
+LEFT_OUTER = pp.CaselessKeyword("LEFT") + pp.Opt(pp.CaselessKeyword("OUTER"))
+RIGHT_OUTER = pp.CaselessKeyword("RIGHT") + pp.Opt(pp.CaselessKeyword("OUTER"))
+FULL_OUTER = pp.CaselessKeyword("FULL") + pp.CaselessKeyword("OUTER")
+INNER = pp.CaselessKeyword("INNER")
+CROSS = pp.CaselessKeyword("CROSS")
+NATURAL = pp.CaselessKeyword("NATURAL")
+JOIN = pp.CaselessKeyword("JOIN")
+USING = pp.CaselessKeyword("USING")
+
+
+RESERVED = (
+    FROM     |
+    AS       |
+    ON       |
+    AND      |
+    OR       |
+    IS       |
+    IS_NOT   |
+    WHERE    |
+    GROUP_BY |
+    ORDER_BY |
+    USING    |
+    LIMIT    |
+    LEFT_OUTER  |
+    RIGHT_OUTER |
+    INNER       |
+    CROSS       |
+    NATURAL     |
+    JOIN
+)
+
+IDENT = ~RESERVED + (
+    pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
+)("ident*")
+
+class ASTToken:
+    def has_aggregate(self):
+        return False
+
+
+class ColumnIdentifier(ASTToken):
+    def __init__(self, table, column):
+        self.table = table
+        self.column = column
+
+    def eval(self, row):
+        if self.table:
+            name = f"{self.table}.{self.column}"
+        else:
+            name = self.column
+
+        return row.field(name)
+
+
+def make_col_identifier(string, loc, toks):
+    ident_parts = toks[0]
+    if len(ident_parts) == 1:
+        table = None
+        column = ident_parts[0]
+    else:
+        table, column = ident_parts
+
+    return ColumnIdentifier(table, column)
+
+
+class TableIdent(ASTToken):
+    def __init__(self, table_name, alias=None):
+        self.table_name = table_name
+        self.alias = alias
+
+    def eval(self, row):
+        # If we call this, something bad happened...
+        raise NotImplementedError()
+
+
+def make_table_identifier(string, loc, toks):
+    table = toks[0]
+    return TableIdent(table)
+
+
+def make_aliased_table_identifier(string, loc, toks):
+    table = toks[0]
+    if len(toks) > 1:
+        table.alias = toks[-1].table_name
+    return table
+
+
+QUALIFIED_IDENT = pp.Group(
+    pp.delimitedList(IDENT, delim=".", max=2)
+)("qualified_ident").setParseAction(make_col_identifier)
+
+
+TABLE_IDENT = IDENT.copy() \
+    .set_name("table_ident") \
+    .setParseAction(make_table_identifier)
+
+
+class Literal(ASTToken):
+    def __init__(self, val):
+        self.val = val
+
+    def eval(self, row):
+        return self.val
+
+
+def as_literal(string, loc, toks):
+    return Literal(toks[0])
+
+def as_bool(string, loc, toks):
+    if toks[0].upper() == 'TRUE':
+        return True
+    elif toks[0].upper() == 'FALSE':
+        return False
+    else:
+        raise RuntimeError("how?")
+
+
+LIT_STR = pp.QuotedString(quote_char="'")
+LIT_NUM = ppc.number
+
+LIT_BOOL = (
+    pp.CaselessKeyword("TRUE") | pp.CaselessKeyword("FALSE")
+).setParseAction(as_bool)
+
+LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL).setParseAction(as_literal)
 
 EXPRESSION = pp.Forward()
 
-FUNC_CALL = (
+
+from dbdb.operators.aggregate import Aggregates
+class FunctionCall(ASTToken):
+    def __init__(self, func_name, func_expr, agg_type):
+        self.func_name = func_name
+        self.func_expr = func_expr
+        self.agg_type = agg_type
+
+    # TODO : So this kind of sucks. We need/want to do aggs
+    # separately from projection, and i kind of understand why
+    # that is now.... it in fact _does_ need to be its own step in
+    # execution DAG... that's kind of wild!!
+    def has_aggregate(self):
+        return self.agg_type != Aggregates.SCALAR
+
+    def eval(self, row):
+        return self.func_expr.eval(row)
+
+
+def call_function(string, loc, toks):
+    # <func_name> ( <expr> )
+    func_name = toks[0].func_name[0].upper()
+    func_expr = toks[0].func_expression
+    agg_type = getattr(Aggregates, func_name, Aggregates.SCALAR)
+    return FunctionCall(func_name, func_expr, agg_type)
+
+
+FUNC_CALL = pp.Group(
     IDENT("func_name") +
     LPAR +
     pp.Opt(EXPRESSION("func_expression")) +
     RPAR
-)("func_call")
+).setParseAction(call_function)
+
+
+class BinaryOperator:
+    def __init__(self, lhs, operator, rhs):
+        self.lhs = lhs
+        self.operator = operator
+        self.rhs = rhs
+
+    def eval(self, row):
+        if self.operator == '+':
+            op = lambda l, r: l + r
+        elif self.operator == '-':
+            op = lambda l, r: l - r
+        elif self.operator == '*':
+            op = lambda l, r: l * r
+        elif self.operator == '/':
+            op = lambda l, r: l / r
+
+        # TODO: Don't think this is right....
+        elif self.operator == 'AND':
+            op = lambda l, r: l and r
+        elif self.operator == 'OR':
+            op = lambda l, r: l or r
+
+        elif self.operator == '=':
+            op = lambda l, r: l == r
+        elif self.operator == '!=':
+            op = lambda l, r: l != r
+
+        elif self.operator == 'IS':
+            op = lambda l, r: l is r
+
+        elif self.operator == 'IS_NOT':
+            op = lambda l, r: l is not r
+
+        else:
+            import ipdb; ipdb.set_trace()
+
+        return op(
+            self.lhs.eval(row),
+            self.rhs.eval(row)
+        )
+
+
+def op_negate(string, loc, toks):
+    # TODO:
+    pass
+
+
+def binary_operator(string, loc, toks):
+    lhs, op, rhs = toks[0]
+    return BinaryOperator(lhs, op, rhs)
 
 
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | QUALIFIED_IDENT | LITERAL,
+    FUNC_CALL | LITERAL | QUALIFIED_IDENT,
     [
-        ('-', 1, pp.OpAssoc.RIGHT),
-        (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT),
-        (pp.oneOf('+ -'), 2, pp.OpAssoc.LEFT),
-        (pp.oneOf('<= >='), 2, pp.OpAssoc.LEFT),
-        (pp.oneOf('< >'), 2, pp.OpAssoc.LEFT),
-        (pp.oneOf('= !='), 2, pp.OpAssoc.LEFT),
+        ('-', 1, pp.OpAssoc.RIGHT, op_negate),
+        (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),
+        (pp.oneOf('+ -'), 2, pp.OpAssoc.LEFT, binary_operator),
+        (pp.oneOf('<= >='), 2, pp.OpAssoc.LEFT, binary_operator),
+        (pp.oneOf('< >'), 2, pp.OpAssoc.LEFT, binary_operator),
+        (pp.oneOf('= !='), 2, pp.OpAssoc.LEFT, binary_operator),
 
-        (IS_NOT, 2, pp.OpAssoc.LEFT),
-        (IS, 2, pp.OpAssoc.LEFT),
+        (IS_NOT, 2, pp.OpAssoc.LEFT, binary_operator),
+        (IS, 2, pp.OpAssoc.LEFT, binary_operator),
 
-        (AND, 2, pp.OpAssoc.LEFT),
-        (OR, 2, pp.OpAssoc.LEFT),
+        (AND, 2, pp.OpAssoc.LEFT, binary_operator),
+        (OR, 2, pp.OpAssoc.LEFT, binary_operator),
     ]
 )("expression")
 
 COLUMN_EXPR = pp.Group(
-    (FUNC_CALL | EXPRESSION)
-    + pp.Opt(AS)
-    + pp.Opt(IDENT("alias"))
+    EXPRESSION("column_expression") +
+    pp.Opt(
+        pp.Opt(AS) +
+        IDENT("alias")
+    )
 )
 
-JOIN_TYPE = (
-    (pp.CaselessKeyword("LEFT") + pp.Opt(pp.CaselessKeyword("OUTER"))) |
-    (pp.CaselessKeyword("INNER")) |
-    (pp.CaselessKeyword("FULL") + pp.CaselessKeyword("OUTER")) |
-    (pp.CaselessKeyword("CROSS")) |
-    (pp.Empty())
-) + pp.CaselessKeyword("JOIN")
+class JoinCondition:
+    def __init__(self, join_type, join_expr):
+        self.join_type = join_type
+        self.join_expr = join_expr
+
+    def eval(self, row):
+        return self.join_expr.eval(row)
+
+    @classmethod
+    def make_from_on_expr(cls, tokens):
+        # ON <expr>
+        return JoinCondition('ON', tokens[1])
+
+    @classmethod
+    def make_from_using_expr(cls, tokens):
+        # USING ( <field list> )
+        # Build our own expression...
+        # TODO: What is the LHS and RHS???
+        join_expr = None
+        return JoinCondition('USING', join_expr)
+
+def make_explicit_join(string, loc, toks):
+    return JoinCondition.make_from_on_expr(toks)
+
+def make_implicit_join(string, loc, toks):
+    return JoinCondition.make_from_using_expr(toks)
+
+
+def make_join(string, loc, toks):
+    if toks[0] == 'JOIN':
+        return JoinType.INNER
+    elif toks[0] == 'INNER':
+        return JoinType.INNER
+    elif toks[0] == 'LEFT' and toks[1] == 'OUTER':
+        return JoinType.LEFT_OUTER
+    elif toks[0] == 'RIGHT' and toks[1] == 'OUTER':
+        return JoinType.RIGHT_OUTER
+    elif toks[0] == 'FULL' and toks[1] == 'OUTER':
+        return JoinType.FULL_OUTER
+    elif toks[0] == 'NATURAL':
+        return JoinType.NATURAL
+    elif toks[0] == 'CROSS':
+        return JoinType.CROSS
+    elif toks[0] == ',':
+        return JoinType.CROSS
+    else:
+        raise RuntimeError(f"Invalid join type: {toks}")
+
+
+QUALIFIED_JOIN_TYPES = (
+    (LEFT_OUTER + JOIN) |
+    (FULL_OUTER + JOIN) |
+    (RIGHT_OUTER + JOIN) |
+    (INNER + JOIN) |
+    JOIN
+).setParseAction(make_join)
+
+UNQUALIFIED_JOIN_TYPES = (
+    (NATURAL + JOIN) |
+    (CROSS + JOIN) |
+    pp.Literal(",")
+).setParseAction(make_join)
+
+# TODO : For this to actually work, we need to know about the LHS and RHS
+# otherwise we cannot build the binary operator....
+JOIN_CONDITION = (
+    (ON + EXPRESSION).setParseAction(make_explicit_join) |
+    (USING + LPAR + pp.delimitedList(IDENT) + RPAR).setParseAction(make_implicit_join)
+)
+
+
+class JoinClause(ASTToken):
+    def __init__(self, to, join_type, on):
+        self.to = to
+        self.join_type = join_type
+        self.on = on
+
+    @classmethod
+    def new_qualified(cls, to, join_type, on):
+        return cls(to, join_type, on)
+
+    @classmethod
+    def new_unqualified(cls, to, join_type):
+        return cls(to, join_type, on=True)
+
+
+def make_join_clause(string, loc, tokens):
+    # <join type> <target> [condition]
+    if len(tokens) == 2:
+        join_type, to = tokens
+        return JoinClause.new_unqualified(to, join_type)
+    elif len(tokens) == 3:
+        join_type, to, on = tokens
+        return JoinClause.new_qualified(to, join_type, on)
+    else:
+        raise RuntimeError(f"Unexpected join: {tokens}")
+
+
+ALIASED_TABLE_IDENT = (
+    TABLE_IDENT + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
+).setParseAction(make_aliased_table_identifier)
+
 
 JOIN_CLAUSE = (
-    JOIN_TYPE + QUALIFIED_IDENT + ON + EXPRESSION
-)
+    (QUALIFIED_JOIN_TYPES + ALIASED_TABLE_IDENT + JOIN_CONDITION) |
+    (UNQUALIFIED_JOIN_TYPES + ALIASED_TABLE_IDENT)
+).setParseAction(make_join_clause)
+
 
 GRAMMAR = (
     pp.CaselessKeyword("SELECT") +
@@ -112,7 +423,8 @@ GRAMMAR = (
     )('columns') +
 
     # from clause
-    pp.CaselessKeyword("FROM") + QUALIFIED_IDENT("_from") +
+    # TODO: This is optional...
+    FROM + ALIASED_TABLE_IDENT("_from") +
 
     pp.ZeroOrMore(
         JOIN_CLAUSE
@@ -123,18 +435,137 @@ GRAMMAR = (
     )("where") +
 
     pp.Opt(
+        GROUP_BY + pp.delimitedList(EXPRESSION)
+    )("group_by") +
+
+    pp.Opt(
         ORDER_BY + pp.delimitedList(EXPRESSION)
     )("order_by") +
 
     # limit
     pp.Opt(
-        pp.CaselessKeyword("LIMIT") +
-        pp.Word(pp.nums)("limit")
-        .setParseAction(lambda x: int(x[0]))
+        LIMIT + LIT_NUM.setParseAction(as_literal)
     )("limit") +
 
     pp.StringEnd()
 )
+
+from dbdb.lang.select import (
+    Select,
+    SelectList,
+    SelectProjection,
+    SelectFilter,
+    SelectFileSource,
+    SelectMemorySource,
+    SelectJoin,
+    SelectOrder,
+    SelectOrderBy,
+    SelectLimit,
+)
+
+
+def stringify(alias):
+    if alias:
+        return alias[0]
+    else:
+        return None
+
+
+def extract_projections(ast):
+    projections = []
+    for i, column in enumerate(ast.columns):
+        expr = column.column_expression
+        alias = stringify(column.alias) or f'col_{i}'
+
+        # Like... big big hack. oops...
+        if type(expr) == FunctionCall:
+            agg_type = expr.agg_type
+        else:
+            agg_type = Aggregates.SCALAR
+
+        projection = SelectProjection(
+            expr=expr.eval,
+            aggregate=agg_type,
+            alias=alias
+        )
+        projections.append(projection)
+
+    return SelectList(projections=projections)
+
+
+def extract_wheres(ast):
+    if 'where' not in ast:
+        return None
+    
+    _, where_clause = ast.where
+    # where clause is just a binary operator or expression here..
+
+    return SelectFilter(expr=where_clause)
+
+
+def make_source(table_source):
+    table_name = table_source.table_name
+    table_alias = table_source.alias
+    table_id = TableIdentifier.new(table_name, table_alias)
+    return SelectFileSource(
+        file_path=f"{table_id}.dumb",
+        table_identifier=table_id,
+        columns=[
+            # TODO TODO TODO HOW???
+            table_id.field('my_string'),
+            table_id.field('is_odd'),
+        ]
+    )
+
+
+def extract_source(ast, referenced_fields):
+    if '_from' not in ast:
+        return None
+
+    source = ast._from
+    return make_source(source)
+
+
+def extract_joins(ast):
+    joins = []
+    for join_clause in ast.joins:
+        # TODO TODO TODO
+        join_source = make_source(join_clause.to)
+        join = SelectJoin.new(
+            to=join_source,
+            expression=join_clause.on,
+            join_type=join_clause.join_type,
+            # TODO: What's the right kind of join.... where
+            # does that get configured?
+        )
+        joins.append(join)
+    return joins
+
+
+def extract_limit(ast):
+    if 'limit' in ast:
+        limit = ast.limit[1]
+        return SelectLimit(limit)
+    return None
+
+
+def ast_to_select_obj(ast):
+    projections = extract_projections(ast)
+    wheres = extract_wheres(ast)
+    joins = extract_joins(ast)
+    order_by = None
+    limit = extract_limit(ast)
+
+    source = extract_source(ast, [])
+
+    return Select(
+        projections=projections,
+        where=wheres,
+        source=source,
+        joins=joins,
+        order_by=order_by,
+        limit=limit
+    )
 
 
 def parse_query(query):
@@ -145,8 +576,6 @@ def parse_query(query):
         FROM <table path>
         [LIMIT <count>]
     """
-    res = GRAMMAR.parseString(query)
-
-    # I think i want to make a visitor kind of pattern for this bad-boy
-
-    return res
+    ast = GRAMMAR.parseString(query)
+    select_obj = ast_to_select_obj(ast)
+    return select_obj

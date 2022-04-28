@@ -6,6 +6,8 @@ from dbdb.operators.project import ProjectOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
     HashJoinOperator,
+    JoinStrategy,
+    JoinType
 )
 
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
@@ -198,17 +200,23 @@ class SelectMemorySource(SelectClause):
 
 
 class SelectJoin(SelectClause):
-    def __init__(self, to, inner, expression, join_type):
+    def __init__(self, to, expression, join_type, join_strategy):
         self.to = to
-        self.inner = inner
         self.expression = expression
         self.join_type = join_type
+        self.join_strategy = join_strategy
 
     def as_operator(self):
-        return self.join_type.create(
-            inner=self.inner,
+        return self.join_strategy.create(
+            join_type=self.join_type,
             expression=self.expression
         )
+
+    @classmethod
+    def new(cls, to, expression, join_type):
+        # TODO: Pick this dynamically?
+        join_strategy = JoinStrategy.NestedLoop
+        return cls(to, expression, join_type, join_strategy)
 
 
 class SelectOrder(SelectClause):

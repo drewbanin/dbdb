@@ -4,15 +4,24 @@ from dbdb.expressions import EqualityTypes
 
 from enum import Enum
 
+import enum
+class JoinType(enum.Enum):
+    INNER = enum.auto()
+    LEFT_OUTER = enum.auto()
+    RIGHT_OUTER = enum.auto()
+    FULL_OUTER = enum.auto()
+    NATURAL = enum.auto()
+    CROSS = enum.auto()
 
-class JoinTypes(Enum):
+
+class JoinStrategy(Enum):
     NestedLoop = 1
     HashJoin = 2
 
     def create(self, *args, **kwargs):
-        if self == JoinTypes.NestedLoop:
+        if self == JoinStrategy.NestedLoop:
             JoinClass = NestedLoopJoinOperator
-        elif self == JoinTypes.HashJoin:
+        elif self == JoinStrategy.HashJoin:
             JoinClass = HashJoinOperator
         else:
             raise NotImplementedError()
@@ -24,10 +33,10 @@ class JoinConfig(OperatorConfig):
     def __init__(
         self,
         # TODO: Make an enum of options?
-        inner=True,
-        expression=None,
+        join_type,
+        expression,
     ):
-        self.inner = inner
+        self.join_type = join_type
         self.expression = expression
 
 
@@ -38,7 +47,6 @@ class JoinOperator(Operator):
         iterator = self._join(left_rows, right_rows)
         return Rows.merge([left_rows, right_rows], iterator)
 
-
 class NestedLoopJoinOperator(JoinOperator):
     def _join(self, left_values, right_values):
         # Unfortunate thing: we need to materialize the
@@ -47,16 +55,30 @@ class NestedLoopJoinOperator(JoinOperator):
         lvals = left_values.materialize()
         rvals = right_values.materialize()
 
+        # Handle cross join
+        if self.config.join_type == JoinType.CROSS:
+            yield from self.cross_join(lvals, rvals)
+            return
+        elif self.config.join_type == JoinType.FULL_OUTER:
+            yield from self.full_outer_join(lvals, rvals)
+
+        is_outer = False
+        if self.config.join_type == JoinType.LEFT_OUTER:
+            is_outer = True
+        if self.config.join_type == JoinType.RIGHT_OUTER:
+            lvals, rvals = rvals, lvals
+            is_outer = True
+
+        yielded = 0
         for lval in lvals:
-            included = False
             for rval in rvals:
                 merged = lval.merge(rval)
-                if self.config.expression.evaluate(merged):
-                    included = True
+                if self.config.expression.eval(merged):
                     yield merged
-
-            if not self.config.inner and not included:
-                yield lval.as_tuple() + right_values.nulls()
+                    yielded += 1
+                elif is_outer:
+                    yield lval.as_tuple() + rval.nulls()
+                    yielded += 1
 
 
 class HashJoinOperator(JoinOperator):
@@ -94,6 +116,8 @@ class HashJoinOperator(JoinOperator):
                     merged = lval.merge(rval)
                     yield merged
 
+                # TODO: Handle different join types here?
+                import ipdb; ipdb.set_trace()
                 if not self.config.inner and not included:
                     yield lval.as_tuple() + right_values.nulls()
 

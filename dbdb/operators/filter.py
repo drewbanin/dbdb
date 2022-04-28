@@ -45,7 +45,7 @@ class FilterOperator(Operator):
     def make_iterator(self, tuples):
         predicate = self.config.predicate
         for row in tuples:
-            if predicate.evaluate(row):
+            if predicate.eval(row):
                 yield row
 
     def run(self, rows):
