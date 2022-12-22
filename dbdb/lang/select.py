@@ -25,6 +25,7 @@ class Select:
         where=None,
         source=None,
         joins=None,
+        group_by=None,
         having=None,
         order_by=None,
         limit=None,
@@ -33,6 +34,7 @@ class Select:
         self.where = where
         self.source = source
         self.joins = joins or []
+        self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
 
@@ -75,11 +77,21 @@ class Select:
             plan.add_edge(table_op, filter_op, input_arg="rows")
             table_op = filter_op
 
-        # Projections
-        project_op = self.projections.as_operator()
-        plan.add_node(project_op, label="Project")
-        plan.add_edge(table_op, project_op, input_arg="rows")
-        table_op = project_op
+        # GROUP BY
+        if self.group_by:
+            aggregate_op = self.group_by.as_operator()
+            plan.add_node(aggregate_op, label="Aggregate")
+            plan.add_edge(table_op, aggregate_op, input_arg="rows")
+            table_op = aggregate_op
+            # We can do the actual grouping here.... should this
+            # just be it's own operator? why not??????
+            # I feel like i already tried this though...
+        else:
+            # Scalar projections
+            project_op = self.projections.as_operator()
+            plan.add_node(project_op, label="Project")
+            plan.add_edge(table_op, project_op, input_arg="rows")
+            table_op = project_op
 
         if self.order_by:
             order_by_op = self.order_by.as_operator()
@@ -116,51 +128,21 @@ class SelectList(SelectClause):
         self.projections = projections
 
     def as_operator(self):
-        # TODO : It's not super smart to mix projections and aliases here..
-        # Do i need a new operator that just does the grouping part? That
-        # Would feed forward tuples that contained the grouping set of tuples..
-        # which could be kind of interesting! It should totally be its own node
-        # in the execution graph.... but splitting up the projecting and agg
-        # from the grouping part feels kind of annoying... hmm.....
-        is_scalar = all(p.is_scalar() for p in self.projections)
-
-        if is_scalar:
-            return self.scalar_projection()
-        else:
-            return self.aggregate_projection()
-
-    def scalar_projection(self):
         return ProjectOperator(
-            project=[p.scalar_tuple() for p in self.projections]
-        )
-
-    def aggregate_projection(self):
-        return AggregateOperator(
-            fields=[p.agg_tuple() for p in self.projections]
+            project=self.projections
         )
 
 
 class SelectProjection(SelectClause):
-    def __init__(self, expr, aggregate, alias):
+    def __init__(self, expr, alias):
         self.expr = expr
-        self.aggregate = aggregate
         self.alias = alias
 
-    def scalar_tuple(self):
-        return (
-            self.expr,
-            self.alias
-        )
+    def get_aggregated_fields(self):
+        return self.expr.get_aggregated_fields()
 
-    def agg_tuple(self):
-        return (
-            self.aggregate,
-            self.expr,
-            self.alias
-        )
-
-    def is_scalar(self):
-        return self.aggregate == Aggregates.SCALAR
+    def get_non_aggregated_fields(self):
+        return self.expr.get_non_aggregated_fields()
 
 
 class SelectFilter(SelectClause):
@@ -219,6 +201,18 @@ class SelectJoin(SelectClause):
         return cls(to, expression, join_type, join_strategy)
 
 
+class SelectGroupBy(SelectClause):
+    def __init__(self, group_by_list, projections):
+        self.group_by_list = group_by_list
+        self.projections = projections
+
+    def as_operator(self):
+        return AggregateOperator(
+            group_by_list=self.group_by_list,
+            projections=self.projections,
+        )
+
+
 class SelectOrder(SelectClause):
     def __init__(self, order_by_list):
         self.order_by_list = order_by_list
@@ -230,6 +224,15 @@ class SelectOrder(SelectClause):
             order=order
         )
 
+    @classmethod
+    def parse_tokens(cls, string, loc, tokens):
+        order_by_list = []
+        for token in tokens:
+            order_by = SelectOrderBy.parse_tokens(token)
+            order_by_list.append(order_by)
+
+        return cls(order_by_list)
+
 
 class SelectOrderBy(SelectClause):
     def __init__(self, ascending, expression):
@@ -238,6 +241,18 @@ class SelectOrderBy(SelectClause):
 
     def as_tuple(self):
         return (self.ascending, self.expression)
+
+    @classmethod
+    def parse_tokens(cls, tokens):
+        ascending = True
+        if len(tokens) == 2:
+            ascending = tokens[1].upper() == 'ASC'
+
+        # TODO: Do we handle int literals here or elsewhere?
+        return cls(
+            ascending=ascending,
+            expression=tokens[0]
+        )
 
 
 class SelectLimit(SelectClause):

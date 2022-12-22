@@ -45,9 +45,11 @@ Identity = object()
 class AggregateConfig(OperatorConfig):
     def __init__(
         self,
-        fields,
+        group_by_list,
+        projections,
     ):
-        self.fields = fields
+        self.group_by_list = group_by_list
+        self.projections = projections
 
 
 class AggregateOperator(Operator):
@@ -57,7 +59,7 @@ class AggregateOperator(Operator):
         groups = {}
 
         for value in values:
-            key = tuple(expr_f(value) for _, expr_f, _ in exprs)
+            key = tuple(expr.eval(value) for expr in exprs)
             if key not in groups:
                 groups[key] = []
 
@@ -82,10 +84,55 @@ class AggregateOperator(Operator):
             yield tuple(result)
 
     def run(self, rows):
-        scalars = [p for p in self.config.fields if p[0] == Aggregates.SCALAR]
-        field_names = tuple([field for _, _, field in self.config.fields])
+        from dbdb.lang.lang import Literal
+        # Check group by fields against aggregate fields
+        # and make sure it all tracks
 
-        grouping = self.grouping_set(scalars, rows)
+        groupings = self.config.group_by_list
+        projections = self.config.projections.projections
+
+        grouped_fields = set()
+        for grouping in groupings:
+            if isinstance(grouping, Literal) and grouping.is_int():
+                # GROUP BY <INT>
+                index = grouping.value()
+                # TODO: Check for out of range
+                group_field = projections[index - 1]
+                fields_to_group = group_field.get_non_aggregated_fields()
+                agg_fields = group_field.get_aggregated_fields()
+                if len(agg_fields) > 0:
+                    raise RuntimeError("you're bad at writing SQL")
+
+                grouped_fields.update(fields_to_group)
+            else:
+                # GROUP BY <EXPR>
+                import ipdb; ipdb.set_trace()
+                pass
+
+        scalar_fields = []
+
+        for projection in projections:
+            # Check that referenced fields are either grouped or aggregated...
+            # Also, no expr should have both agg'd and unagg'd fields...
+
+            aggregated = projection.get_aggregated_fields()
+            scalar = projection.get_non_aggregated_fields()
+
+            if len(scalar) > 0 and len(aggregated) > 0:
+                raise RuntimeError("You're bad at writing SQL")
+
+            for field in scalar:
+                if field not in grouped_fields:
+                    raise RuntimeError(
+                        f"Field {field} is neither grouped"
+                        " nor aggregated"
+                    )
+
+            if len(scalar) > 0:
+                scalar_fields.append(projection.expr)
+
+        grouping = self.grouping_set(scalar_fields, rows)
+        # TODO : You stopped here...
         iterator = self.make_iterator(grouping)
 
         # This gets a temporary name because we do not know the name

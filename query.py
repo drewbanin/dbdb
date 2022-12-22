@@ -43,7 +43,7 @@ inner join my_table as debug on debug.my_string = my_table.my_string
 where debug.is_odd = true
   and debug.is_odd is not false
 group by 1
-order by my_table.my_string, 2
+order by my_table.my_string asc, 2
 limit 3
 """
 

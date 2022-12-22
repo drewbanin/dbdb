@@ -65,6 +65,9 @@ GROUP_BY = (pp.CaselessKeyword("GROUP") + pp.CaselessKeyword("BY"))
 ORDER_BY = (pp.CaselessKeyword("ORDER") + pp.CaselessKeyword("BY"))
 LIMIT = pp.CaselessKeyword("LIMIT")
 
+ASC = pp.CaselessKeyword("ASC")
+DESC = pp.CaselessKeyword("DESC")
+
 LEFT_OUTER = pp.CaselessKeyword("LEFT") + pp.Opt(pp.CaselessKeyword("OUTER"))
 RIGHT_OUTER = pp.CaselessKeyword("RIGHT") + pp.Opt(pp.CaselessKeyword("OUTER"))
 FULL_OUTER = pp.CaselessKeyword("FULL") + pp.CaselessKeyword("OUTER")
@@ -93,7 +96,9 @@ RESERVED = (
     INNER       |
     CROSS       |
     NATURAL     |
-    JOIN
+    JOIN |
+    ASC  |
+    DESC
 )
 
 IDENT = ~RESERVED + (
@@ -110,13 +115,24 @@ class ColumnIdentifier(ASTToken):
         self.table = table
         self.column = column
 
-    def eval(self, row):
+    def qualify(self):
         if self.table:
             name = f"{self.table}.{self.column}"
         else:
             name = self.column
 
+        return name
+
+    def eval(self, row):
+        name = self.qualify()
         return row.field(name)
+
+    def get_aggregated_fields(self):
+        return set()
+
+    def get_non_aggregated_fields(self):
+        name = self.qualify()
+        return {name}
 
 
 def make_col_identifier(string, loc, toks):
@@ -138,6 +154,7 @@ class TableIdent(ASTToken):
     def eval(self, row):
         # If we call this, something bad happened...
         raise NotImplementedError()
+
 
 
 def make_table_identifier(string, loc, toks):
@@ -168,6 +185,18 @@ class Literal(ASTToken):
 
     def eval(self, row):
         return self.val
+
+    def value(self):
+        return self.val
+
+    def get_aggregated_fields(self):
+        return set()
+
+    def get_non_aggregated_fields(self):
+        return set()
+
+    def is_int(self):
+        return isinstance(self.val, int)
 
 
 def as_literal(string, loc, toks):
@@ -201,15 +230,31 @@ class FunctionCall(ASTToken):
         self.func_expr = func_expr
         self.agg_type = agg_type
 
-    # TODO : So this kind of sucks. We need/want to do aggs
-    # separately from projection, and i kind of understand why
-    # that is now.... it in fact _does_ need to be its own step in
-    # execution DAG... that's kind of wild!!
-    def has_aggregate(self):
-        return self.agg_type != Aggregates.SCALAR
-
     def eval(self, row):
         return self.func_expr.eval(row)
+
+    def get_aggregated_fields(self):
+        # If this is a scalar function, return the set of fields
+        # that are aggregated within the function expression
+        if self.agg_type == Aggregates.SCALAR:
+            return self.func_expr.get_aggregated_fields()
+        else:
+            # If it's an aggregate function, then confirm that the func_expr
+            # is _not_ also an aggregate. Otherwise, return the non-agg fields
+            # contained within the function expression
+            agg_fields = self.func_expr.get_aggregated_fields()
+            if len(agg_fields) > 0:
+                raise RuntimeError("Tried to do a bad thing")
+
+            # So these are the un-agg fields that become aggregated via being
+            # contained within this function
+            return self.func_expr.get_non_aggregated_fields()
+
+    def get_non_aggregated_fields(self):
+        if self.agg_type == Aggregates.SCALAR:
+            return self.func_expr.get_non_aggregated_fields()
+        else:
+            return set()
 
 
 def call_function(string, loc, toks):
@@ -269,6 +314,16 @@ class BinaryOperator:
             self.rhs.eval(row)
         )
 
+    def get_aggregated_fields(self):
+        return self.lhs.get_aggregated_fields().union(
+            self.rhs.get_aggregated_fields()
+        )
+
+    def get_non_aggregated_fields(self):
+        return self.lhs.get_non_aggregated_fields().union(
+            self.rhs.get_non_aggregated_fields()
+        )
+
 
 def op_negate(string, loc, toks):
     # TODO:
@@ -326,6 +381,7 @@ class JoinCondition:
         # TODO: What is the LHS and RHS???
         join_expr = None
         return JoinCondition('USING', join_expr)
+
 
 def make_explicit_join(string, loc, toks):
     return JoinCondition.make_from_on_expr(toks)
@@ -415,6 +471,12 @@ JOIN_CLAUSE = (
 ).setParseAction(make_join_clause)
 
 
+from dbdb.lang.select import SelectOrder
+ORDER_BY_LIST = pp.delimitedList(
+    pp.Group(EXPRESSION + pp.Opt(ASC | DESC))
+).setParseAction(SelectOrder.parse_tokens)
+
+
 GRAMMAR = (
     pp.CaselessKeyword("SELECT") +
 
@@ -439,7 +501,7 @@ GRAMMAR = (
     )("group_by") +
 
     pp.Opt(
-        ORDER_BY + pp.delimitedList(EXPRESSION)
+        ORDER_BY + ORDER_BY_LIST
     )("order_by") +
 
     # limit
@@ -458,6 +520,7 @@ from dbdb.lang.select import (
     SelectFileSource,
     SelectMemorySource,
     SelectJoin,
+    SelectGroupBy,
     SelectOrder,
     SelectOrderBy,
     SelectLimit,
@@ -477,15 +540,8 @@ def extract_projections(ast):
         expr = column.column_expression
         alias = stringify(column.alias) or f'col_{i}'
 
-        # Like... big big hack. oops...
-        if type(expr) == FunctionCall:
-            agg_type = expr.agg_type
-        else:
-            agg_type = Aggregates.SCALAR
-
         projection = SelectProjection(
-            expr=expr.eval,
-            aggregate=agg_type,
+            expr=expr,
             alias=alias
         )
         projections.append(projection)
@@ -542,18 +598,42 @@ def extract_joins(ast):
     return joins
 
 
+def extract_group_by(ast, projections):
+    if 'group_by' not in ast:
+        return None
+
+    grouping_exprs = ast.group_by[2:]
+
+    # GROUP BY <expr>
+    return SelectGroupBy(
+        grouping_exprs,
+        projections,
+    )
+
+
+def extract_order_by(ast):
+    if 'order_by' not in ast:
+        return None
+
+    # ORDER BY <expr>
+    return ast.order_by[2]
+
+
 def extract_limit(ast):
-    if 'limit' in ast:
-        limit = ast.limit[1]
-        return SelectLimit(limit)
-    return None
+    if 'limit' not in ast:
+        return None
+
+    # LIMIT <count>
+    limit = ast.limit[1]
+    return SelectLimit(limit)
 
 
 def ast_to_select_obj(ast):
     projections = extract_projections(ast)
     wheres = extract_wheres(ast)
     joins = extract_joins(ast)
-    order_by = None
+    order_by = extract_order_by(ast)
+    group_by = extract_group_by(ast, projections)
     limit = extract_limit(ast)
 
     source = extract_source(ast, [])
@@ -563,6 +643,7 @@ def ast_to_select_obj(ast):
         where=wheres,
         source=source,
         joins=joins,
+        group_by=group_by,
         order_by=order_by,
         limit=limit
     )

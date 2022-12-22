@@ -34,9 +34,11 @@ class TableScanOperator(Operator):
         self.cache.update(self.reader.stats())
 
     def make_iterator(self, tuples):
-        for record in tuples:
+        for i, record in enumerate(tuples):
             yield record
             self.update_stats(record)
+            if i > 1000:
+                break
 
     def run(self):
         self.cache['rows_seen'] = 0
@@ -50,6 +52,7 @@ class TableScanOperator(Operator):
         )
 
         iterator = self.make_iterator(tuples)
+
         return Rows(
             self.config.table,
             self.config.columns,
