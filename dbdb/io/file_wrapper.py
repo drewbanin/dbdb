@@ -3,6 +3,7 @@
 # Records stats
 
 from contextlib import contextmanager
+import time
 
 
 class FileHandleProxy:
@@ -18,6 +19,9 @@ class FileHandleProxy:
         fh.seek(0)
 
     def read(self, count):
+        print("Blocking read")
+        time.sleep(0.5)
+
         if count is None:
             raise NotImplementedError()
 

@@ -47,6 +47,8 @@ setup(
         'networkx==2.8',
         'pyparsing==3.0.8',
         'tabulate==0.8.9',
+        'Pympler==1.0.1',
+
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

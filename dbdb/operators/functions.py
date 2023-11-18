@@ -1,51 +1,98 @@
 
-def none_if_empty(func):
-    def _inner(values):
-        lst = list(values)
-        if len(lst) == 0:
+class Aggregation:
+    ...
+
+
+class AggregationMin(Aggregation):
+    def __init__(self):
+        self.min = None
+
+    def process(self, value):
+        if self.min is None:
+            self.min = value
+
+        elif value < self.min:
+            self.min = value
+
+    def result(self):
+        return self.min
+
+
+class AggregationMax(Aggregation):
+    def __init__(self):
+        self.max = None
+
+    def _process(self, value):
+        if self.max is None:
+            self.max = value
+
+        elif value > self.max:
+            self.max = value
+
+    def result(self):
+        return self.max
+
+
+class AggregationSum(Aggregation):
+    def __init__(self):
+        self.sum = None
+
+    def process(self, value):
+        if self.sum is None:
+            self.sum = value
+
+        else:
+            self.sum += value
+
+    def result(self):
+        return self.sum
+
+
+class AggregationAverage(Aggregation):
+    def __init__(self):
+        self.sum = 0
+        self.seen = 0
+
+    def process(self, value):
+        self.sum += value
+        self.seen += 1
+
+    def result(self):
+        if self.seen == 0:
             return None
 
-        return func(lst)
-    return _inner
+        return self.sum / self.seen
 
 
-@none_if_empty
-def agg_min(values):
-    return min(values)
+class AggregationCount(Aggregation):
+    def __init__(self):
+        self.seen = 0
+
+    def process(self, value):
+        self.seen += 1
+
+    def result(self):
+        return self.seen
 
 
-@none_if_empty
-def agg_max(values):
-    return max(values)
+class AggregationCountDistinct(Aggregation):
+    def __init__(self):
+        self.seen = set()
+
+    def process(self, value):
+        self.seen.add(value)
+
+    def result(self):
+        return len(self.seen)
 
 
-@none_if_empty
-def agg_sum(values):
-    return sum(values)
+class AggregationListAgg(Aggregation):
+    def __init__(self):
+        self.seen = set()
 
+    def process(self, value):
+        self.seen.add(value)
 
-@none_if_empty
-def agg_avg(values):
-    count = len(values)
-    total = sum(values)
-
-    if count == 0:
-        return None
-    else:
-        return total / count
-
-
-@none_if_empty
-def agg_count(values):
-    return sum(0 if v is None else 1 for v in values)
-
-
-@none_if_empty
-def agg_countd(values):
-    return len(set(values))
-
-
-@none_if_empty
-def agg_list(values, distinct=False):
-    # TODO: distinct, ordering, w/e
-    return ",".join(values)
+    def result(self):
+        self.result = ",".join([str(s) for s in self.seen])
+        return self.result

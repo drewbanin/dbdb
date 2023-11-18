@@ -260,4 +260,4 @@ class SelectLimit(SelectClause):
         self.limit = limit
 
     def as_operator(self):
-        return LimitOperator(limit=self.limit)
+        return LimitOperator(limit=self.limit.val)

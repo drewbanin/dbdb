@@ -29,19 +29,18 @@ class TableScanConfig(OperatorConfig):
 class TableScanOperator(Operator):
     Config = TableScanConfig
 
-    def update_stats(self, tuples):
-        self.cache['rows_seen'] += 1
-        self.cache.update(self.reader.stats())
-
     def make_iterator(self, tuples):
         for i, record in enumerate(tuples):
+            self.stats.update_row_processed(record)
+
             yield record
-            self.update_stats(record)
-            if i > 1000:
-                break
+            self.stats.update_custom_stats(self.reader.stats())
+            self.stats.update_row_emitted(record)
+
+        self.stats.update_done_running()
 
     def run(self):
-        self.cache['rows_seen'] = 0
+        self.stats.update_start_running()
 
         self.reader = FileReader(self.config.table_ref)
         column_names = [c.name for c in self.config.columns]

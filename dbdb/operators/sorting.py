@@ -30,23 +30,28 @@ class SortOperator(Operator):
         # this will sort "ascending", so make sure that
         # we account for sort order in here... somehow...
 
+        self.stats.update_row_processed(row)
         sort_keys = []
-        for ascending, key_f in self.config.order:
-            if ascending:
-                key = key_f(row)
-            else:
-                key = ReverseSort(key_f(row))
+        for ascending, projection in self.config.order:
+            key = projection.eval(row)
+            if not ascending:
+                key = ReverseSort(key)
 
             sort_keys.append(key)
 
         return sort_keys
 
     def make_iterator(self, tuples):
-        yield from sorted(
+        for row in sorted(
             tuples,
             key=self.sort_func,
-        )
+        ):
+            self.stats.update_row_emitted(row)
+            yield row
+
+        self.stats.update_done_running()
 
     def run(self, rows):
+        self.stats.update_start_running()
         iterator = self.make_iterator(rows)
         return rows.new(iterator)

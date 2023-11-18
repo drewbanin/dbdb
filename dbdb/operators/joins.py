@@ -5,6 +5,8 @@ from dbdb.expressions import EqualityTypes
 from enum import Enum
 
 import enum
+
+
 class JoinType(enum.Enum):
     INNER = enum.auto()
     LEFT_OUTER = enum.auto()
@@ -44,8 +46,10 @@ class JoinOperator(Operator):
     Config = JoinConfig
 
     def run(self, left_rows, right_rows):
+        self.stats.update_start_running()
         iterator = self._join(left_rows, right_rows)
         return Rows.merge([left_rows, right_rows], iterator)
+
 
 class NestedLoopJoinOperator(JoinOperator):
     def _join(self, left_values, right_values):
@@ -69,16 +73,20 @@ class NestedLoopJoinOperator(JoinOperator):
             lvals, rvals = rvals, lvals
             is_outer = True
 
-        yielded = 0
         for lval in lvals:
+            self.stats.update_row_processed(lval)
             for rval in rvals:
+                self.stats.update_row_processed(rval)
                 merged = lval.merge(rval)
                 if self.config.expression.eval(merged):
                     yield merged
-                    yielded += 1
+                    self.stats.update_row_emitted(merged)
                 elif is_outer:
-                    yield lval.as_tuple() + rval.nulls()
-                    yielded += 1
+                    merged = lval.as_tuple() + rval.nulls()
+                    self.stats.update_row_emitted(merged)
+                    yield merged
+
+        self.stats.update_done_running()
 
 
 class HashJoinOperator(JoinOperator):
@@ -107,19 +115,25 @@ class HashJoinOperator(JoinOperator):
         rvals = right_values.materialize()
         rhash = self._hash_to_list(rvals, equality.rexpr)
 
+        # TODO : I think i can/should change this to only hash one side up-front...
         for key, lrows in lhash.items():
             rrows = rhash.get(key, [])
             for lval in lrows:
+                self.stats.update_row_processed(lval)
                 included = False
                 for rval in rrows:
+                    self.stats.update_row_processed(rval)
                     included = True
                     merged = lval.merge(rval)
                     yield merged
+                    self.stats.update_row_emitted(merged)
 
-                # TODO: Handle different join types here?
-                import ipdb; ipdb.set_trace()
+                # TODO : Does this work?
                 if not self.config.inner and not included:
                     yield lval.as_tuple() + right_values.nulls()
+                    self.stats.update_row_emitted(merged)
+
+        self.stats.update_done_running()
 
 
 class MergeJoinOperator(JoinOperator):

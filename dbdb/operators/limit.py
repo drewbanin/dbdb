@@ -20,12 +20,17 @@ class LimitOperator(Operator):
         if limit == 0:
             raise StopIteration()
 
-        for i, val in enumerate(tuples):
-            yield val
+        for i, row in enumerate(tuples):
+            self.stats.update_row_processed(row)
+            yield row
+            self.stats.update_row_emitted(row)
 
             if i >= limit - 1:
                 break
 
+        self.stats.update_done_running()
+
     def run(self, rows):
+        self.stats.update_start_running()
         iterator = self.make_iterator(rows)
         return rows.new(iterator)
