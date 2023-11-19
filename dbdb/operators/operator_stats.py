@@ -8,10 +8,19 @@ STATE_RUNNING = "running"
 STATE_DONE = "done"
 
 SIZE_CACHE = {}
+STAT_CALLBACK = None
+
+
+def set_stats_callback(function):
+    global STAT_CALLBACK
+    STAT_CALLBACK = function
 
 
 class OperatorStats:
-    def __init__(self):
+    def __init__(self, operator_id, operator_type):
+        self.operator_id = operator_id
+        self.operator_type = operator_type
+
         self.rows_processed = 0
         self.rows_emitted = 0
         self.bytes_processed = 0
@@ -59,7 +68,6 @@ class OperatorStats:
         # cache it b/c in practice is is slow asf
         row_id = id(row)
         if row_id in SIZE_CACHE:
-            print(self.size_cache_hits)
             return SIZE_CACHE[row_id]
 
         size = asizeof.asizeof(row)
@@ -71,6 +79,9 @@ class OperatorStats:
         self.rows_processed += 1
         self.bytes_processed += self._get_size_of_row(row)
 
+        if (STAT_CALLBACK):
+            STAT_CALLBACK(self.get_stats())
+
     def update_row_emitted(self, row):
         self.rows_emitted += 1
         self.bytes_emmitted += self._get_size_of_row(row)
@@ -80,6 +91,9 @@ class OperatorStats:
 
     def get_stats(self):
         return {
+            "operator_id": self.operator_id,
+            "operator_type": self.operator_type,
+
             "rows_processed": self.rows_processed,
             "rows_emitted": self.rows_emitted,
             "bytes_processed": self.bytes_processed,

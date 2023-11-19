@@ -90,6 +90,19 @@ class Rows:
 
         return self.data
 
+    def as_table(self):
+        data = self.materialize()
+
+        raw = tuple([r.data for r in data])
+        fields = [f.name for f in self.fields]
+
+        accum = []
+        for row in raw:
+            as_dict = dict(zip(fields, row))
+            accum.append(as_dict)
+
+        return accum
+
     def display(self, num_rows=10):
         # We need to materialize the iterator otherwise
         # printing the table will consume all rows :/

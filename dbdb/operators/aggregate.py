@@ -55,6 +55,9 @@ class AggregateConfig(OperatorConfig):
 class AggregateOperator(Operator):
     Config = AggregateConfig
 
+    def name(self):
+        return "Aggregate"
+
     def grouping_set(self, exprs, values):
         groups = {}
 

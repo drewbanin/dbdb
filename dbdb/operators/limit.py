@@ -13,6 +13,14 @@ class LimitConfig(OperatorConfig):
 class LimitOperator(Operator):
     Config = LimitConfig
 
+    def name(self):
+        return "Limit"
+
+    def details(self):
+        return {
+            "Limit": self.config.limit
+        }
+
     def make_iterator(self, tuples):
         limit = self.config.limit
 

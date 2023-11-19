@@ -29,6 +29,15 @@ class TableScanConfig(OperatorConfig):
 class TableScanOperator(Operator):
     Config = TableScanConfig
 
+    def name(self):
+        return "Table Scan"
+
+    def details(self):
+        return {
+            "table": self.config.table_ref,
+            "columns": self.config.columns,
+        }
+
     def make_iterator(self, tuples):
         for i, record in enumerate(tuples):
             self.stats.update_row_processed(record)

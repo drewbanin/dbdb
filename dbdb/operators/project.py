@@ -3,7 +3,6 @@ from dbdb.tuples.rows import Rows, RowTuple
 from dbdb.tuples.identifiers import FieldIdentifier
 
 
-
 class ProjectConfig(OperatorConfig):
     def __init__(
         self,
@@ -15,12 +14,15 @@ class ProjectConfig(OperatorConfig):
 class ProjectOperator(Operator):
     Config = ProjectConfig
 
+    def name(self):
+        return "Projection"
+
     def make_iterator(self, tuples):
         projections = self.config.project
         for row in tuples:
             projected = []
-            for project_f, _ in projections:
-                value = project_f(row)
+            for projection in projections:
+                value = projection.expr.eval(row)
                 projected.append(value)
 
             yield projected
@@ -28,7 +30,8 @@ class ProjectOperator(Operator):
     def run(self, rows):
         fields = []
         projections = self.config.project
-        for _, alias in projections:
+        for projection in projections:
+            alias = projection.alias
             field = FieldIdentifier(alias, rows.table)
             fields.append(field)
 

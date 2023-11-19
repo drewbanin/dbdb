@@ -25,6 +25,9 @@ class SortingConfig(OperatorConfig):
 class SortOperator(Operator):
     Config = SortingConfig
 
+    def name(self):
+        return "Sort"
+
     def sort_func(self, row):
         # function that returns a tuple of sort orders...
         # this will sort "ascending", so make sure that

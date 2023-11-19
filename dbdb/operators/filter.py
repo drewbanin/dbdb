@@ -42,6 +42,9 @@ class FilterConfig(OperatorConfig):
 class FilterOperator(Operator):
     Config = FilterConfig
 
+    def name(self):
+        return "Filter"
+
     def make_iterator(self, tuples):
         predicate = self.config.predicate
         for row in tuples:

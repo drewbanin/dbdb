@@ -26,10 +26,26 @@ class Operator:
         self.operator_id = uuid.uuid4()
         self.cache = {}
         self.config = self.Config(**config)
-        self.stats = OperatorStats()
+        self.stats = OperatorStats(
+            operator_id=id(self),
+            operator_type=self.name()
+        )
 
     def run(self):
         raise NotImplementedError()
+
+    def name(self):
+        raise NotImplementedError()
+
+    def details(self):
+        return {}
+
+    def to_dict(self):
+        return {
+            "id": id(self),
+            "name": self.name(),
+            "details": self.details()
+        }
 
     def print_cache(self):
         rows = []

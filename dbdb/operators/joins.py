@@ -16,6 +16,16 @@ class JoinType(enum.Enum):
     CROSS = enum.auto()
 
 
+JoinTypeNames = {
+    JoinType.INNER: "Inner",
+    JoinType.LEFT_OUTER: "Left Outer",
+    JoinType.RIGHT_OUTER: "Right Outer",
+    JoinType.FULL_OUTER: "Full Outer",
+    JoinType.NATURAL: "Natural",
+    JoinType.CROSS: "Cross Join",
+}
+
+
 class JoinStrategy(Enum):
     NestedLoop = 1
     HashJoin = 2
@@ -45,6 +55,14 @@ class JoinConfig(OperatorConfig):
 class JoinOperator(Operator):
     Config = JoinConfig
 
+    def name(self):
+        return "Join"
+
+    def details(self):
+        return {
+            "type": JoinTypeNames[self.config.join_type]
+        }
+
     def run(self, left_rows, right_rows):
         self.stats.update_start_running()
         iterator = self._join(left_rows, right_rows)
@@ -52,6 +70,9 @@ class JoinOperator(Operator):
 
 
 class NestedLoopJoinOperator(JoinOperator):
+    def name(self):
+        return "Nested Loop Join"
+
     def _join(self, left_values, right_values):
         # Unfortunate thing: we need to materialize the
         # left and right iterators in order to loop over
@@ -90,6 +111,9 @@ class NestedLoopJoinOperator(JoinOperator):
 
 
 class HashJoinOperator(JoinOperator):
+    def name(self):
+        return "Hash Join"
+
     def _hash_to_list(self, rows, expr):
         hashed = {}
         for row in rows:
@@ -137,5 +161,8 @@ class HashJoinOperator(JoinOperator):
 
 
 class MergeJoinOperator(JoinOperator):
+    def name(self):
+        return "Merge Join"
+
     def _join(self, left_values, right_values):
         raise NotImplementedError()

@@ -4,6 +4,7 @@
 
 from contextlib import contextmanager
 import time
+import asyncio
 
 
 class FileHandleProxy:
@@ -20,7 +21,6 @@ class FileHandleProxy:
 
     def read(self, count):
         print("Blocking read")
-        time.sleep(0.5)
 
         if count is None:
             raise NotImplementedError()
