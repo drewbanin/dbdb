@@ -44,9 +44,10 @@ class SortOperator(Operator):
 
         return sort_keys
 
-    def make_iterator(self, tuples):
+    async def make_iterator(self, rows):
+        data = await rows.materialize()
         for row in sorted(
-            tuples,
+            data,
             key=self.sort_func,
         ):
             self.stats.update_row_emitted(row)
@@ -54,7 +55,7 @@ class SortOperator(Operator):
 
         self.stats.update_done_running()
 
-    def run(self, rows):
+    async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
         return rows.new(iterator)

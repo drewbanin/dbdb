@@ -9,6 +9,7 @@
     "@uiw/react-textarea-code-editor": "^2.1.9",
     "bootstrap": "^5.3.2",
     "dagre": "^0.8.5",
+    "eventemitter3": "^5.0.1",
     "react": "^18.2.0",
     "react-bootstrap": "^2.9.1",
     "react-data-table-component": "^7.5.4",

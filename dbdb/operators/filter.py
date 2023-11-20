@@ -45,9 +45,9 @@ class FilterOperator(Operator):
     def name(self):
         return "Filter"
 
-    def make_iterator(self, tuples):
+    async def make_iterator(self, tuples):
         predicate = self.config.predicate
-        for row in tuples:
+        async for row in tuples:
             self.stats.update_row_processed(row)
             if predicate.eval(row):
                 yield row
@@ -55,7 +55,7 @@ class FilterOperator(Operator):
 
         self.stats.update_done_running()
 
-    def run(self, rows):
+    async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
         return rows.new(iterator)

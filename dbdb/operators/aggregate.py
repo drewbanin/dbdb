@@ -70,7 +70,7 @@ class AggregateOperator(Operator):
 
         return groups
 
-    def make_iterator(self, scalar_fields, grouping, rows):
+    async def make_iterator(self, scalar_fields, grouping, rows):
         projections = self.config.projections.projections
 
         resolve_funcs = []
@@ -80,7 +80,7 @@ class AggregateOperator(Operator):
                 resolve_funcs.append(agg_class)
 
         grouped_sets = {}
-        for row in rows:
+        async for row in rows:
             self.stats.update_row_processed(row)
             grouping_values = []
             agg_values = []
@@ -120,8 +120,7 @@ class AggregateOperator(Operator):
 
         self.stats.update_done_running()
 
-
-    def run(self, rows):
+    async def run(self, rows):
         self.stats.update_start_running()
         from dbdb.lang.lang import Literal
         # Check group by fields against aggregate fields

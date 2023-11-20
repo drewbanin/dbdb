@@ -4,10 +4,11 @@ from dbdb.operators.operator_stats import set_stats_callback
 import networkx as nx
 import time
 import json
+import random
 from pydantic import BaseModel
 from typing import Dict, List
 
-from fastapi import FastAPI, BackgroundTasks, Request
+from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
@@ -34,7 +35,7 @@ app.add_middleware(
 
 
 EVENTS = []
-STREAM_DELAY = 1  # second
+STREAM_DELAY = 0.1  # second
 
 
 @app.get('/stream')
@@ -61,10 +62,18 @@ async def message_stream(request: Request):
     return EventSourceResponse(event_generator())
 
 
-async def do_run_query(plan, nodes):
+async def _do_run_query(plan, nodes):
+    start_time = time.time()
     row_iterators: Dict[str, List] = {}
 
-    def on_stat(stat):
+    # Sample stats
+
+    def on_stat(name, stat):
+        if name == "processing":
+            # sample it
+            if random.random() > 0.05:
+                return
+
         EVENTS.append({
             "event": "OperatorStats",
             "data": stat
@@ -79,16 +88,16 @@ async def do_run_query(plan, nodes):
             args[key] = row_iterators[parent]
 
         print("Running operator", node, "with args", args)
-        rows = node.run(**args)
+        rows = await node.run(**args)
         row_iterators[node] = rows
 
     leaf_node = nodes[-1]
 
     preso = row_iterators[leaf_node]
-    preso.display()
+    await preso.display()
 
     columns = [f.name for f in preso.fields]
-    data = preso.as_table()
+    data = await preso.as_table()
 
     EVENTS.append({
         "event": "QueryComplete",
@@ -99,11 +108,40 @@ async def do_run_query(plan, nodes):
         }
     })
 
+    total_bytes_read = 0
+    for node in nodes:
+        if node.name() == "Table Scan":
+            total_bytes_read += node.stats.custom_stats['bytes_read']
 
-@app.post("/query")
-async def run_query(query: Query, background_tasks: BackgroundTasks):
-    sql = query.sql
+    end_time = time.time()
+    elapsed = end_time - start_time
 
+    EVENTS.append({
+        "event": "QueryStats",
+        "data": {
+            "id": id(plan),
+            "elapsed": elapsed,
+            "bytes_read": total_bytes_read,
+        }
+    })
+
+
+
+async def do_run_query(plan, nodes):
+    try:
+        await _do_run_query(plan, nodes)
+    except RuntimeError as e:
+        print("GOT AN ERROR!", e)
+        EVENTS.append({
+            "event": "QueryError",
+            "data": {
+                "id": id(plan),
+                "error": str(e)
+            }
+        })
+
+
+def make_plan(sql):
     parsed = dbdb.lang.lang.parse_query(sql)
     plan = parsed.make_plan()
     nodes = list(nx.topological_sort(plan))
@@ -113,7 +151,36 @@ async def run_query(query: Query, background_tasks: BackgroundTasks):
         parent_nodes = plan.predecessors(node)
         parents[id(node)] = [id(n) for n in parent_nodes]
 
+    return plan, nodes, parents
+
+
+@app.post("/query")
+async def run_query(query: Query, background_tasks: BackgroundTasks):
+    sql = query.sql
+    try:
+        plan, nodes, parents = make_plan(sql)
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=400, detail=str(e))
+
     background_tasks.add_task(do_run_query, plan, nodes)
+
+    return {
+        "query_id": id(plan),
+        "nodes": [node.to_dict() for node in nodes],
+        "edges": parents,
+    }
+
+
+@app.post("/explain")
+async def explain_query(query: Query):
+    sql = query.sql
+
+    try:
+        plan, nodes, parents = make_plan(sql)
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=400, detail=str(e))
 
     return {
         "query_id": id(plan),

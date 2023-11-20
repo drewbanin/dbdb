@@ -3,29 +3,61 @@ import Button from 'react-bootstrap/Button';
 
 import { postRequest } from '../Client.js';
 import { QueryContext } from '../Store.js';
-import { usePollForQuery } from '../Hooks.js';
+import { usePub } from '../Hooks.js';
 
 import CodeEditor from '@uiw/react-textarea-code-editor';
 import Spinner from '../spinner.gif';
 
 function QueryComponent() {
 
-    const { query, result, nodes } = useContext(QueryContext);
-
+    const { query, result, nodes, error } = useContext(QueryContext);
 
     const [ queryText, setQueryText ] = query;
     const [ _, setResult ] = result;
     const [ nodeData, setNodeData ] = nodes;
+    const [ errorData, setError ] = error;
 
     const [ queryRunning, setQueryRunning ] = useState(false);
-    const runQuery = useCallback(async () => {
+    const runQuery = () => {
         if (queryRunning) return;
+
+        setError(null);
+        setNodeData(null);
+        setResult(null);
 
         setQueryRunning(true);
         postRequest("query", {sql: queryText}, (res) => {
-            setNodeData(res);
+            if (res.detail) {
+                setQueryRunning(false)
+                setError({error: res.detail});
+                setNodeData(null)
+            } else {
+                setNodeData(res);
+            }
         })
-    });
+    };
+
+    const explainQuery = () => {
+        if (queryRunning) return;
+
+        setError(null);
+        setNodeData(null);
+        setResult(null);
+
+        setQueryRunning(true);
+        postRequest("explain", {sql: queryText}, (res) => {
+            if (res.detail) {
+                setError({error: res.detail});
+                setQueryRunning(false)
+                setNodeData(null)
+            } else {
+                setNodeData(res);
+                setQueryRunning(false);
+            }
+        })
+    };
+
+    const publish = usePub();
 
     useEffect(() => {
       const sse = new EventSource('http://localhost:8000/stream', { withCredentials: false });
@@ -38,8 +70,12 @@ function QueryComponent() {
         if (event === "QueryComplete") {
             setResult(data);
             setQueryRunning(false);
-        } else if (event === "OperatorStats") {
-            console.log(data);
+        } else if (event === "QueryError") {
+            setResult(null);
+            setQueryRunning(false);
+            setError(data);
+        } else {
+            publish(event, data);
         }
       }
       sse.onerror = (e) => {
@@ -78,7 +114,10 @@ function QueryComponent() {
               }}
             />
             <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
-            <Button disabled={queryRunning}>EXPLAIN</Button>
+            <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
+            {errorData && <div className="queryError">
+                <strong>Query Error:</strong> {errorData.error}
+            </div>}
         </>
     )
 }

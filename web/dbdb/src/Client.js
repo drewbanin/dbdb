@@ -12,7 +12,7 @@ function postRequest(path, body, callback) {
     )
     .then(response => response.json())
     .then(json => callback(json))
-    .catch(error => console.error(error));
+    .catch(error => callback(error));
 }
 
 

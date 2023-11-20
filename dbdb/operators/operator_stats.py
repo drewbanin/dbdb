@@ -34,12 +34,17 @@ class OperatorStats:
         self.size_cache_hits = 0
 
     def update_start_running(self):
-        self.state = STATE_RUNNING
-        self.start_time = time.time()
+        self.state = STATE_WAITING
+
+        if (STAT_CALLBACK):
+            STAT_CALLBACK("waiting", self.get_stats())
 
     def update_done_running(self):
         self.state = STATE_DONE
         self.end_time = time.time()
+
+        if (STAT_CALLBACK):
+            STAT_CALLBACK("done", self.get_stats())
 
     def _get_elapsed_time(self):
         if self.start_time is None:
@@ -54,14 +59,14 @@ class OperatorStats:
         if elapsed == 0:
             return 0
 
-        return self.bytes_emmitted / elapsed
+        return self.rows_processed / elapsed
 
     def _get_rows_per_sec(self):
         elapsed = self._get_elapsed_time()
         if elapsed == 0:
             return 0
 
-        return self.rows_emitted / elapsed
+        return self.rows_processed / elapsed
 
     def _get_size_of_row(self, row):
         # this is a fairly heavy-handed way to do this, but w/e
@@ -76,18 +81,29 @@ class OperatorStats:
         return size
 
     def update_row_processed(self, row):
+        if self.start_time is None:
+            self.start_time = time.time()
+
+        self.state = STATE_RUNNING
+
         self.rows_processed += 1
         self.bytes_processed += self._get_size_of_row(row)
 
         if (STAT_CALLBACK):
-            STAT_CALLBACK(self.get_stats())
+            STAT_CALLBACK("processing", self.get_stats())
 
     def update_row_emitted(self, row):
         self.rows_emitted += 1
         self.bytes_emmitted += self._get_size_of_row(row)
 
+        if (STAT_CALLBACK):
+            STAT_CALLBACK("processing", self.get_stats())
+
     def update_custom_stats(self, stats_dict):
         self.custom_stats = stats_dict
+
+        if (STAT_CALLBACK):
+            STAT_CALLBACK("processing", self.get_stats())
 
     def get_stats(self):
         return {

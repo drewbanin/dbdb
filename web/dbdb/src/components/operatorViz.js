@@ -1,4 +1,4 @@
-import React, {useContext, useCallback, useEffect} from 'react';
+import React, {useContext, useCallback, useState, useMemo} from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   Panel,
@@ -7,18 +7,20 @@ import ReactFlow, {
   useEdgesState,
   useReactFlow,
 } from 'reactflow';
+
 import Dagre from 'dagre';
 
 import { QueryContext } from '../Store.js';
+import { OperatorNode } from "./OperatorNode.js"
 
 const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
 
 const getLayoutedElements = (nodes, edges, options) => {
   g.setGraph({
     rankdir: options.direction,
-    nodesep: 200,
+    nodesep: 100,
     edgesep: 100,
-    ranksep: 100,
+    ranksep: 50,
   });
 
   edges.forEach((edge) => g.setEdge(edge.source, edge.target));
@@ -59,6 +61,9 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
     [nodes, edges]
   );
 
+  const nodeTypes = useMemo(() => ({
+      operator: OperatorNode
+  }), []);
 
   return (
     <ReactFlow
@@ -66,6 +71,7 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      nodeTypes={nodeTypes}
       fitView
       fitViewOptions={{ padding: 0.3, includeHiddenNodes: true, nodes: nodes }}
       proOptions={{ hideAttribution: true }}
@@ -81,25 +87,25 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
 function OperatorViz(props) {
     const { query, result, nodes } = useContext(QueryContext);
     const [ nodeData, setNodeData ] = nodes;
-
-    console.log("Node data", nodeData);
+    const [ labels, setLabels ] = useState({nodes: {}})
 
     if (!nodeData || !nodeData.nodes) {
         return (<div style={{ marginTop: 10 }}>NO DATA</div>)
     }
-    
+
     const RFNodes = nodeData.nodes.map((node) => {
         return {
             id: node.id + '',
             data: {
                 label: node.name,
+                id: node.id,
             },
-            type: 'default',
-            width: 100,
-            height: 20,
+            type: 'operator',
             position: { x: 0, y: 0 },
             sourcePosition: 'right',
             targetPosition: 'left',
+            width: 200,
+            height: 100
         }
     })
 
@@ -127,7 +133,6 @@ function OperatorViz(props) {
             });
         });
     });
-
 
     const layouted = getLayoutedElements(RFNodes, RFEdges, {direction: "LR"});
 

@@ -40,52 +40,51 @@ select
   sum(my_table.is_odd + 10) as my_avg
 
 from my_table
-inner join my_table as debug on debug.my_string = my_table.my_string
-where debug.is_odd = true
-  and debug.is_odd is not false
 group by 1
 order by 1
 limit 10
 """
 
+
 import dbdb.lang.lang
-
-query = dbdb.lang.lang.parse_query(sql)
-print(query)
-
-plan = query.make_plan()
-print(plan)
-
-nodes = list(nx.topological_sort(plan))
-
-parents = {}
-for node in nodes:
-    parent_nodes = plan.predecessors(node)
-    parents[id(node)] = [id(n) for n in parent_nodes]
-
-print(
-print(parents)
-
-import sys
-sys.exit(0)
-
-row_iterators = {}
-for node in nodes:
-    args = {}
-    for parent, _, data in plan.in_edges(node, data=True):
-        key = data['input_arg']
-        args[key] = row_iterators[parent]
-
-    print("Running operator", node, "with args", args)
-    rows = node.run(**args)
-    row_iterators[node] = rows
-
-leaf_node = nodes[-1]
-print("Leaf:", leaf_node)
+import asyncio
 
 
-preso = row_iterators[leaf_node]
-preso.display()
+async def run():
+
+    query = dbdb.lang.lang.parse_query(sql)
+    print(query)
+
+    plan = query.make_plan()
+    print(plan)
+
+    nodes = list(nx.topological_sort(plan))
+
+    parents = {}
+    for node in nodes:
+        parent_nodes = plan.predecessors(node)
+        parents[id(node)] = [id(n) for n in parent_nodes]
+
+    row_iterators = {}
+    for node in nodes:
+        args = {}
+        for parent, _, data in plan.in_edges(node, data=True):
+            key = data['input_arg']
+            args[key] = row_iterators[parent]
+
+        print("Running operator", node, "with args", args)
+        rows = await node.run(**args)
+        row_iterators[node] = rows
+
+    leaf_node = nodes[-1]
+    print("Leaf:", leaf_node)
+
+
+    preso = row_iterators[leaf_node]
+    await preso.display()
+
+
+asyncio.run(run())
 
 """
 my_table = TableIdentifier.new("my_table")

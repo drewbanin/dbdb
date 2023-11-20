@@ -21,14 +21,15 @@ class LimitOperator(Operator):
             "Limit": self.config.limit
         }
 
-    def make_iterator(self, tuples):
+    async def make_iterator(self, tuples):
         limit = self.config.limit
 
         # Do not read _any_ rows if limit is zero
         if limit == 0:
             raise StopIteration()
 
-        for i, row in enumerate(tuples):
+        i = 0
+        async for row in tuples:
             self.stats.update_row_processed(row)
             yield row
             self.stats.update_row_emitted(row)
@@ -36,9 +37,12 @@ class LimitOperator(Operator):
             if i >= limit - 1:
                 break
 
+            i += 1
+
         self.stats.update_done_running()
 
-    def run(self, rows):
+    async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
+
         return rows.new(iterator)

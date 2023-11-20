@@ -1,6 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useSub } from '../Hooks.js';
+
+import { LineDetail } from './LineDetail.js';
+import { formatBytes, formatNumber } from '../Helpers.js';
 
 function QueryStats() {
+    const [queryStats, setQueryStats] = useState(null)
+
+    useSub('QueryStats', (stats) => {
+        console.log(stats);
+        setQueryStats(stats);
+    });
+
+    const formatElapsed = (elapsed) => {
+        if (!elapsed) {
+            return '?';
+        }
+
+        return elapsed.toFixed(2) + " seconds";
+    }
+
+    const timeElapsed = queryStats ? formatElapsed(queryStats.elapsed) : "?";
+    const bytesRead = queryStats ? formatBytes(queryStats.bytes_read) : "?";
+
     return (
         <>
             <div className="panelHeader">
@@ -11,11 +33,8 @@ function QueryStats() {
                 </div>
             </div>
             <div className="configBox">
-                <div>
-                    <span className="light">Rows / sec</span>
-                    <span className="light">.........</span>
-                    <span className="heavy">487</span>
-                </div>
+                <LineDetail label={"TIME ELAPSED"} value={timeElapsed} />
+                <LineDetail label={"BYTES READ"} value={bytesRead} />
             </div>
         </>
     )

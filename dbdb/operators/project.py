@@ -27,7 +27,7 @@ class ProjectOperator(Operator):
 
             yield projected
 
-    def run(self, rows):
+    async def run(self, rows):
         fields = []
         projections = self.config.project
         for projection in projections:

@@ -1,42 +1,26 @@
-import React, { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { postRequest } from './Client.js';
 import { QueryContext } from './Store.js';
+import { EventEmitter } from 'eventemitter3';
 
-const usePollForQuery = (queryText) => {
-    const { query, result, nodes } = useContext(QueryContext);
+const Emitter = new EventEmitter();
+const useSub = (event, callback) => {
+  const unsubscribe = () => {
+    Emitter.off(event, callback);
+  };
 
-    const [ intervalId, setIntervalId ] = useState(null);
-    const [ response, setResponse ] = useState(null);
+  useEffect(() => {
+    Emitter.on(event, callback);
+    return unsubscribe;
+  }, []);
 
-    postRequest("query", {sql: queryText}, (resp) => {
-        console.log("Setting node data", resp);
-        //setNodeData(resp);
-    });
+  return unsubscribe;
+};
 
+const usePub = () => {
+  return (event, data) => {
+    Emitter.emit(event, data);
+  };
+};
 
-    useEffect(() => {
-      const isComplete = false;
-
-      const interval = setInterval(() => {
-          debugger
-
-            postRequest("query-results", {queryId: response.id}, (resp) => {
-                console.log("GOT RESULTS", resp);
-                clearInterval(intervalId);
-            });
-
-        console.log('This will run every second!');
-      }, 2000);
-
-      setIntervalId(interval)
-
-
-
-      return () => clearInterval(interval);
-
-    }, []);
-
-    return [false, null];
-}
-
-export { usePollForQuery,  };
+export { useSub, usePub };

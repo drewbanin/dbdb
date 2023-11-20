@@ -63,7 +63,7 @@ class JoinOperator(Operator):
             "type": JoinTypeNames[self.config.join_type]
         }
 
-    def run(self, left_rows, right_rows):
+    async def run(self, left_rows, right_rows):
         self.stats.update_start_running()
         iterator = self._join(left_rows, right_rows)
         return Rows.merge([left_rows, right_rows], iterator)
@@ -73,19 +73,20 @@ class NestedLoopJoinOperator(JoinOperator):
     def name(self):
         return "Nested Loop Join"
 
-    def _join(self, left_values, right_values):
+    async def _join(self, left_values, right_values):
         # Unfortunate thing: we need to materialize the
         # left and right iterators in order to loop over
         # them multiple times. I guess that's fine...?
-        lvals = left_values.materialize()
-        rvals = right_values.materialize()
+        lvals = await left_values.materialize()
+        rvals = await right_values.materialize()
 
         # Handle cross join
         if self.config.join_type == JoinType.CROSS:
-            yield from self.cross_join(lvals, rvals)
+            async for row in self.cross_join(lvals, rvals):
+                yield row
             return
         elif self.config.join_type == JoinType.FULL_OUTER:
-            yield from self.full_outer_join(lvals, rvals)
+            raise NotImplementedError()
 
         is_outer = False
         if self.config.join_type == JoinType.LEFT_OUTER:
@@ -124,7 +125,7 @@ class HashJoinOperator(JoinOperator):
             hashed[val].append(row)
         return hashed
 
-    def _join(self, left_values, right_values):
+    async def _join(self, left_values, right_values):
         equality = self.config.expression
 
         if equality.equality != EqualityTypes.EQ:
@@ -133,8 +134,8 @@ class HashJoinOperator(JoinOperator):
                 f" a join with operator: {equality.equality}"
             )
 
-        lvals = left_values.materialize()
-        lhash = self._hash_to_list(lvals, equality.lexpr)
+        lvals = await left_values.materialize()
+        lhash = await self._hash_to_list(lvals, equality.lexpr)
 
         rvals = right_values.materialize()
         rhash = self._hash_to_list(rvals, equality.rexpr)

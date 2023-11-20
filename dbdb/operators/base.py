@@ -31,7 +31,7 @@ class Operator:
             operator_type=self.name()
         )
 
-    def run(self):
+    async def run(self):
         raise NotImplementedError()
 
     def name(self):

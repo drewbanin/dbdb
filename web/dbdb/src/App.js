@@ -14,7 +14,7 @@ import { QueryContextProvider } from './Store.js';
 
 
 function App() {
-    const [activeTab, setActiveTab] = useState('table');
+    const [activeTab, setActiveTab] = useState('plan');
 
     return (
         <div className="App">
@@ -41,11 +41,11 @@ function App() {
                         <div className="flexRow">
                             <div className="flexRowBox boxWrapper" style={{ flexGrow: 1 }}>
                                 <div className="tabPicker light">
-                                    <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
                                     <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
+                                    <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
                                 </div>
-                                { activeTab === "table" && <ResultTable />}
                                 { activeTab === "plan" && <OperatorViz />}
+                                { activeTab === "table" && <ResultTable />}
                             </div>
                         </div>
                     </div>

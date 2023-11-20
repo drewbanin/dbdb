@@ -38,7 +38,7 @@ class TableScanOperator(Operator):
             "columns": self.config.columns,
         }
 
-    def make_iterator(self, tuples):
+    async def make_iterator(self, tuples):
         for i, record in enumerate(tuples):
             self.stats.update_row_processed(record)
 
@@ -48,7 +48,7 @@ class TableScanOperator(Operator):
 
         self.stats.update_done_running()
 
-    def run(self):
+    async def run(self):
         self.stats.update_start_running()
 
         self.reader = FileReader(self.config.table_ref)
@@ -81,5 +81,5 @@ class TableGenOperator(OperatorConfig):
 class TableGenOperator(Operator):
     Config = TableGenOperator
 
-    def run(self):
+    async def run(self):
         return self.config.rows

@@ -13,7 +13,8 @@ class RowTuple:
         elif isinstance(data, (tuple, list)):
             self.data = data
         else:
-            raise RuntimeError("bad input to RowTuple")
+            import ipdb; ipdb.set_trace()
+            raise RuntimeError(f"bad input to RowTuple: {data}")
 
     def field(self, name):
         found = None
@@ -49,11 +50,20 @@ class Rows:
         self.iterator = iterator
         self.data = None
 
-    def __iter__(self):
+    # def __iter__(self):
+    #     return self
+
+    # def __next__(self):
+    #     record = next(self.iterator)
+    #     return self._make_row(record)
+
+    def __aiter__(self):
         return self
 
-    def __next__(self):
-        record = next(self.iterator)
+    async def __anext__(self):
+        import asyncio
+        await asyncio.sleep(0.000001)
+        record = await self.iterator.__anext__()
         return self._make_row(record)
 
     def _make_row(self, record):
@@ -84,14 +94,16 @@ class Rows:
         table = TableIdentifier.temporary()
         return Rows(table, fields, iterator)
 
-    def materialize(self):
+    async def materialize(self):
+        if type(self.iterator).__name__ == 'generator':
+            import ipdb; ipdb.set_trace()
         if not self.data:
-            self.data = tuple([self._make_row(row) for row in self.iterator])
+            self.data = tuple([self._make_row(row) async for row in self.iterator])
 
         return self.data
 
-    def as_table(self):
-        data = self.materialize()
+    async def as_table(self):
+        data = await self.materialize()
 
         raw = tuple([r.data for r in data])
         fields = [f.name for f in self.fields]
@@ -103,10 +115,10 @@ class Rows:
 
         return accum
 
-    def display(self, num_rows=10):
+    async def display(self, num_rows=10):
         # We need to materialize the iterator otherwise
         # printing the table will consume all rows :/
-        data = self.materialize()
+        data = await self.materialize()
         raw = tuple([r.data for r in data])
 
         if num_rows is not None:

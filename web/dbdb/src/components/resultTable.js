@@ -3,17 +3,6 @@ import DataTable from 'react-data-table-component';
 
 import { QueryContext } from '../Store.js';
 
-const columns = [
-    {
-        name: 'Title',
-        selector: row => row.title,
-    },
-    {
-        name: 'Year',
-        selector: row => row.year,
-    },
-];
-
 const customStyles = {
     rows: {
         style: {
