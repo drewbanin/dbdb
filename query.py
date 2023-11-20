@@ -35,15 +35,26 @@ from dbdb.lang.select import (
 
 
 sql = """
+select * from my_table
+where is_odd = true
+limit 5
+"""
+
+
+sql = """
 select
   my_table.my_string as my_string,
   sum(my_table.is_odd + 10) as my_avg
 
-from my_table
+from (
+    select *
+    from my_table
+)
 group by 1
 order by 1
 limit 10
 """
+
 
 
 import dbdb.lang.lang
@@ -79,12 +90,15 @@ async def run():
     leaf_node = nodes[-1]
     print("Leaf:", leaf_node)
 
-
     preso = row_iterators[leaf_node]
     await preso.display()
 
+    for node in nodes:
+        node.close()
+
 
 asyncio.run(run())
+print("done?")
 
 """
 my_table = TableIdentifier.new("my_table")

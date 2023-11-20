@@ -23,9 +23,22 @@ export const OperatorNode = ({ data }) => {
   const rows_processed = formatNumber(statData.rows_processed, 0);
   const rows_emitted = formatNumber(statData.rows_emitted, 0);
 
-  const bytesRead = isTableScan && formatBytes(statData.custom.bytes_read);
-  const bytesTotal = isTableScan && formatBytes(statData.custom.bytes_total);
-  const pagesRead = isTableScan && statData.custom.reads;
+  const getCustomStat = (statData, statName, formatFunc) => {
+      if (!statData || !statData.custom) {
+          return null;
+      }
+
+      const value = statData.custom[statName];
+      if (formatFunc) {
+          return formatFunc(value);
+      } else {
+        return value;
+      } 
+  }
+
+  const bytesRead = getCustomStat(statData, 'bytes_read', formatBytes);
+  const bytesTotal = getCustomStat(statData, 'bytes_total', formatBytes);
+  const pagesRead = getCustomStat(statData, 'reads');
 
   return (
     <>

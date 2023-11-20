@@ -31,12 +31,14 @@ class LimitOperator(Operator):
         i = 0
         async for row in tuples:
             self.stats.update_row_processed(row)
-            yield row
-            self.stats.update_row_emitted(row)
 
-            if i >= limit - 1:
-                break
+            if i < limit:
+                yield row
+                self.stats.update_row_emitted(row)
 
+            # This is dumb! We would ideally break, but we
+            # actually need to go back and drain our parent
+            # iterators or else they will "hang".
             i += 1
 
         self.stats.update_done_running()
@@ -44,5 +46,6 @@ class LimitOperator(Operator):
     async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
+        self.iterator = iterator
 
         return rows.new(iterator)

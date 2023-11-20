@@ -39,13 +39,14 @@ class TableScanOperator(Operator):
         }
 
     async def make_iterator(self, tuples):
-        for i, record in enumerate(tuples):
+        for record in tuples:
             self.stats.update_row_processed(record)
 
             yield record
             self.stats.update_custom_stats(self.reader.stats())
             self.stats.update_row_emitted(record)
 
+        print("TABLE SCAN COMPLETED???")
         self.stats.update_done_running()
 
     async def run(self):
@@ -60,6 +61,7 @@ class TableScanOperator(Operator):
         )
 
         iterator = self.make_iterator(tuples)
+        self.iterator = iterator
 
         return Rows(
             self.config.table,

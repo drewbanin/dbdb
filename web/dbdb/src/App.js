@@ -22,12 +22,12 @@ function App() {
                 <div className="flexColumn">
                     <div className="flexColumnBox">
                         <div className="flexRow">
-                            <div className="flexRowBox" style={{ flexGrow: 2, marginRight: 40 }}>
+                            <div className="flexRowBox" style={{ flexGrow: 1, marginRight: 40 }}>
                                 <div className="boxWrapper">
                                     <QueryComponent />
                                 </div>
                             </div>
-                            <div className="statsPanel" style={{ flexGrow: 1 }}>
+                            <div className="statsPanel" style={{ flexGrow: 0, minWidth: 500 }}>
                                 <div className="boxWrapper">
                                     <div className="flexColumn">
                                         <DatabaseConfig />

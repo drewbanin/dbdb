@@ -58,4 +58,5 @@ class FilterOperator(Operator):
     async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
+        self.iterator = iterator
         return rows.new(iterator)

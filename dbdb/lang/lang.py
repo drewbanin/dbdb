@@ -219,6 +219,7 @@ LIT_BOOL = (
 ).setParseAction(as_bool)
 
 LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL).setParseAction(as_literal)
+STAR = "*"
 
 EXPRESSION = pp.Forward()
 
@@ -336,7 +337,7 @@ def binary_operator(string, loc, toks):
 
 
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | QUALIFIED_IDENT,
+    FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
     [
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),

@@ -17,23 +17,42 @@ class ProjectOperator(Operator):
     def name(self):
         return "Projection"
 
-    def make_iterator(self, tuples):
+    async def make_iterator(self, tuples):
         projections = self.config.project
-        for row in tuples:
+        async for row in tuples:
+            self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
-                value = projection.expr.eval(row)
-                projected.append(value)
+                if projection.expr == "*":
+                    for value in row.data:
+                        projected.append(value)
+                else:
+                    value = projection.expr.eval(row)
+                    projected.append(value)
 
             yield projected
+            self.stats.update_row_emitted(row)
+        self.stats.update_done_running()
 
-    async def run(self, rows):
+    def list_fields(self, rows):
         fields = []
         projections = self.config.project
         for projection in projections:
-            alias = projection.alias
-            field = FieldIdentifier(alias, rows.table)
-            fields.append(field)
+            if projection.expr == "*":
+                for field in rows.fields:
+                    fields.append(field)
+            else:
+                alias = projection.alias
+                field = FieldIdentifier(alias, rows.table)
+                fields.append(field)
+
+        return fields
+
+    async def run(self, rows):
+        self.stats.update_start_running()
+
+        fields = self.list_fields(rows)
 
         iterator = self.make_iterator(rows)
+        self.iterator = iterator
         return Rows(rows.table, fields, iterator)

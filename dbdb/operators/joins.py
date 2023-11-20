@@ -66,6 +66,7 @@ class JoinOperator(Operator):
     async def run(self, left_rows, right_rows):
         self.stats.update_start_running()
         iterator = self._join(left_rows, right_rows)
+        self.iterator = iterator
         return Rows.merge([left_rows, right_rows], iterator)
 
 

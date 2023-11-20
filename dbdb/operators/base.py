@@ -31,8 +31,14 @@ class Operator:
             operator_type=self.name()
         )
 
+        self.iterator = None
+
     async def run(self):
         raise NotImplementedError()
+
+    def close(self):
+        if self.iterator:
+            self.iterator.aclose()
 
     def name(self):
         raise NotImplementedError()

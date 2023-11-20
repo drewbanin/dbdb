@@ -27,12 +27,34 @@ function ResultTable() {
     if (!resultData)
         return (<div style={{ marginTop: 10 }}>NO DATA</div>)
 
+    const formatRow = (row) => {
+        Object.keys(row).forEach((key) => {
+            const value = row[key];
+
+            if (value === true) {
+                row[key] = "TRUE";
+            } else if (value === false) {
+                row[key] = "FALSE";
+            } else if (value === null) {
+                row[key] = "NULL"
+            }
+        });
+
+        return row;
+    }
+
     const columns = resultData.columns.map( (col) => {
         return {
             name: col,
-            selector: row => row[col]
+            selector: row => row[col],
         }
     })
+
+    const rows = resultData.rows.forEach((row) => {
+        // this mutates
+        formatRow(row);
+    })
+
 
     return (
         <DataTable columns={columns} data={resultData.rows} customStyles={customStyles}/>

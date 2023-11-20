@@ -170,6 +170,7 @@ class AggregateOperator(Operator):
                 scalar_fields.append(i)
 
         iterator = self.make_iterator(scalar_fields, grouping, rows)
+        self.iterator = iterator
 
         # This gets a temporary name because we do not know the name
         # of this table... in fact... there is none!? I might need to
