@@ -19,7 +19,7 @@ class RowTuple:
     def field(self, name):
         found = None
         for i, field in enumerate(self.fields):
-            matched = field.is_match(name)
+            matched = field == "*" or field.is_match(name)
             if matched and found is not None:
                 raise RuntimeError(f"Ambiguous column: {name}")
             elif matched:
@@ -61,8 +61,8 @@ class Rows:
         return self
 
     async def __anext__(self):
-        import asyncio
-        await asyncio.sleep(0.000001)
+        # import asyncio
+        # await asyncio.sleep(0.000001)
         record = await self.iterator.__anext__()
         return self._make_row(record)
 

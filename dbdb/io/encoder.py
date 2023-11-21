@@ -73,7 +73,10 @@ def decode_null_bitmap(bitfield_buffer, data, num_records):
 
             elements_created += 1
             if present:
-                yield data[element_index]
+                value =  data[element_index]
+                if isinstance(value, bytes):
+                    value = value.decode().strip()
+                yield value
                 element_index += 1
             else:
                 yield None

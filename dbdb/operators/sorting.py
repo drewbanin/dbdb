@@ -36,7 +36,11 @@ class SortOperator(Operator):
         self.stats.update_row_processed(row)
         sort_keys = []
         for ascending, projection in self.config.order:
-            key = projection.eval(row)
+            if projection.is_int():
+                key = row.data[projection.value() - 1]
+            else:
+                key = projection.eval(row)
+
             if not ascending:
                 key = ReverseSort(key)
 

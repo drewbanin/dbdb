@@ -11,6 +11,9 @@ from dbdb.tuples.identifiers import (
 
 from dbdb.operators.joins import JoinType
 
+from dbdb.io import file_format
+from dbdb.io.file_wrapper import FileReader
+
 pp.ParserElement.enable_packrat()
 
 
@@ -478,6 +481,10 @@ ORDER_BY_LIST = pp.delimitedList(
 ).setParseAction(SelectOrder.parse_tokens)
 
 
+SELECT = pp.Forward()
+
+SUBQUERY = LPAR + SELECT + RPAR + pp.Opt(pp.Opt(AS) + TABLE_IDENT)
+
 GRAMMAR = (
     pp.CaselessKeyword("SELECT") +
 
@@ -512,6 +519,8 @@ GRAMMAR = (
 
     pp.StringEnd()
 )
+
+SELECT << GRAMMAR
 
 from dbdb.lang.select import (
     Select,
@@ -564,14 +573,17 @@ def make_source(table_source):
     table_name = table_source.table_name
     table_alias = table_source.alias
     table_id = TableIdentifier.new(table_name, table_alias)
+
+    fname = f"{table_source.table_name}.dumb"
+    reader = FileReader(fname)
+    column_data = file_format.read_header(reader)
+    column_names = [c.column_name for c in column_data]
+    columns = [table_id.field(name) for name in column_names]
+
     return SelectFileSource(
         file_path=f"{table_id}.dumb",
         table_identifier=table_id,
-        columns=[
-            # TODO TODO TODO HOW???
-            table_id.field('my_string'),
-            table_id.field('is_odd'),
-        ]
+        columns=columns,
     )
 
 

@@ -34,25 +34,20 @@ from dbdb.lang.select import (
 )
 
 
-sql = """
-select * from my_table
-where is_odd = true
-limit 5
-"""
-
 
 sql = """
 select
   my_table.my_string as my_string,
   sum(my_table.is_odd + 10) as my_avg
 
-from (
-    select *
-    from my_table
-)
+from my_table
 group by 1
 order by 1
 limit 10
+"""
+
+sql = """
+select user_id from people order by 1
 """
 
 

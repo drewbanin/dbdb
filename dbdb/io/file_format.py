@@ -148,6 +148,34 @@ class ColumnInfo(object):
     def is_sorted(self):
         return self.sorting == DataSorting.SORTED
 
+    def encoding_name(self):
+        pass
+
+    def to_dict(self):
+
+        encoding_lookup = {
+            DataEncoding.RAW: "RAW",
+            DataEncoding.RUN_LENGTH: "RUN_LENGTH",
+            DataEncoding.DELTA: "DELTA",
+            DataEncoding.DICTIONARY: "DICTIONARY",
+        }
+
+        type_lookup = {
+            DataType.BOOL: "BOOL",
+            DataType.INT8: "INT_8",
+            DataType.INT32: "INT_32",
+            DataType.STR: "STRING",
+            DataType.DATE: "DATE"
+        }
+
+        return {
+            "name": self.column_name,
+            "type": type_lookup[self.column_type],
+            "encoding": encoding_lookup[self.encoding],
+            # "compression": self.compression,
+            # "sorted": self.sorting
+        }
+
     def describe(self):
         print(f"Column {self.column_name}")
         print(f"  - Type={self.column_type} ({self.column_type.value})")
@@ -412,6 +440,13 @@ class Table(object):
     @classmethod
     def iter_pages(cls, fh, column, num_records, start, end):
         yield from encoder.iter_decode(fh, column, num_records, start, end)
+
+
+def read_header(reader):
+    with reader.open() as fh:
+        column_info_list, num_rows = Table.read_header(fh)
+
+    return column_info_list
 
 
 def read_pages(reader, columns):

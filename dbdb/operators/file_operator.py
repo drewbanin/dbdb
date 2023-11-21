@@ -46,14 +46,21 @@ class TableScanOperator(Operator):
             self.stats.update_custom_stats(self.reader.stats())
             self.stats.update_row_emitted(record)
 
-        print("TABLE SCAN COMPLETED???")
         self.stats.update_done_running()
 
     async def run(self):
         self.stats.update_start_running()
 
         self.reader = FileReader(self.config.table_ref)
-        column_names = [c.name for c in self.config.columns]
+
+        column_data = file_format.read_header(self.reader)
+        scanned_columns = [c.to_dict() for c in column_data]
+        column_names = [c.column_name for c in column_data]
+
+        self.stats.update_custom_stats({
+            "scanned_columns": scanned_columns,
+            "file_ref": self.reader.table_ref,
+        })
 
         tuples = file_format.read_pages(
             reader=self.reader,

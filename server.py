@@ -51,6 +51,7 @@ async def message_stream(request: Request):
                 num_events = len(EVENTS)
                 for i in range(num_events):
                     event = EVENTS.pop(0)
+                    print(event)
                     yield {
                         "event": "message",
                         "id": int(time.time()),

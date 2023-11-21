@@ -20,8 +20,6 @@ class FileHandleProxy:
         fh.seek(0)
 
     def read(self, count):
-        print("Blocking read")
-
         if count is None:
             raise NotImplementedError()
 

@@ -39,6 +39,7 @@ export const OperatorNode = ({ data }) => {
   const bytesRead = getCustomStat(statData, 'bytes_read', formatBytes);
   const bytesTotal = getCustomStat(statData, 'bytes_total', formatBytes);
   const pagesRead = getCustomStat(statData, 'reads');
+  const fileRef = getCustomStat(statData, 'file_ref');
 
   return (
     <>
@@ -52,16 +53,17 @@ export const OperatorNode = ({ data }) => {
         </div>
         <div className="operator-stats">
             <ul>
-                <li>State: {state}</li>
-                <li>Rows Processed: {rows_processed}</li>
-                <li>Rows Emitted: {rows_emitted}</li>
+                <li>STATE: {state.toUpperCase()}</li>
+                <li>PROCESSED: {rows_processed}</li>
+                <li>EMITTED: {rows_emitted}</li>
 
                 {isTableScan && (
                     <>
                         <li>&nbsp;</li>
-                        <li>Bytes read: {bytesRead}</li>
-                        <li>Bytes total: {bytesTotal}</li>
-                        <li>Pages read: {pagesRead}</li>
+                        <li>BYTES READ: {bytesRead}</li>
+                        <li>BYTES TOTAL: {bytesTotal}</li>
+                        <li>PAGES READ: {pagesRead}</li>
+                        <li>FILE: {fileRef}</li>
                     </>
                 )}
             </ul>

@@ -1,15 +1,13 @@
 import { React, useState, createContext } from "react";
 
 const DEFAULT_QUERY =`select
-  my_table.my_string as my_string,
-  sum(my_table.is_odd + 10) as my_avg
-
-from my_table
-inner join my_table as debug on debug.my_string = my_table.my_string
-where debug.is_odd = true
-  and debug.is_odd is not false
-group by 1
-order by 1
+  first_name as first_name,
+  last_name as last_name,
+  sum(1) as count_friends
+from people
+join friends on people.user_id = friends.from_friend
+group by 1,2
+order by 3 desc
 limit 10
 `
 

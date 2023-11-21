@@ -30,8 +30,8 @@ function App() {
                             <div className="statsPanel" style={{ flexGrow: 0, minWidth: 500 }}>
                                 <div className="boxWrapper">
                                     <div className="flexColumn">
-                                        <DatabaseConfig />
                                         <QueryStats />
+                                        {false && <DatabaseConfig />}
                                     </div>
                                 </div>
                             </div>

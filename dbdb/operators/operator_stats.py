@@ -29,7 +29,7 @@ class OperatorStats:
         self.state = STATE_WAITING
         self.start_time = None
         self.end_time = None
-        self.custom_stats = None
+        self.custom_stats = {}
 
         self.size_cache_hits = 0
 
@@ -100,7 +100,7 @@ class OperatorStats:
             STAT_CALLBACK("processing", self.get_stats())
 
     def update_custom_stats(self, stats_dict):
-        self.custom_stats = stats_dict
+        self.custom_stats.update(stats_dict)
 
         if (STAT_CALLBACK):
             STAT_CALLBACK("processing", self.get_stats())
