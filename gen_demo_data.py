@@ -35,7 +35,7 @@ def make_date(dt):
 
 
 NUM_PEOPLE = 1_000
-NUM_FRIENDS = 2_000
+NUM_FRIENDS = 100
 
 people = []
 for i in range(NUM_PEOPLE):

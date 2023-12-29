@@ -61,8 +61,8 @@ class Rows:
         return self
 
     async def __anext__(self):
-        # import asyncio
-        # await asyncio.sleep(0.000001)
+        import asyncio
+        await asyncio.sleep(0.00001)
         record = await self.iterator.__anext__()
         return self._make_row(record)
 

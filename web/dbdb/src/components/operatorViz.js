@@ -99,6 +99,7 @@ function OperatorViz(props) {
             data: {
                 label: node.name,
                 id: node.id,
+                details: node.details,
             },
             type: 'operator',
             position: { x: 0, y: 0 },

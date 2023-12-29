@@ -1,13 +1,10 @@
 import { React, useState, createContext } from "react";
 
 const DEFAULT_QUERY =`select
+  user_id as user_id,
   first_name as first_name,
-  last_name as last_name,
-  sum(1) as count_friends
+  last_name as last_name
 from people
-join friends on people.user_id = friends.from_friend
-group by 1,2
-order by 3 desc
 limit 10
 `
 

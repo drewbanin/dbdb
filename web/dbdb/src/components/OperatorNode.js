@@ -22,6 +22,7 @@ export const OperatorNode = ({ data }) => {
   const state = statData.state || 'pending';
   const rows_processed = formatNumber(statData.rows_processed, 0);
   const rows_emitted = formatNumber(statData.rows_emitted, 0);
+  const table_name = (data.details || {}).table;
 
   const getCustomStat = (statData, statName, formatFunc) => {
       if (!statData || !statData.custom) {
@@ -39,7 +40,6 @@ export const OperatorNode = ({ data }) => {
   const bytesRead = getCustomStat(statData, 'bytes_read', formatBytes);
   const bytesTotal = getCustomStat(statData, 'bytes_total', formatBytes);
   const pagesRead = getCustomStat(statData, 'reads');
-  const fileRef = getCustomStat(statData, 'file_ref');
 
   return (
     <>
@@ -63,9 +63,13 @@ export const OperatorNode = ({ data }) => {
                         <li>BYTES READ: {bytesRead}</li>
                         <li>BYTES TOTAL: {bytesTotal}</li>
                         <li>PAGES READ: {pagesRead}</li>
-                        <li>FILE: {fileRef}</li>
                     </>
                 )}
+
+                {!!table_name && (
+                    <li>FILE: {table_name}</li>
+                )}
+
             </ul>
         </div>
       </div>
