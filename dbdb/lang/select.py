@@ -4,6 +4,8 @@ from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
 from dbdb.operators.project import ProjectOperator
+from dbdb.operators.music import PlayMusicOperator
+from dbdb.operators.union import UnionOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
     HashJoinOperator,
@@ -32,6 +34,8 @@ class Select:
         order_by=None,
         limit=None,
         ctes=None,
+
+        play_music=None,
     ):
         self.projections = projections
         self.where = where
@@ -41,6 +45,8 @@ class Select:
         self.order_by = order_by
         self.limit = limit
         self.ctes = ctes or {}
+
+        self.play_music = play_music
 
     def make_plan(self, plan=None):
         """
@@ -132,6 +138,33 @@ class Select:
         Order: {self.order_by}
         Limit: {self.limit}
         """
+
+class MusicPlayer:
+    def __init__(self, sources, bpm, ctes):
+        self.sources = sources
+        self.bpm = bpm
+        self.ctes = ctes
+
+    def make_plan(self):
+        plan = nx.DiGraph()
+        scopes = {}
+
+        for (cte_name, cte) in self.ctes.items():
+            plan, output_op = cte.make_plan(plan)
+            scopes[cte_name] = output_op
+
+        union_op = UnionOperator()
+        for source in self.sources:
+            if source.name() not in scopes:
+                raise RuntimeError(f"Unknown table: {source.name()}")
+
+            parent_node = scopes[source.name()]
+            plan.add_edge(parent_node, union_op, input_arg="rows", list_args=True)
+
+        music_op = PlayMusicOperator(bpm=self.bpm)
+        plan.add_edge(union_op, music_op, input_arg="rows")
+
+        return plan, music_op
 
 
 class SelectClause:

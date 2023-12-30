@@ -87,7 +87,12 @@ async def _do_run_query(plan, nodes):
         print("Configuring operator", node)
         for parent, _, data in plan.in_edges(node, data=True):
             key = data['input_arg']
-            args[key] = row_iterators[parent]
+            if data.get("list_args"):
+                if key not in args:
+                    args[key] = []
+                args[key].append(row_iterators[parent])
+            else:
+                args[key] = row_iterators[parent]
 
         print("Running operator", node, "with args", args)
         rows = await node.run(**args)

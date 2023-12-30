@@ -93,6 +93,11 @@ FOLLOWING = pp.CaselessKeyword("FOLLOWING")
 CURRENT = pp.CaselessKeyword("CURRENT")
 ROW = pp.CaselessKeyword("ROW")
 
+# dbdb - fun!
+PLAY = pp.CaselessKeyword("PLAY")
+AT = pp.CaselessKeyword("AT")
+BPM = pp.CaselessKeyword("BPM")
+
 RESERVED = pp.Group(
     FROM     |
     WITH     |
@@ -115,7 +120,9 @@ RESERVED = pp.Group(
     NATURAL     |
     JOIN |
     ASC  |
-    DESC
+    DESC |
+    PLAY |
+    AT
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
@@ -593,14 +600,28 @@ SUBQUERY = LPAR + SELECT_STATEMENT + RPAR + pp.Opt(pp.Opt(AS) + TABLE_IDENT)
 CTE_SELECT = pp.Group(TABLE_IDENT("cte_alias") + AS + LPAR + SELECT_STATEMENT + RPAR)("cte")
 CTE_LIST = WITH + pp.delimitedList(CTE_SELECT)("ctes")
 
+# Get it -- like a playlist?
+PLAY_LIST = pp.Group(
+    PLAY +
+    pp.delimitedList(TABLE_IDENT)("sources") +
+    AT +
+    LIT_NUM("bpm") +
+    BPM
+)
+
+
 # Set final select statement (CTEs + select)
 SELECT_STATEMENT << (
     pp.Optional(CTE_LIST) +
-    SELECT_GRAMMAR("select")
+    (
+        SELECT_GRAMMAR("select") |
+        PLAY_LIST("play_list")
+    )
 )
 
 from dbdb.lang.select import (
     Select,
+    MusicPlayer,
     SelectList,
     SelectProjection,
     SelectFilter,
@@ -734,6 +755,16 @@ def extract_limit(ast):
     limit = ast.limit[1]
     return SelectLimit(limit)
 
+def make_play_list_from_scope(play_list, scopes):
+    sources = [extract_source(s, scopes) for s in play_list.sources]
+    bpm = play_list.bpm.value()
+
+    return MusicPlayer(
+        sources=sources,
+        bpm=bpm,
+        ctes=scopes,
+    )
+
 def make_select_from_scope(ast_select, scopes):
     projections = extract_projections(ast_select)
     wheres = extract_wheres(ast_select)
@@ -753,7 +784,7 @@ def make_select_from_scope(ast_select, scopes):
         joins=joins,
         group_by=group_by,
         order_by=order_by,
-        limit=limit
+        limit=limit,
     )
 
 def ast_to_select_obj(ast):
@@ -763,8 +794,13 @@ def ast_to_select_obj(ast):
         select = make_select_from_scope(cte.select, scopes)
         scopes[alias.table_name] = select
 
-    select = make_select_from_scope(ast.select, scopes)
-    select.ctes = scopes
+    if ast.select:
+        select = make_select_from_scope(ast.select, scopes)
+        select.ctes = scopes
+    elif ast.play_list:
+        select = make_play_list_from_scope(ast.play_list, scopes)
+    else:
+        raise RuntimeError("Invalid query: does not contain a SELECT or PLAY instruction...")
 
     return select
 

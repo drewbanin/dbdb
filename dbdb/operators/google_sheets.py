@@ -13,10 +13,6 @@ from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
-# The ID and range of a sample spreadsheet.
-SAMPLE_SPREADSHEET_ID = '1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU'
-SAMPLE_RANGE_NAME = "Bass!A:D"
-
 class GoogleSheetsConfig(OperatorConfig):
     def __init__(
         self,
@@ -36,14 +32,18 @@ class GoogleSheetsConfig(OperatorConfig):
         token_path = os.path.join(ROOT_DIR, "token.json")
         creds_path = os.path.join(ROOT_DIR, "credentials.json")
 
+        print("GSHEETS - Getting creds")
         creds = None
         if os.path.exists(token_path):
+            print("GSHEETS - Getting creds from file")
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
+                print("GSHEETS - Getting creds - existing were expired")
                 creds.refresh(Request())
             else:
+                print("GSHEETS - Getting creds - running oauth flow")
                 flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
                 creds = flow.run_local_server(port=0)
             with open(token_path, "w") as token:

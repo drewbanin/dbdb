@@ -20,28 +20,15 @@ sql = """
 with bass as (
     select
         note,
-        length
-
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Bass')
-),
-
-melody as (
-    select
-        note,
-        length
+        length,
+        octave,
+        amplitude,
+        start_time
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
 )
 
-select
-    bass.note,
-    count(1) as counter,
-    listagg(bass.length)
-
-from bass
-join melody on bass.note = melody.note
-group by 1
-order by 2 desc
+play bass at 130 bpm
 """
 
 parsed = dbdb.lang.lang.parse_query(sql)
