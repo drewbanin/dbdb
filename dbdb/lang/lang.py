@@ -15,6 +15,7 @@ from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
 
 pp.ParserElement.enable_packrat()
+# pp.enable_all_warnings()
 
 
 class SelectQuery(object):
@@ -54,6 +55,8 @@ def handle_is_not(string, loc, toks):
 LPAR = pp.Literal('(')
 RPAR = pp.Literal(')')
 
+WITH = pp.CaselessKeyword("WITH")
+SELECT = pp.CaselessKeyword("SELECT")
 FROM = pp.CaselessKeyword("FROM")
 AS = pp.CaselessKeyword("AS")
 ON = pp.CaselessKeyword("ON")
@@ -80,9 +83,20 @@ NATURAL = pp.CaselessKeyword("NATURAL")
 JOIN = pp.CaselessKeyword("JOIN")
 USING = pp.CaselessKeyword("USING")
 
+# Window funcs
+OVER = pp.CaselessKeyword("OVER")
+ROWS = pp.CaselessKeyword("ROWS")
+BETWEEN = pp.CaselessKeyword("BETWEEN")
+UNBOUNDED = pp.CaselessKeyword("UNBOUNDED")
+PRECEDING = pp.CaselessKeyword("PRECEDING")
+FOLLOWING = pp.CaselessKeyword("FOLLOWING")
+CURRENT = pp.CaselessKeyword("CURRENT")
+ROW = pp.CaselessKeyword("ROW")
 
-RESERVED = (
+RESERVED = pp.Group(
     FROM     |
+    WITH     |
+    SELECT   |
     AS       |
     ON       |
     AND      |
@@ -102,7 +116,7 @@ RESERVED = (
     JOIN |
     ASC  |
     DESC
-)
+).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
     pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
@@ -176,6 +190,8 @@ def make_aliased_table_function(string, loc, toks):
     func = toks[0]
     if len(toks) > 1:
         func.alias = toks[-1].table_name
+    else:
+        func.alias = toks[0].func_name
     return func
 
 
@@ -276,6 +292,15 @@ def call_function(string, loc, toks):
     return FunctionCall(func_name, func_expr, agg_type)
 
 
+def call_window_function(string, loc, toks):
+    func_name = toks[0].func_name[0].upper()
+    func_expr = toks[0].func_expression
+    agg_type = Aggregates.SCALAR
+
+    import ipdb; ipdb.set_trace()
+    return FunctionCall(func_name, func_expr, agg_type)
+
+
 FUNC_CALL = pp.Group(
     IDENT("func_name") +
     LPAR +
@@ -284,6 +309,31 @@ FUNC_CALL = pp.Group(
     ) +
     RPAR
 ).setParseAction(call_function)
+
+FRAME_CLAUSE = pp.Group(
+    ROWS +
+    BETWEEN +
+    (
+        (UNBOUNDED + PRECEDING) | (CURRENT + ROW)
+    )("frame_start") +
+    AND +
+    (
+        (CURRENT + ROW) | (UNBOUNDED + FOLLOWING)
+    )("frame_end")
+)
+
+WINDOW_CALL = pp.Group(
+    IDENT("func_name") +
+    LPAR +
+    pp.Opt(
+        pp.delimitedList(EXPRESSION)("func_expression")
+    ) +
+    RPAR +
+    OVER +
+    LPAR +
+    FRAME_CLAUSE("frame") +
+    RPAR
+).setParseAction(call_window_function)
 
 
 class BinaryOperator:
@@ -349,7 +399,7 @@ def binary_operator(string, loc, toks):
 
 
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
+    WINDOW_CALL | FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
     [
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),
@@ -493,12 +543,10 @@ ORDER_BY_LIST = pp.delimitedList(
 ).setParseAction(SelectOrder.parse_tokens)
 
 
-SELECT = pp.Forward()
+SELECT_STATEMENT = pp.Forward()
 
-SUBQUERY = LPAR + SELECT + RPAR + pp.Opt(pp.Opt(AS) + TABLE_IDENT)
-
-GRAMMAR = (
-    pp.CaselessKeyword("SELECT") +
+SELECT_GRAMMAR = pp.Group(
+    SELECT +
 
     pp.delimitedList(
         COLUMN_EXPR
@@ -527,12 +575,19 @@ GRAMMAR = (
     # limit
     pp.Opt(
         LIMIT + LIT_NUM.setParseAction(as_literal)
-    )("limit") +
+    )("limit")
+)("select")
 
-    pp.StringEnd()
+# Subqueries and CTEs
+SUBQUERY = LPAR + SELECT_STATEMENT + RPAR + pp.Opt(pp.Opt(AS) + TABLE_IDENT)
+CTE_SELECT = pp.Group(TABLE_IDENT("cte_alias") + AS + LPAR + SELECT_STATEMENT + RPAR)("cte")
+CTE_LIST = WITH + pp.delimitedList(CTE_SELECT)("ctes")
+
+# Set final select statement (CTEs + select)
+SELECT_STATEMENT << (
+    pp.Optional(CTE_LIST) +
+    SELECT_GRAMMAR("select")
 )
-
-SELECT << GRAMMAR
 
 from dbdb.lang.select import (
     Select,
@@ -541,6 +596,7 @@ from dbdb.lang.select import (
     SelectFilter,
     SelectFileSource,
     SelectFunctionSource,
+    SelectReferenceSource,
     SelectMemorySource,
     SelectJoin,
     SelectGroupBy,
@@ -582,7 +638,7 @@ def extract_wheres(ast):
     return SelectFilter(expr=where_clause)
 
 
-def make_source(table_source):
+def make_table_source(table_source):
     table_name = table_source.table_name
     table_alias = table_source.alias
     table_id = TableIdentifier.new(table_name, table_alias)
@@ -614,30 +670,35 @@ def make_source_function(func_source):
     )
 
 
-def extract_source(ast, referenced_fields):
-    if '_from' not in ast:
-        return None
+def make_reference_source(source):
+    table_id = TableIdentifier.new(source.table_name, source.alias)
+    return SelectReferenceSource(
+        table_identifier=table_id,
+    )
 
-    source = ast._from
+
+def extract_source(source, scopes):
     if isinstance(source, FunctionCall):
         return make_source_function(source)
+
+    scope_name = source.table_name
+    if scope_name in scopes:
+        return make_reference_source(source)
     else:
-        return make_source(source)
+        return make_table_source(source)
 
 
-def extract_joins(ast):
+def extract_joins(ast, scopes):
     joins = []
     for join_clause in ast.joins:
-        # TODO TODO TODO
-        join_source = make_source(join_clause.to)
+        join_source = extract_source(join_clause.to, scopes)
         join = SelectJoin.new(
             to=join_source,
             expression=join_clause.on,
             join_type=join_clause.join_type,
-            # TODO: What's the right kind of join.... where
-            # does that get configured?
         )
         joins.append(join)
+
     return joins
 
 
@@ -670,16 +731,17 @@ def extract_limit(ast):
     limit = ast.limit[1]
     return SelectLimit(limit)
 
+def make_select_from_scope(ast_select, scopes):
+    projections = extract_projections(ast_select)
+    wheres = extract_wheres(ast_select)
+    joins = extract_joins(ast_select, scopes)
+    order_by = extract_order_by(ast_select)
+    group_by = extract_group_by(ast_select, projections)
+    limit = extract_limit(ast_select)
 
-def ast_to_select_obj(ast):
-    projections = extract_projections(ast)
-    wheres = extract_wheres(ast)
-    joins = extract_joins(ast)
-    order_by = extract_order_by(ast)
-    group_by = extract_group_by(ast, projections)
-    limit = extract_limit(ast)
-
-    source = extract_source(ast, [])
+    source = None
+    if '_from' in ast_select:
+        source = extract_source(ast_select._from, scopes)
 
     return Select(
         projections=projections,
@@ -691,6 +753,18 @@ def ast_to_select_obj(ast):
         limit=limit
     )
 
+def ast_to_select_obj(ast):
+    scopes = {}
+    for cte  in ast.ctes:
+        alias = cte.cte_alias
+        select = make_select_from_scope(cte.select, scopes)
+        scopes[alias.table_name] = select
+
+    select = make_select_from_scope(ast.select, scopes)
+    select.ctes = scopes
+
+    return select
+
 
 def parse_query(query):
     """
@@ -700,6 +774,6 @@ def parse_query(query):
         FROM <table path>
         [LIMIT <count>]
     """
-    ast = GRAMMAR.parseString(query)
+    ast = SELECT_STATEMENT.parseString(query)
     select_obj = ast_to_select_obj(ast)
     return select_obj

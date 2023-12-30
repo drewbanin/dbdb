@@ -30,6 +30,7 @@ class Select:
         having=None,
         order_by=None,
         limit=None,
+        ctes=None,
     ):
         self.projections = projections
         self.where = where
@@ -38,8 +39,9 @@ class Select:
         self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
+        self.ctes = ctes or {}
 
-    def make_plan(self):
+    def make_plan(self, plan=None):
         """
         Order of operations:
         1. Table scan from FROM clause
@@ -50,40 +52,56 @@ class Select:
         7. Apply LIMIT
         """
 
-        plan = nx.DiGraph()
+        plan = plan or nx.DiGraph()
+        scopes = {}
+
+        for (cte_name, cte) in self.ctes.items():
+            plan, output_op = cte.make_plan(plan)
+            scopes[cte_name] = output_op
+
+        def resolve_internal_reference(source):
+            if isinstance(source, SelectReferenceSource):
+                # Set the source operator to the output node from the parent scope
+                return scopes[source.name]
+            else:
+                return source.as_operator()
 
         # FROM
-        source_op = self.source.as_operator()
-        plan.add_node(source_op, label="FROM", is_root=True)
+        source_op = resolve_internal_reference(self.source)
+        if source_op not in plan:
+            plan.add_node(source_op, label="FROM")
 
         # JOIN
-        table_op = source_op
+        output_op = source_op
         for join in self.joins:
             join_op = join.as_operator()
             plan.add_node(join_op, label="JOIN")
-            plan.add_edge(table_op, join_op, input_arg="left_rows")
+            plan.add_edge(output_op, join_op, input_arg="left_rows")
 
-            join_to_op = join.to.as_operator()
-            # TODO: How do we make this its own node?
-            plan.add_node(join_to_op, label="FROM (join)", is_root=True)
+            import ipdb; ipdb.set_trace()
+
+            join_to_op = resolve_internal_reference(join.to)
+            # join_to_op = join.to.as_operator()
+            if join_to_op not in plan:
+                plan.add_node(join_to_op, label="FROM (join)")
             plan.add_edge(join_to_op, join_op, input_arg="right_rows")
 
             # Future operations are on the output of this operation
-            table_op = join_op
+            output_op = join_op
 
         # WHERE
         if self.where:
             filter_op = self.where.as_operator()
             plan.add_node(filter_op, label="Filter")
-            plan.add_edge(table_op, filter_op, input_arg="rows")
-            table_op = filter_op
+            plan.add_edge(output_op, filter_op, input_arg="rows")
+            output_op = filter_op
 
         # GROUP BY
         if self.group_by:
             aggregate_op = self.group_by.as_operator()
             plan.add_node(aggregate_op, label="Aggregate")
-            plan.add_edge(table_op, aggregate_op, input_arg="rows")
-            table_op = aggregate_op
+            plan.add_edge(output_op, aggregate_op, input_arg="rows")
+            output_op = aggregate_op
             # We can do the actual grouping here.... should this
             # just be it's own operator? why not??????
             # I feel like i already tried this though...
@@ -91,22 +109,22 @@ class Select:
             # Scalar projections
             project_op = self.projections.as_operator()
             plan.add_node(project_op, label="Project")
-            plan.add_edge(table_op, project_op, input_arg="rows")
-            table_op = project_op
+            plan.add_edge(output_op, project_op, input_arg="rows")
+            output_op = project_op
 
         if self.order_by:
             order_by_op = self.order_by.as_operator()
             plan.add_node(order_by_op, label="Order")
-            plan.add_edge(table_op, order_by_op, input_arg="rows")
-            table_op = order_by_op
+            plan.add_edge(output_op, order_by_op, input_arg="rows")
+            output_op = order_by_op
 
         if self.limit:
             limit_op = self.limit.as_operator()
             plan.add_node(limit_op, label="Limit")
-            plan.add_edge(table_op, limit_op, input_arg="rows")
-            table_op = limit_op
+            plan.add_edge(output_op, limit_op, input_arg="rows")
+            output_op = limit_op
 
-        return plan
+        return plan, output_op
 
     def __str__(self):
         return f"""
@@ -154,6 +172,15 @@ class SelectFilter(SelectClause):
         return FilterOperator(
             predicate=self.expr
         )
+
+
+class SelectReferenceSource(SelectClause):
+    def __init__(self, table_identifier):
+        self.table = table_identifier
+        self.name = table_identifier.name
+
+    def as_operator(self):
+        raise NotImplementedError("Cannot call as_operator on select reference source")
 
 
 class SelectFunctionSource(SelectClause):

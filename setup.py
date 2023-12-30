@@ -45,7 +45,8 @@ setup(
         # TODO
         'hexdump==3.3',
         'networkx==2.8',
-        'pyparsing==3.0.8',
+        #'pyparsing==3.0.8',
+        'pyparsing',
         'tabulate==0.8.9',
         'Pympler==1.0.1',
         'fastapi[all]==0.104.1',

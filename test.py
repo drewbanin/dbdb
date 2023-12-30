@@ -19,32 +19,39 @@ import asyncio
 sql = """
 with bass as (
     select
-        sum(length) over (rows between unbounded preceding and current row) as start_time,
-        start_time,
-        play_tone(
-            note,
-            octave,
-            length,
-            amplitude,
-            start_time
-        )
+        add_note(
+            Note,
+            Octave,
+            Length,
+            Amplitude,
+            Start
+        ) as res
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Bass')
+),
+
+melody as (
+    select
+        add_note(
+            Note,
+            Octave,
+            Length,
+            Amplitude,
+            Start
+        ) as res
+
+    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
 )
 
 select *
 from bass
+join melody on bass.res = melody.res
+limit 10
 """
 
 parsed = dbdb.lang.lang.parse_query(sql)
-plan = parsed.make_plan()
+plan, output_node = parsed.make_plan()
 nodes = list(nx.topological_sort(plan))
-
-parents = {}
-for node in nodes:
-    parent_nodes = plan.predecessors(node)
-    parents[id(node)] = [id(n) for n in parent_nodes]
-
 
 from server import _do_run_query
 
