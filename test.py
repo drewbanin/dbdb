@@ -19,33 +19,21 @@ import asyncio
 sql = """
 with bass as (
     select
-        add_note(
-            Note,
-            Octave,
-            Length,
-            Amplitude,
-            Start
-        ) as res
+        Note
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Bass')
 ),
 
 melody as (
     select
-        add_note(
-            Note,
-            Octave,
-            Length,
-            Amplitude,
-            Start
-        ) as res
+        Note
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
 )
 
 select *
 from bass
-join melody on bass.res = melody.res
+join melody on bass.Note = melody.Note
 limit 10
 """
 
