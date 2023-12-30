@@ -616,18 +616,11 @@ from dbdb.lang.select import (
 )
 
 
-def stringify(alias):
-    if alias:
-        return alias[0]
-    else:
-        return None
-
-
 def extract_projections(ast):
     projections = []
     for i, column in enumerate(ast.columns):
         expr = column.column_expression
-        alias = stringify(column.alias) or f'col_{i}'
+        alias = column.alias[0] if column.alias else None
 
         projection = SelectProjection(
             expr=expr,

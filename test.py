@@ -19,27 +19,27 @@ import asyncio
 sql = """
 with bass as (
     select
-        Note as Note,
-        Length as Length
+        note,
+        length
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Bass')
 ),
 
 melody as (
     select
-        Note as Note,
-        Length as Length
+        note,
+        length
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
 )
 
 select
-    bass.Note,
-    count(1),
-    listagg(bass.Length)
+    bass.note,
+    count(1) as counter,
+    listagg(bass.length)
 
 from bass
-join melody on bass.Note = melody.Note
+join melody on bass.note = melody.note
 group by 1
 order by 2 desc
 """

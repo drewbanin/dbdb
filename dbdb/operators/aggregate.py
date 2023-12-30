@@ -120,6 +120,25 @@ class AggregateOperator(Operator):
 
         self.stats.update_done_running()
 
+    def field_names(self, table):
+        from dbdb.lang.lang import ColumnIdentifier, FunctionCall
+
+        fields = []
+        unnamed_col_counter = 0
+        for field in self.config.projections.projections:
+            if field.alias:
+                field_name = field.alias
+            elif isinstance(field.expr, ColumnIdentifier):
+                field_name = field.expr.column
+            elif isinstance(field.expr, FunctionCall):
+                field_name = field.expr.func_name.lower()
+            else:
+                field_name = f"col_{unnamed_col_counter}"
+                unnamed_col_counter += 1
+
+            fields.append(table.field(field_name))
+        return fields
+
     async def run(self, rows):
         self.stats.update_start_running()
         from dbdb.lang.lang import Literal
@@ -177,6 +196,6 @@ class AggregateOperator(Operator):
         # think about that more because fields are still scoped to their
         # parent locations.. which is kind of confusing.... hm....
         table_identifier = TableIdentifier.temporary()
-        field_names = [p.alias for p in self.config.projections.projections]
-        fields = [table_identifier.field(f) for f in field_names]
+        fields = self.field_names(table_identifier)
+
         return Rows(table_identifier, fields, iterator)

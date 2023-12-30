@@ -41,15 +41,27 @@ class ProjectOperator(Operator):
         self.stats.update_done_running()
 
     def list_fields(self, rows):
+        from dbdb.lang.lang import ColumnIdentifier, FunctionCall
+
         fields = []
         projections = self.config.project
+        unnamed_col_counter = 0
         for projection in projections:
             if projection.expr == "*":
                 for field in rows.fields:
                     fields.append(field)
             else:
-                alias = projection.alias
-                field = FieldIdentifier(alias, rows.table)
+                if projection.alias:
+                    col_name = projection.alias
+                elif isinstance(projection.expr, ColumnIdentifier):
+                    col_name = projection.expr.column
+                elif isinstance(projection.expr, FunctionCall):
+                    col_name = projection.expr.func_name.lower()
+                else:
+                    col_name = f"col_{unnamed_col_counter}"
+                    unnamed_col_counter += 1
+
+                field = FieldIdentifier(col_name, rows.table)
                 fields.append(field)
 
         return fields

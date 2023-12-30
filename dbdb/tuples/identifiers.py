@@ -86,9 +86,10 @@ class FieldIdentifier(Identifier):
         return self.parent.is_match(candidate_parts)
 
     def __str__(self):
-        parent_qualifier = self.parent.provided_parts()
-        qualified = parent_qualifier + [self.name]
-        return ".".join(qualified)
+        # parent_qualifier = self.parent.provided_parts()
+        # qualified = parent_qualifier + [self.name]
+        # return ".".join(qualified)
+        return self.name
 
     def __repr__(self):
         return self.__str__()
