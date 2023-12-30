@@ -226,7 +226,11 @@ class Literal(ASTToken):
 
 
 def as_literal(string, loc, toks):
-    return Literal(toks[0])
+    # Big hack - no idea why this happens!
+    if isinstance(toks[0], Literal):
+        return toks[0]
+    else:
+        return Literal(toks[0])
 
 def as_bool(string, loc, toks):
     if toks[0].upper() == 'TRUE':
@@ -269,13 +273,19 @@ class FunctionCall(ASTToken):
             # If it's an aggregate function, then confirm that the func_expr
             # is _not_ also an aggregate. Otherwise, return the non-agg fields
             # contained within the function expression
-            agg_fields = self.func_expr.get_aggregated_fields()
-            if len(agg_fields) > 0:
-                raise RuntimeError("Tried to do a bad thing")
+            scalar_fields = set()
+
+            for expr in self.func_expr:
+                aggs = expr.get_aggregated_fields()
+                if len(aggs) > 0:
+                    raise RuntimeError("Tried to agg an agg")
+
+                scalars = expr.get_non_aggregated_fields()
+                scalar_fields.update(scalars)
 
             # So these are the un-agg fields that become aggregated via being
             # contained within this function
-            return self.func_expr.get_non_aggregated_fields()
+            return scalar_fields
 
     def get_non_aggregated_fields(self):
         if self.agg_type == Aggregates.SCALAR:
@@ -399,7 +409,7 @@ def binary_operator(string, loc, toks):
 
 
 EXPRESSION << pp.infix_notation(
-    WINDOW_CALL | FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
+    FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
     [
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),

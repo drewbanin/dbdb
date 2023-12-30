@@ -11,6 +11,7 @@ from dbdb.operators.joins import (
     JoinType
 )
 
+from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
@@ -59,17 +60,18 @@ class Select:
             plan, output_op = cte.make_plan(plan)
             scopes[cte_name] = output_op
 
-        def resolve_internal_reference(source):
-            if isinstance(source, SelectReferenceSource):
-                # Set the source operator to the output node from the parent scope
-                return scopes[source.name]
-            else:
-                return source.as_operator()
+        def resolve_internal_reference(source, label):
+            source_op = source.as_operator()
+            plan.add_node(source_op, label=label)
+
+            if source.name() in scopes:
+                parent_node = scopes[source.name()]
+                plan.add_edge(parent_node, source_op, input_arg="rows")
+
+            return source_op
 
         # FROM
-        source_op = resolve_internal_reference(self.source)
-        if source_op not in plan:
-            plan.add_node(source_op, label="FROM")
+        source_op = resolve_internal_reference(self.source, label="FROM")
 
         # JOIN
         output_op = source_op
@@ -78,12 +80,7 @@ class Select:
             plan.add_node(join_op, label="JOIN")
             plan.add_edge(output_op, join_op, input_arg="left_rows")
 
-            import ipdb; ipdb.set_trace()
-
-            join_to_op = resolve_internal_reference(join.to)
-            # join_to_op = join.to.as_operator()
-            if join_to_op not in plan:
-                plan.add_node(join_to_op, label="FROM (join)")
+            join_to_op = resolve_internal_reference(join.to, label="FROM (join)")
             plan.add_edge(join_to_op, join_op, input_arg="right_rows")
 
             # Future operations are on the output of this operation
@@ -177,10 +174,14 @@ class SelectFilter(SelectClause):
 class SelectReferenceSource(SelectClause):
     def __init__(self, table_identifier):
         self.table = table_identifier
-        self.name = table_identifier.name
+
+    def name(self):
+        return self.table.name
 
     def as_operator(self):
-        raise NotImplementedError("Cannot call as_operator on select reference source")
+        return RenameScopeOperator(
+            scope_name=self.table.name
+        )
 
 
 class SelectFunctionSource(SelectClause):
@@ -192,6 +193,9 @@ class SelectFunctionSource(SelectClause):
         # TODO : Move this into function / module!
         if self.function_name != 'GOOGLE_SHEET':
             raise RuntimeError(f"Unsupported table function: {self.function_name}")
+
+    def name(self):
+        return self.table.name
 
     def as_operator(self):
         sheet_id = self.function_args[0]
@@ -210,6 +214,9 @@ class SelectFileSource(SelectClause):
         self.table_identifier = table_identifier
         self.columns = columns
 
+    def name(self):
+        return self.table_identifier.name
+
     def as_operator(self):
         return TableScanOperator(
             table_ref=self.file_path,
@@ -222,6 +229,9 @@ class SelectMemorySource(SelectClause):
     def __init__(self, table_identifier, rows):
         self.table_identifier = table_identifier
         self.rows = rows
+
+    def name(self):
+        return self.table_identifier.name
 
     def as_operator(self):
         return TableGenOperator(

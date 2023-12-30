@@ -19,22 +19,29 @@ import asyncio
 sql = """
 with bass as (
     select
-        Note
+        Note as Note,
+        Length as Length
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Bass')
 ),
 
 melody as (
     select
-        Note
+        Note as Note,
+        Length as Length
 
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
 )
 
-select *
+select
+    bass.Note,
+    count(1),
+    listagg(bass.Length)
+
 from bass
 join melody on bass.Note = melody.Note
-limit 10
+group by 1
+order by 2 desc
 """
 
 parsed = dbdb.lang.lang.parse_query(sql)

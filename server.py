@@ -84,6 +84,7 @@ async def _do_run_query(plan, nodes):
 
     for node in nodes:
         args = {}
+        print("Configuring operator", node)
         for parent, _, data in plan.in_edges(node, data=True):
             key = data['input_arg']
             args[key] = row_iterators[parent]
@@ -143,7 +144,7 @@ async def do_run_query(plan, nodes):
 
 def make_plan(sql):
     parsed = dbdb.lang.lang.parse_query(sql)
-    plan = parsed.make_plan()
+    plan, output_node = parsed.make_plan()
     nodes = list(nx.topological_sort(plan))
 
     parents = {}

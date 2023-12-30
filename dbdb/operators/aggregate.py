@@ -91,8 +91,8 @@ class AggregateOperator(Operator):
                 else:
                     # Calc value inside the func - this is dumb
                     # would be better to make the agg func do this
-                    value = projection.expr.func_expr.eval(row)
-                    agg_values.append(value)
+                    values = [fe.eval(row) for fe in projection.expr.func_expr]
+                    agg_values.append(values)
 
             grouping_set = tuple(grouping_values)
             if grouping_set not in grouped_sets:

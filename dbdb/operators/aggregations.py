@@ -7,7 +7,8 @@ class AggregationMin(Aggregation):
     def __init__(self):
         self.min = None
 
-    def process(self, value):
+    def process(self, values):
+        value = values[0]
         if self.min is None:
             self.min = value
 
@@ -22,7 +23,8 @@ class AggregationMax(Aggregation):
     def __init__(self):
         self.max = None
 
-    def _process(self, value):
+    def _process(self, values):
+        value = values[0]
         if self.max is None:
             self.max = value
 
@@ -37,7 +39,8 @@ class AggregationSum(Aggregation):
     def __init__(self):
         self.sum = None
 
-    def process(self, value):
+    def process(self, values):
+        value = values[0]
         if self.sum is None:
             self.sum = value
 
@@ -53,7 +56,8 @@ class AggregationAverage(Aggregation):
         self.sum = 0
         self.seen = 0
 
-    def process(self, value):
+    def process(self, values):
+        value = values[0]
         self.sum += value
         self.seen += 1
 
@@ -68,7 +72,7 @@ class AggregationCount(Aggregation):
     def __init__(self):
         self.seen = 0
 
-    def process(self, value):
+    def process(self, values):
         self.seen += 1
 
     def result(self):
@@ -79,7 +83,8 @@ class AggregationCountDistinct(Aggregation):
     def __init__(self):
         self.seen = set()
 
-    def process(self, value):
+    def process(self, values):
+        value = values[0]
         self.seen.add(value)
 
     def result(self):
@@ -89,10 +94,16 @@ class AggregationCountDistinct(Aggregation):
 class AggregationListAgg(Aggregation):
     def __init__(self):
         self.seen = set()
+        self.delim = ','
 
-    def process(self, value):
+    def process(self, values):
+        if len(values) == 1:
+            value = values[0]
+        else:
+            value, self.delim = values
+
         self.seen.add(value)
 
     def result(self):
-        self.result = ",".join([str(s) for s in self.seen])
+        self.result = self.delim.join([str(s) for s in self.seen])
         return self.result
