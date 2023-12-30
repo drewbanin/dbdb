@@ -48,8 +48,13 @@ setup(
         'pyparsing==3.0.8',
         'tabulate==0.8.9',
         'Pympler==1.0.1',
-        'fastapi==0.104.1',
+        'fastapi[all]==0.104.1',
+        "uvicorn",
+        "sse-starlette",
 
+        "google-api-python-client",
+        "google-auth-httplib2",
+        "google-auth-oauthlib",
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

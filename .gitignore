@@ -6,3 +6,7 @@ env/
 *.pyc
 __pycache__
 *.png
+
+# gsheets integration
+credentials.json
+token.json

@@ -1,5 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.operators import functions
+from dbdb.operators import aggregations
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier
 
@@ -20,15 +20,15 @@ class Aggregates(enum.Enum):
 
 
 _agg_funcs = {
-    Aggregates.MIN: functions.AggregationMin,
-    Aggregates.MAX: functions.AggregationMax,
-    Aggregates.SUM: functions.AggregationSum,
-    Aggregates.AVG: functions.AggregationAverage,
+    Aggregates.MIN: aggregations.AggregationMin,
+    Aggregates.MAX: aggregations.AggregationMax,
+    Aggregates.SUM: aggregations.AggregationSum,
+    Aggregates.AVG: aggregations.AggregationAverage,
 
-    Aggregates.COUNT: functions.AggregationCount,
-    Aggregates.COUNTD: functions.AggregationCountDistinct,
+    Aggregates.COUNT: aggregations.AggregationCount,
+    Aggregates.COUNTD: aggregations.AggregationCountDistinct,
 
-    Aggregates.LISTAGG: functions.AggregationListAgg,
+    Aggregates.LISTAGG: aggregations.AggregationListAgg,
 }
 
 

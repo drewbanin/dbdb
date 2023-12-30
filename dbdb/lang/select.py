@@ -1,4 +1,5 @@
 from dbdb.operators.file_operator import TableScanOperator, TableGenOperator
+from dbdb.operators.google_sheets import GoogleSheetsOperator
 from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
@@ -152,6 +153,27 @@ class SelectFilter(SelectClause):
     def as_operator(self):
         return FilterOperator(
             predicate=self.expr
+        )
+
+
+class SelectFunctionSource(SelectClause):
+    def __init__(self, function_name, function_args, table_identifier):
+        self.function_name = function_name
+        self.function_args = function_args
+        self.table = table_identifier
+
+        # TODO : Move this into function / module!
+        if self.function_name != 'GOOGLE_SHEET':
+            raise RuntimeError(f"Unsupported table function: {self.function_name}")
+
+    def as_operator(self):
+        sheet_id = self.function_args[0]
+        tab_id = self.function_args[1] if len(self.function_args) == 2 else None
+
+        return GoogleSheetsOperator(
+            table=self.table,
+            sheet_id=sheet_id,
+            tab_id=tab_id
         )
 
 

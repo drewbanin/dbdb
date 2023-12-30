@@ -172,6 +172,13 @@ def make_aliased_table_identifier(string, loc, toks):
     return table
 
 
+def make_aliased_table_function(string, loc, toks):
+    func = toks[0]
+    if len(toks) > 1:
+        func.alias = toks[-1].table_name
+    return func
+
+
 QUALIFIED_IDENT = pp.Group(
     pp.delimitedList(IDENT, delim=".", max=2)
 )("qualified_ident").setParseAction(make_col_identifier)
@@ -272,7 +279,9 @@ def call_function(string, loc, toks):
 FUNC_CALL = pp.Group(
     IDENT("func_name") +
     LPAR +
-    pp.Opt(EXPRESSION("func_expression")) +
+    pp.Opt(
+        pp.delimitedList(EXPRESSION)("func_expression")
+    ) +
     RPAR
 ).setParseAction(call_function)
 
@@ -468,6 +477,9 @@ ALIASED_TABLE_IDENT = (
     TABLE_IDENT + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
 ).setParseAction(make_aliased_table_identifier)
 
+ALIASED_TABLE_FUNCTION = (
+    FUNC_CALL + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
+).setParseAction(make_aliased_table_function)
 
 JOIN_CLAUSE = (
     (QUALIFIED_JOIN_TYPES + ALIASED_TABLE_IDENT + JOIN_CONDITION) |
@@ -494,7 +506,7 @@ GRAMMAR = (
 
     # from clause
     # TODO: This is optional...
-    FROM + ALIASED_TABLE_IDENT("_from") +
+    FROM + (ALIASED_TABLE_FUNCTION("_from") | ALIASED_TABLE_IDENT("_from")) +
 
     pp.ZeroOrMore(
         JOIN_CLAUSE
@@ -528,6 +540,7 @@ from dbdb.lang.select import (
     SelectProjection,
     SelectFilter,
     SelectFileSource,
+    SelectFunctionSource,
     SelectMemorySource,
     SelectJoin,
     SelectGroupBy,
@@ -562,7 +575,7 @@ def extract_projections(ast):
 def extract_wheres(ast):
     if 'where' not in ast:
         return None
-    
+
     _, where_clause = ast.where
     # where clause is just a binary operator or expression here..
 
@@ -587,12 +600,29 @@ def make_source(table_source):
     )
 
 
+def make_source_function(func_source):
+    func_name = func_source.func_name
+    func_expr = func_source.func_expr
+    func_alias = func_source.alias
+
+    table_id = TableIdentifier.new(func_alias, func_alias)
+
+    return SelectFunctionSource(
+        function_name=func_name,
+        function_args=[f.value() for f in func_expr],
+        table_identifier=table_id,
+    )
+
+
 def extract_source(ast, referenced_fields):
     if '_from' not in ast:
         return None
 
     source = ast._from
-    return make_source(source)
+    if isinstance(source, FunctionCall):
+        return make_source_function(source)
+    else:
+        return make_source(source)
 
 
 def extract_joins(ast):

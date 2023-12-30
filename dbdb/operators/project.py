@@ -2,6 +2,8 @@ from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows, RowTuple
 from dbdb.tuples.identifiers import FieldIdentifier
 
+from dbdb.operators.functions import find_func
+
 
 class ProjectConfig(OperatorConfig):
     def __init__(
@@ -26,6 +28,10 @@ class ProjectOperator(Operator):
                 if projection.expr == "*":
                     for value in row.data:
                         projected.append(value)
+                elif hasattr(projection.expr, 'func_name'):
+                    func = find_func(projection.expr.func_name)
+                    value = func.eval(projection.expr.func_expr, row)
+                    projected.append(value)
                 else:
                     value = projection.expr.eval(row)
                     projected.append(value)
