@@ -42,6 +42,7 @@ class RowTuple:
     def as_tuple(self):
         return tuple(self.data)
 
+TICKS = 0
 
 class Rows:
     def __init__(self, table, fields, iterator):
@@ -62,7 +63,10 @@ class Rows:
 
     async def __anext__(self):
         import asyncio
-        await asyncio.sleep(0.0)
+        global TICKS
+        TICKS += 1
+        if TICKS % 100 == 0:
+            await asyncio.sleep(0.0)
         record = await self.iterator.__anext__()
         return self._make_row(record)
 

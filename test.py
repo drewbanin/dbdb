@@ -37,10 +37,10 @@ with gen as (
         i as time,
         sin(i * 261.2 * 2 * 3.14 / 44100) as freq
 
-    from generate_series(44100 * 2)
+    from generate_series(44100 * 10)
 )
 
-play gen at 60 bpm
+play gen at 130 bpm
 """
 
 parsed = dbdb.lang.lang.parse_query(sql)

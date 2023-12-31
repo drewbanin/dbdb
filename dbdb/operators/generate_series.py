@@ -26,7 +26,8 @@ class GenerateSeriesOperator(Operator):
             yield row
 
             # would be cooler if range() was async...
-            await asyncio.sleep(0.0)
+            if i % 100 == 0:
+                await asyncio.sleep(0.0)
             self.stats.update_row_emitted(row)
 
         self.stats.update_done_running()

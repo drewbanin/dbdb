@@ -87,14 +87,14 @@ class OperatorStats:
         self.state = STATE_RUNNING
 
         self.rows_processed += 1
-        self.bytes_processed += self._get_size_of_row(row)
+        # self.bytes_processed += self._get_size_of_row(row)
 
         if (STAT_CALLBACK):
             STAT_CALLBACK("processing", self.get_stats())
 
     def update_row_emitted(self, row):
         self.rows_emitted += 1
-        self.bytes_emmitted += self._get_size_of_row(row)
+        # self.bytes_emmitted += self._get_size_of_row(row)
 
         if (STAT_CALLBACK):
             STAT_CALLBACK("processing", self.get_stats())

@@ -35,10 +35,7 @@ class RenameScopeOperator(Operator):
 
     async def make_iterator(self, tuples):
         async for row in tuples:
-            self.stats.update_row_processed(row)
             yield row
-            self.stats.update_row_emitted(row)
-
         self.stats.update_done_running()
 
     async def run(self, rows):
