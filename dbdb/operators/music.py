@@ -3,6 +3,7 @@ import itertools
 
 from dbdb.operators.music_tools import music_player
 from dbdb.operators.music_tools.track import Track
+from dbdb.operators.music_tools.timeline import Timeline
 
 
 class MusicConfig(OperatorConfig):
@@ -20,23 +21,23 @@ class PlayMusicOperator(Operator):
         return "Music"
 
     async def make_iterator(self, tuples):
-        track = Track(bpm=int(self.config.bpm))
+        # track = Track(bpm=int(self.config.bpm))
+        timeline = Timeline()
 
         async for row in tuples:
             self.stats.update_row_processed(row)
-
-            track.add_note(
-                note=row.field('note'),
-                octave=int(row.field('octave')),
-                length=float(row.field('length')),
-                amplitude=float(row.field('amplitude')),
+            timeline.add_tone(
+                row.field('time'),
+                row.field('freq')
             )
+
             yield row
 
             self.stats.update_row_emitted(row)
 
         # WAIT for music here?
-        music_player.play_track(track)
+        timeline.play()
+        # music_player.play_track(track)
         self.stats.update_done_running()
 
     async def run(self, rows):

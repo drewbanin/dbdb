@@ -1,5 +1,6 @@
 from dbdb.operators.file_operator import TableScanOperator, TableGenOperator
 from dbdb.operators.google_sheets import GoogleSheetsOperator
+from dbdb.operators.generate_series import GenerateSeriesOperator
 from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
@@ -224,21 +225,30 @@ class SelectFunctionSource(SelectClause):
         self.table = table_identifier
 
         # TODO : Move this into function / module!
-        if self.function_name != 'GOOGLE_SHEET':
+        if self.function_name not in ('GOOGLE_SHEET', 'GENERATE_SERIES'):
             raise RuntimeError(f"Unsupported table function: {self.function_name}")
 
     def name(self):
         return self.table.name
 
     def as_operator(self):
-        sheet_id = self.function_args[0]
-        tab_id = self.function_args[1] if len(self.function_args) == 2 else None
+        if self.function_name == "GOOGLE_SHEET":
+            sheet_id = self.function_args[0]
+            tab_id = self.function_args[1] if len(self.function_args) == 2 else None
 
-        return GoogleSheetsOperator(
-            table=self.table,
-            sheet_id=sheet_id,
-            tab_id=tab_id
-        )
+            return GoogleSheetsOperator(
+                table=self.table,
+                sheet_id=sheet_id,
+                tab_id=tab_id
+            )
+        elif self.function_name == "GENERATE_SERIES":
+            count = self.function_args[0]
+
+            return GenerateSeriesOperator(
+                table=self.table,
+                count=count,
+            )
+
 
 
 class SelectFileSource(SelectClause):

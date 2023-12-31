@@ -31,6 +31,18 @@ with bass as (
 play bass at 130 bpm
 """
 
+sql = """
+with gen as (
+    select
+        i as time,
+        sin(i * 261.2 * 2 * 3.14 / 44100) as freq
+
+    from generate_series(44100 * 2)
+)
+
+play gen at 60 bpm
+"""
+
 parsed = dbdb.lang.lang.parse_query(sql)
 plan, output_node = parsed.make_plan()
 nodes = list(nx.topological_sort(plan))

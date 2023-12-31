@@ -411,8 +411,22 @@ def op_negate(string, loc, toks):
 
 
 def binary_operator(string, loc, toks):
-    lhs, op, rhs = toks[0]
-    return BinaryOperator(lhs, op, rhs)
+    # Combine exprs, eg:
+    # -> x * y * z
+    # -> x * op(y, *, z)
+    # -> op(x, * op(y, *, z)
+
+    exprs = toks[0].deepcopy()
+    binop = None
+    while len(exprs) > 1:
+        rhs = exprs.pop()
+        op = exprs.pop()
+        lhs = exprs.pop()
+
+        binop = BinaryOperator(lhs, op, rhs)
+        exprs.append(binop)
+
+    return binop
 
 
 EXPRESSION << pp.infix_notation(
@@ -689,7 +703,7 @@ def make_source_function(func_source):
 
     return SelectFunctionSource(
         function_name=func_name,
-        function_args=[f.value() for f in func_expr],
+        function_args=[f.eval(None) for f in func_expr],
         table_identifier=table_id,
     )
 
