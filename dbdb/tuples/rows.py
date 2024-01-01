@@ -2,6 +2,7 @@ from dbdb.tuples.identifiers import TableIdentifier
 
 import tabulate
 from typing import NamedTuple
+import functools
 
 
 class RowTuple:
@@ -26,10 +27,12 @@ class RowTuple:
                 found = i
 
         if found is None:
-            import ipdb; ipdb.set_trace()
             raise RuntimeError(f"field {name} not found in table")
 
         return self.data[found]
+
+    def nulls(self):
+        return (None,) * len(self.fields)
 
     def index(self, index):
         return self.data[index]

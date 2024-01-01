@@ -1,5 +1,6 @@
 
 import itertools
+import functools
 
 
 class Identifier:
@@ -75,6 +76,7 @@ class FieldIdentifier(Identifier):
         self.name = name
         self.parent = parent
 
+    @functools.cache
     def is_match(self, candidate):
         candidate_parts = candidate.split(".")
         assert len(candidate_parts) > 0, f"Got empty candidate: {candidate}"

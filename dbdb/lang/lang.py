@@ -3,6 +3,18 @@ import pyparsing as pp
 from pyparsing import common as ppc
 
 
+from dbdb.lang.expr_types import (
+    ColumnIdentifier,
+    TableIdent,
+    Literal,
+    FunctionCall,
+    BinaryOperator,
+    CaseWhen,
+    CastExpr,
+    JoinClause,
+    JoinCondition,
+)
+
 from dbdb.tuples.identifiers import (
     TableIdentifier,
     FieldIdentifier,
@@ -10,6 +22,7 @@ from dbdb.tuples.identifiers import (
 )
 
 from dbdb.operators.joins import JoinType
+from dbdb.operators.aggregate import Aggregates
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
@@ -156,34 +169,6 @@ IDENT = ~RESERVED + (
     pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
 )("ident*")
 
-class ASTToken:
-    def has_aggregate(self):
-        return False
-
-
-class ColumnIdentifier(ASTToken):
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def qualify(self):
-        if self.table:
-            name = f"{self.table}.{self.column}"
-        else:
-            name = self.column
-
-        return name
-
-    def eval(self, row):
-        name = self.qualify()
-        return row.field(name)
-
-    def get_aggregated_fields(self):
-        return set()
-
-    def get_non_aggregated_fields(self):
-        name = self.qualify()
-        return {name}
 
 
 def make_col_identifier(string, loc, toks):
@@ -195,17 +180,6 @@ def make_col_identifier(string, loc, toks):
         table, column = ident_parts
 
     return ColumnIdentifier(table, column)
-
-
-class TableIdent(ASTToken):
-    def __init__(self, table_name, alias=None):
-        self.table_name = table_name
-        self.alias = alias
-
-    def eval(self, row):
-        # If we call this, something bad happened...
-        raise NotImplementedError()
-
 
 
 def make_table_identifier(string, loc, toks):
@@ -239,24 +213,6 @@ TABLE_IDENT = IDENT.copy() \
     .setParseAction(make_table_identifier)
 
 
-class Literal(ASTToken):
-    def __init__(self, val):
-        self.val = val
-
-    def eval(self, row):
-        return self.val
-
-    def value(self):
-        return self.val
-
-    def get_aggregated_fields(self):
-        return set()
-
-    def get_non_aggregated_fields(self):
-        return set()
-
-    def is_int(self):
-        return isinstance(self.val, int)
 
 
 def as_literal(string, loc, toks):
@@ -287,49 +243,6 @@ STAR = "*"
 
 EXPRESSION = pp.Forward()
 
-
-from dbdb.operators.aggregate import Aggregates
-class FunctionCall(ASTToken):
-    def __init__(self, func_name, func_expr, agg_type):
-        self.func_name = func_name
-        self.func_expr = func_expr
-        self.agg_type = agg_type
-
-    def eval(self, row):
-        from dbdb.operators.functions import find_func
-
-        func = find_func(self.func_name)
-        value = func.eval(self.func_expr, row)
-        return value
-
-    def get_aggregated_fields(self):
-        # If this is a scalar function, return the set of fields
-        # that are aggregated within the function expression
-        if self.agg_type == Aggregates.SCALAR:
-            return self.func_expr.get_aggregated_fields()
-        else:
-            # If it's an aggregate function, then confirm that the func_expr
-            # is _not_ also an aggregate. Otherwise, return the non-agg fields
-            # contained within the function expression
-            scalar_fields = set()
-
-            for expr in self.func_expr:
-                aggs = expr.get_aggregated_fields()
-                if len(aggs) > 0:
-                    raise RuntimeError("Tried to agg an agg")
-
-                scalars = expr.get_non_aggregated_fields()
-                scalar_fields.update(scalars)
-
-            # So these are the un-agg fields that become aggregated via being
-            # contained within this function
-            return scalar_fields
-
-    def get_non_aggregated_fields(self):
-        if self.agg_type == Aggregates.SCALAR:
-            return self.func_expr.get_non_aggregated_fields()
-        else:
-            return set()
 
 
 def call_function(string, loc, toks):
@@ -384,19 +297,6 @@ WINDOW_CALL = pp.Group(
 ).setParseAction(call_window_function)
 
 
-class CaseWhen(ASTToken):
-    def __init__(self, when_exprs, else_expr):
-        self.when_exprs = when_exprs
-        self.else_expr = else_expr
-
-    def eval(self, row):
-        for (when_cond, when_value) in self.when_exprs:
-            if when_cond.eval(row):
-                return when_value.eval(row)
-
-        return self.else_expr.eval(row)
-
-
 def case_when(string, loc, toks):
     when_conds = toks[0].when_conds
     else_expr = toks[0].else_cond
@@ -416,29 +316,6 @@ CASE_WHEN_EXPR = pp.Group(
 )("case_when").setParseAction(case_when)
 
 
-class CastExpr(ASTToken):
-    def __init__(self, ttype):
-        self.ttype = ttype
-
-    def eval(self, row):
-        return self.ttype
-
-    @classmethod
-    def make(cls, string, loc, toks):
-        ttype = toks[0]
-
-        if ttype.upper() == 'INT':
-            ttype = int
-        elif ttype.upper() == 'FLOAT':
-            ttype = float
-        elif ttype.upper() in ['STRING', 'TEXT']:
-            ttype = str
-        else:
-            raise RuntimeError(f"Unknown type: {ttype}")
-
-        return CastExpr(ttype)
-
-
 
 TYPE = (
     STRING |
@@ -447,78 +324,6 @@ TYPE = (
     FLOAT
 ).setParseAction(CastExpr.make)
 
-
-
-class BinaryOperator:
-    def __init__(self, lhs, operator, rhs):
-        self.lhs = lhs
-        self.operator = operator
-        self.rhs = rhs
-
-        self._literal_cache = None
-        if isinstance(self.lhs, Literal) and isinstance(self.rhs, Literal):
-            self._literal_cache = self.eval(None)
-
-    def eval(self, row):
-        if self._literal_cache:
-            return self._literal_cache
-
-        if self.operator == '+':
-            op = lambda l, r: l + r
-        elif self.operator == '-':
-            op = lambda l, r: l - r
-        elif self.operator == '*':
-            op = lambda l, r: l * r
-        elif self.operator == '/':
-            op = lambda l, r: l / r
-
-        # TODO: Don't think this is right....
-        elif self.operator == 'AND':
-            op = lambda l, r: l and r
-        elif self.operator == 'OR':
-            op = lambda l, r: l or r
-
-        elif self.operator == '=':
-            op = lambda l, r: l == r
-        elif self.operator == '!=':
-            op = lambda l, r: l != r
-
-        elif self.operator == 'IS':
-            op = lambda l, r: l is r
-
-        elif self.operator == 'IS_NOT':
-            op = lambda l, r: l is not r
-
-        elif self.operator == "<":
-            op = lambda l, r: l < r
-        elif self.operator == ">":
-            op = lambda l, r: l > r
-        elif self.operator == "<=":
-            op = lambda l, r: l <= r
-        elif self.operator == ">=":
-            op = lambda l, r: l >= r
-
-        elif self.operator == '::':
-            # cast value `l` to type `r`
-            op = lambda l, r: r(l)
-
-        else:
-            import ipdb; ipdb.set_trace()
-
-        return op(
-            self.lhs.eval(row),
-            self.rhs.eval(row)
-        )
-
-    def get_aggregated_fields(self):
-        return self.lhs.get_aggregated_fields().union(
-            self.rhs.get_aggregated_fields()
-        )
-
-    def get_non_aggregated_fields(self):
-        return self.lhs.get_non_aggregated_fields().union(
-            self.rhs.get_non_aggregated_fields()
-        )
 
 
 def op_negate(string, loc, toks):
@@ -572,28 +377,6 @@ COLUMN_EXPR = pp.Group(
     )
 )
 
-class JoinCondition:
-    def __init__(self, join_type, join_expr):
-        self.join_type = join_type
-        self.join_expr = join_expr
-
-    def eval(self, row):
-        return self.join_expr.eval(row)
-
-    @classmethod
-    def make_from_on_expr(cls, tokens):
-        # ON <expr>
-        return JoinCondition('ON', tokens[1])
-
-    @classmethod
-    def make_from_using_expr(cls, tokens):
-        # USING ( <field list> )
-        # Build our own expression...
-        # TODO: What is the LHS and RHS???
-        join_expr = None
-        return JoinCondition('USING', join_expr)
-
-
 def make_explicit_join(string, loc, toks):
     return JoinCondition.make_from_on_expr(toks)
 
@@ -642,21 +425,6 @@ JOIN_CONDITION = (
     (ON + EXPRESSION).setParseAction(make_explicit_join) |
     (USING + LPAR + pp.delimitedList(IDENT) + RPAR).setParseAction(make_implicit_join)
 )
-
-
-class JoinClause(ASTToken):
-    def __init__(self, to, join_type, on):
-        self.to = to
-        self.join_type = join_type
-        self.on = on
-
-    @classmethod
-    def new_qualified(cls, to, join_type, on):
-        return cls(to, join_type, on)
-
-    @classmethod
-    def new_unqualified(cls, to, join_type):
-        return cls(to, join_type, on=True)
 
 
 def make_join_clause(string, loc, tokens):
