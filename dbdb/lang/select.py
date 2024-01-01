@@ -36,6 +36,7 @@ class Select:
         limit=None,
         ctes=None,
 
+        scopes=None,
         play_music=None,
     ):
         self.projections = projections
@@ -45,9 +46,12 @@ class Select:
         self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
-        self.ctes = ctes or {}
 
+        self.scopes = scopes or {}
         self.play_music = play_music
+
+        self._plan = None
+        self._output_op = None
 
     def make_plan(self, plan=None):
         """
@@ -61,18 +65,14 @@ class Select:
         """
 
         plan = plan or nx.DiGraph()
-        scopes = {}
-
-        for (cte_name, cte) in self.ctes.items():
-            plan, output_op = cte.make_plan(plan)
-            scopes[cte_name] = output_op
 
         def resolve_internal_reference(source, label):
             source_op = source.as_operator()
             plan.add_node(source_op, label=label)
 
-            if source.name() in scopes:
-                parent_node = scopes[source.name()]
+            print("dEBUG!", source.name(), self.scopes)
+            if source.name() in self.scopes:
+                parent_node = self.scopes[source.name()]
                 plan.add_edge(parent_node, source_op, input_arg="rows")
 
             return source_op
@@ -130,6 +130,11 @@ class Select:
 
         return plan, output_op
 
+    def save_plan(self, plan):
+        plan, output_op = self.make_plan(plan)
+        self._plan = plan
+        self._output_op = output_op
+
     def __str__(self):
         return f"""
         Projections: {self.projections}
@@ -141,25 +146,28 @@ class Select:
         """
 
 class MusicPlayer:
-    def __init__(self, sources, bpm, ctes):
+    def __init__(self, sources, bpm, scopes):
         self.sources = sources
         self.bpm = bpm or 60
-        self.ctes = ctes
+        self.scopes = scopes
 
-    def make_plan(self):
-        plan = nx.DiGraph()
-        scopes = {}
+        self._plan = None
+        self._output_op = None
 
-        for (cte_name, cte) in self.ctes.items():
-            plan, output_op = cte.make_plan(plan)
-            scopes[cte_name] = output_op
+    def save_plan(self, plan):
+        plan, output_op = self.make_plan(plan)
+        self._plan = plan
+        self._output_op = output_op
+
+    def make_plan(self, plan):
+        plan = plan or nx.DiGraph()
 
         union_op = UnionOperator()
         for source in self.sources:
-            if source.name() not in scopes:
+            if source.name() not in self.scopes:
                 raise RuntimeError(f"Unknown table: {source.name()}")
 
-            parent_node = scopes[source.name()]
+            parent_node = self.scopes[source.name()]
             plan.add_edge(parent_node, union_op, input_arg="rows", list_args=True)
 
         music_op = PlayMusicOperator(bpm=self.bpm)

@@ -3,9 +3,6 @@ import math
 import numpy as np
 
 class DBDB_SIN:
-    def __init__(self, number):
-        pass
-
     @classmethod
     def eval(cls, args, row):
         value = args[0].eval(row)
@@ -27,9 +24,6 @@ class DBDB_SQR:
 
 
 class DBDB_IFF:
-    def __init__(self, number):
-        pass
-
     @classmethod
     def eval(cls, args, row):
         if len(args) != 3:
@@ -40,3 +34,15 @@ class DBDB_IFF:
             return args[1].eval(row)
         else:
             return args[2].eval(row)
+
+
+class DBDB_POW:
+    @classmethod
+    def eval(cls, args, row):
+        if len(args) != 2:
+            raise RuntimeError("POW requires 2 args")
+
+        base = args[0].eval(row)
+        exp = args[1].eval(row)
+
+        return base ** exp

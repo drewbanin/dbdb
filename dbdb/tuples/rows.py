@@ -4,6 +4,8 @@ import tabulate
 from typing import NamedTuple
 import functools
 
+import numpy as np
+
 
 class RowTuple:
     def __init__(self, fields, data):
@@ -30,6 +32,13 @@ class RowTuple:
             raise RuntimeError(f"field {name} not found in table")
 
         return self.data[found]
+
+    def has_field(self, name):
+        for f in self.fields:
+            if field.is_match(f):
+                return True
+        return False
+
 
     def nulls(self):
         return (None,) * len(self.fields)
@@ -69,8 +78,8 @@ class Rows:
         import asyncio
         global TICKS
         TICKS += 1
-        if TICKS % 100 == 0:
-            await asyncio.sleep(0.0)
+        # if TICKS % 100 == 0:
+        #     await asyncio.sleep(0.0)
         record = await self.iterator.__anext__()
         return self._make_row(record)
 
@@ -103,8 +112,6 @@ class Rows:
         return Rows(table, fields, iterator)
 
     async def materialize(self):
-        if type(self.iterator).__name__ == 'generator':
-            import ipdb; ipdb.set_trace()
         if not self.data:
             self.data = tuple([self._make_row(row) async for row in self.iterator])
 

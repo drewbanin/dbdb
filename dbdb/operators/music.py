@@ -21,24 +21,28 @@ class PlayMusicOperator(Operator):
         return "Music"
 
     async def make_iterator(self, tuples):
-        # track = Track(bpm=int(self.config.bpm))
-        timeline = Timeline()
+        timeline = Timeline(bpm=int(self.config.bpm))
 
         async for row in tuples:
             # self.stats.update_row_processed(row)
+
+            # dumb
+            try:
+                length = row.field('length')
+            except RuntimeError:
+                length = 1
+
             timeline.add_tone(
-                row.field('time'),
-                row.field('freq')
+                start_time=row.field('time'),
+                frequency=row.field('freq'),
+                length=length,
             )
 
             yield row
 
-            await timeline.buffered_play()
-
             # self.stats.update_row_emitted(row)
 
         await timeline.wait_for_completion()
-        # music_player.play_track(track)
         self.stats.update_done_running()
 
     async def run(self, rows):

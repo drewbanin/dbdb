@@ -352,7 +352,9 @@ def binary_operator(string, loc, toks):
 EXPRESSION << pp.infix_notation(
     FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | TYPE | QUALIFIED_IDENT | STAR,
     [
+        ('::', 2, pp.OpAssoc.LEFT, binary_operator),
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
+
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),
         (pp.oneOf('+ -'), 2, pp.OpAssoc.LEFT, binary_operator),
         (pp.oneOf('<= >='), 2, pp.OpAssoc.LEFT, binary_operator),
@@ -365,7 +367,6 @@ EXPRESSION << pp.infix_notation(
         (AND, 2, pp.OpAssoc.LEFT, binary_operator),
         (OR, 2, pp.OpAssoc.LEFT, binary_operator),
 
-        ('::', 2, pp.OpAssoc.LEFT, binary_operator),
     ]
 )("expression")
 
@@ -666,7 +667,7 @@ def make_play_list_from_scope(play_list, scopes):
     return MusicPlayer(
         sources=sources,
         bpm=bpm,
-        ctes=scopes,
+        scopes=scopes,
     )
 
 def make_select_from_scope(ast_select, scopes):
@@ -689,23 +690,28 @@ def make_select_from_scope(ast_select, scopes):
         group_by=group_by,
         order_by=order_by,
         limit=limit,
+
+        scopes=scopes,
     )
 
 def ast_to_select_obj(ast):
     scopes = {}
-    for cte  in ast.ctes:
+    plan = None
+    for cte in ast.ctes:
         alias = cte.cte_alias
-        select = make_select_from_scope(cte.select, scopes)
-        scopes[alias.table_name] = select
+        scope_copy = scopes.copy()
+        select = make_select_from_scope(cte.select, scope_copy)
+        plan, output_node = select.make_plan(plan)
+        scopes[alias.table_name] = output_node
 
     if ast.select:
         select = make_select_from_scope(ast.select, scopes)
-        select.ctes = scopes
     elif ast.play_list:
         select = make_play_list_from_scope(ast.play_list, scopes)
     else:
         raise RuntimeError("Invalid query: does not contain a SELECT or PLAY instruction...")
 
+    select.save_plan(plan)
     return select
 
 
