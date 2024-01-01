@@ -26,6 +26,7 @@ class RowTuple:
                 found = i
 
         if found is None:
+            import ipdb; ipdb.set_trace()
             raise RuntimeError(f"field {name} not found in table")
 
         return self.data[found]

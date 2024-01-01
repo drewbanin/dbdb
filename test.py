@@ -16,23 +16,6 @@ from sse_starlette.sse import EventSourceResponse
 import asyncio
 
 sql = """
-with bass as (
-    select
-        -- use sum() window func to get start time?
-        -- spread out over duration with a join?
-        note,
-        length,
-        octave,
-        amplitude,
-        start_time
-
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
-)
-
-play bass at 130 bpm
-"""
-
-sql = """
 with gen as (
     select
         i as time,
@@ -47,6 +30,32 @@ with gen as (
 )
 
 play gen
+"""
+
+sql = """
+with spine as (
+
+    select i
+    from generate_series(44100)
+
+),
+
+bass as (
+    select
+        note,
+        length::float as length,
+        octave::int as octave,
+        amplitude::float as amplitude,
+        start_time::float as start_time
+
+    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Melody')
+)
+
+select *
+from spine
+join bass on (bass.start_time * 44100) >= spine.i and (bass.start_time * 44100 + bass.length) < spine.i
+
+limit 100
 """
 
 

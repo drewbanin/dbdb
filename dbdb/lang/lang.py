@@ -106,6 +106,12 @@ PLAY = pp.CaselessKeyword("PLAY")
 AT = pp.CaselessKeyword("AT")
 BPM = pp.CaselessKeyword("BPM")
 
+# TYPES
+STRING = pp.CaselessKeyword("STRING")
+TEXT = pp.CaselessKeyword("TEXT")
+INT = pp.CaselessKeyword("INT")
+FLOAT = pp.CaselessKeyword("FLOAT")
+
 # Literals
 PI = pp.CaselessKeyword("PI").setParseAction(lambda x: Literal(math.pi))
 
@@ -410,6 +416,39 @@ CASE_WHEN_EXPR = pp.Group(
 )("case_when").setParseAction(case_when)
 
 
+class CastExpr(ASTToken):
+    def __init__(self, ttype):
+        self.ttype = ttype
+
+    def eval(self, row):
+        return self.ttype
+
+    @classmethod
+    def make(cls, string, loc, toks):
+        ttype = toks[0]
+
+        if ttype.upper() == 'INT':
+            ttype = int
+        elif ttype.upper() == 'FLOAT':
+            ttype = float
+        elif ttype.upper() in ['STRING', 'TEXT']:
+            ttype = str
+        else:
+            raise RuntimeError(f"Unknown type: {ttype}")
+
+        return CastExpr(ttype)
+
+
+
+TYPE = (
+    STRING |
+    TEXT   |
+    INT    |
+    FLOAT
+).setParseAction(CastExpr.make)
+
+
+
 class BinaryOperator:
     def __init__(self, lhs, operator, rhs):
         self.lhs = lhs
@@ -454,6 +493,14 @@ class BinaryOperator:
             op = lambda l, r: l < r
         elif self.operator == ">":
             op = lambda l, r: l > r
+        elif self.operator == "<=":
+            op = lambda l, r: l <= r
+        elif self.operator == ">=":
+            op = lambda l, r: l >= r
+
+        elif self.operator == '::':
+            # cast value `l` to type `r`
+            op = lambda l, r: r(l)
 
         else:
             import ipdb; ipdb.set_trace()
@@ -497,9 +544,8 @@ def binary_operator(string, loc, toks):
 
     return binop
 
-
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | QUALIFIED_IDENT | STAR,
+    FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | TYPE | QUALIFIED_IDENT | STAR,
     [
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),
@@ -513,6 +559,8 @@ EXPRESSION << pp.infix_notation(
 
         (AND, 2, pp.OpAssoc.LEFT, binary_operator),
         (OR, 2, pp.OpAssoc.LEFT, binary_operator),
+
+        ('::', 2, pp.OpAssoc.LEFT, binary_operator),
     ]
 )("expression")
 
