@@ -13,6 +13,7 @@ from dbdb.operators.joins import JoinType
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
+import math
 
 pp.ParserElement.enable_packrat()
 # pp.enable_all_warnings()
@@ -93,10 +94,24 @@ FOLLOWING = pp.CaselessKeyword("FOLLOWING")
 CURRENT = pp.CaselessKeyword("CURRENT")
 ROW = pp.CaselessKeyword("ROW")
 
+# Case when
+CASE = pp.CaselessKeyword("CASE")
+WHEN = pp.CaselessKeyword("WHEN")
+THEN = pp.CaselessKeyword("THEN")
+ELSE = pp.CaselessKeyword("ELSE")
+END = pp.CaselessKeyword("END")
+
 # dbdb - fun!
 PLAY = pp.CaselessKeyword("PLAY")
 AT = pp.CaselessKeyword("AT")
 BPM = pp.CaselessKeyword("BPM")
+
+# Literals
+PI = pp.CaselessKeyword("PI").setParseAction(lambda x: Literal(math.pi))
+
+MATH = (
+    PI
+)
 
 RESERVED = pp.Group(
     FROM     |
@@ -122,7 +137,13 @@ RESERVED = pp.Group(
     ASC  |
     DESC |
     PLAY |
-    AT
+    AT   |
+    PI   |
+    CASE |
+    WHEN |
+    THEN |
+    ELSE |
+    END
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
@@ -269,7 +290,11 @@ class FunctionCall(ASTToken):
         self.agg_type = agg_type
 
     def eval(self, row):
-        return self.func_expr.eval(row)
+        from dbdb.operators.functions import find_func
+
+        func = find_func(self.func_name)
+        value = func.eval(self.func_expr, row)
+        return value
 
     def get_aggregated_fields(self):
         # If this is a scalar function, return the set of fields
@@ -353,13 +378,52 @@ WINDOW_CALL = pp.Group(
 ).setParseAction(call_window_function)
 
 
+class CaseWhen(ASTToken):
+    def __init__(self, when_exprs, else_expr):
+        self.when_exprs = when_exprs
+        self.else_expr = else_expr
+
+    def eval(self, row):
+        for (when_cond, when_value) in self.when_exprs:
+            if when_cond.eval(row):
+                return when_value.eval(row)
+
+        return self.else_expr.eval(row)
+
+
+def case_when(string, loc, toks):
+    when_conds = toks[0].when_conds
+    else_expr = toks[0].else_cond
+
+    when_exprs = [(w.when_expr, w.then_expr) for w in when_conds]
+    return CaseWhen(when_exprs, else_expr)
+
+WHEN_COND = pp.Group(
+    WHEN + EXPRESSION.copy()("when_expr") +
+    THEN + EXPRESSION.copy()("then_expr")
+)
+
+CASE_WHEN_EXPR = pp.Group(
+    CASE +
+    pp.OneOrMore(WHEN_COND)("when_conds") +
+    pp.Opt(ELSE + EXPRESSION.copy()("else_cond"))
+)("case_when").setParseAction(case_when)
+
+
 class BinaryOperator:
     def __init__(self, lhs, operator, rhs):
         self.lhs = lhs
         self.operator = operator
         self.rhs = rhs
 
+        self._literal_cache = None
+        if isinstance(self.lhs, Literal) and isinstance(self.rhs, Literal):
+            self._literal_cache = self.eval(None)
+
     def eval(self, row):
+        if self._literal_cache:
+            return self._literal_cache
+
         if self.operator == '+':
             op = lambda l, r: l + r
         elif self.operator == '-':
@@ -385,6 +449,11 @@ class BinaryOperator:
 
         elif self.operator == 'IS_NOT':
             op = lambda l, r: l is not r
+
+        elif self.operator == "<":
+            op = lambda l, r: l < r
+        elif self.operator == ">":
+            op = lambda l, r: l > r
 
         else:
             import ipdb; ipdb.set_trace()
@@ -430,7 +499,7 @@ def binary_operator(string, loc, toks):
 
 
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | QUALIFIED_IDENT | STAR,
+    FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | QUALIFIED_IDENT | STAR,
     [
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
         (pp.oneOf('* /'), 2, pp.OpAssoc.LEFT, binary_operator),
@@ -618,9 +687,11 @@ CTE_LIST = WITH + pp.delimitedList(CTE_SELECT)("ctes")
 PLAY_LIST = pp.Group(
     PLAY +
     pp.delimitedList(TABLE_IDENT)("sources") +
-    AT +
-    LIT_NUM("bpm") +
-    BPM
+    pp.Opt(
+        AT +
+        LIT_NUM("bpm") +
+        BPM
+    )
 )
 
 
@@ -771,7 +842,10 @@ def extract_limit(ast):
 
 def make_play_list_from_scope(play_list, scopes):
     sources = [extract_source(s, scopes) for s in play_list.sources]
-    bpm = play_list.bpm.value()
+
+    bpm = None
+    if play_list.bpm:
+        bpm = play_list.bpm.value()
 
     return MusicPlayer(
         sources=sources,

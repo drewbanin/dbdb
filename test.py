@@ -15,10 +15,11 @@ from fastapi.exceptions import RequestValidationError
 from sse_starlette.sse import EventSourceResponse
 import asyncio
 
-
 sql = """
 with bass as (
     select
+        -- use sum() window func to get start time?
+        -- spread out over duration with a join?
         note,
         length,
         octave,
@@ -35,13 +36,23 @@ sql = """
 with gen as (
     select
         i as time,
-        sin(i * 261.2 * 2 * 3.14 / 44100) as freq
+        case
+            when i < 44100 then sqr(i * 261.2 * 2 * pi / 44100)
+            when i < (44100 * 2) then sqr(i * 261.2 * 3 * pi / 44100)
+            when i < (44100 * 3) then sqr(i * 261.2 * 4 * pi / 44100)
+            else sqr(i * 261.2 * 5 * pi / 44100)
+        as freq
 
-    from generate_series(44100 * 10)
+    from generate_series(44100)
 )
 
-play gen at 130 bpm
+play gen
 """
+
+
+
+
+# sin(i * 261.2 * 2 * pi / 44100) as freq
 
 parsed = dbdb.lang.lang.parse_query(sql)
 plan, output_node = parsed.make_plan()

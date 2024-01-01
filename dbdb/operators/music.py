@@ -25,7 +25,7 @@ class PlayMusicOperator(Operator):
         timeline = Timeline()
 
         async for row in tuples:
-            self.stats.update_row_processed(row)
+            # self.stats.update_row_processed(row)
             timeline.add_tone(
                 row.field('time'),
                 row.field('freq')
@@ -33,10 +33,11 @@ class PlayMusicOperator(Operator):
 
             yield row
 
-            self.stats.update_row_emitted(row)
+            await timeline.buffered_play()
 
-        # WAIT for music here?
-        timeline.play()
+            # self.stats.update_row_emitted(row)
+
+        await timeline.wait_for_completion()
         # music_player.play_track(track)
         self.stats.update_done_running()
 

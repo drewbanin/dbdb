@@ -143,7 +143,7 @@ class Select:
 class MusicPlayer:
     def __init__(self, sources, bpm, ctes):
         self.sources = sources
-        self.bpm = bpm
+        self.bpm = bpm or 60
         self.ctes = ctes
 
     def make_plan(self):

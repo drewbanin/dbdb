@@ -22,22 +22,18 @@ class ProjectOperator(Operator):
     async def make_iterator(self, tuples):
         projections = self.config.project
         async for row in tuples:
-            self.stats.update_row_processed(row)
+            # self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
                 if projection.expr == "*":
                     for value in row.data:
                         projected.append(value)
-                elif hasattr(projection.expr, 'func_name'):
-                    func = find_func(projection.expr.func_name)
-                    value = func.eval(projection.expr.func_expr, row)
-                    projected.append(value)
                 else:
                     value = projection.expr.eval(row)
                     projected.append(value)
 
             yield projected
-            self.stats.update_row_emitted(row)
+            # self.stats.update_row_emitted(row)
         self.stats.update_done_running()
 
     def list_fields(self, rows):

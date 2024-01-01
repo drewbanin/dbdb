@@ -2,63 +2,75 @@
 import pygame
 import numpy as np
 from collections import defaultdict
+import asyncio
 
-FACTOR = 1
+
+class SoundBuffer:
+    def __init__(self, max_size=60):
+        self.buffer = self._make_buffer(max_size)
+        self.max_pos = 0
+
+        self.current_pos = 0
+
+    def _make_buffer(self, length_in_s):
+        return np.zeros(44100 * length_in_s, dtype = np.int16)
+
+    def set_freq(self, pos, freq):
+        self.buffer[pos] = freq
+        self.max_pos = max(pos, self.max_pos)
+
+    def norm_buffer(self, buffer):
+        # min_hz = min(buffer)
+        # max_hz = max(buffer)
+        # norm_hz = 2 * ((note_hz - min_hz) / (max_hz - min_hz)) - 1
+        # pass
+        return buffer
+
+    def get_next_chunk(self, flush=False):
+        start = self.current_pos
+        if flush:
+            end = self.max_pos
+        else:
+            end = start + 44100
+
+        if not flush and self.max_pos < end:
+            return None
+        else:
+            self.current_pos = end
+            segment = self.buffer[start:end]
+            normed = self.norm_buffer(segment)
+            return normed
+
 
 class Timeline:
     def __init__(self):
-        # TODO : BPM?
-        self.tones = defaultdict(list)
-        self.duration_ms = 0
+        self.buffer = SoundBuffer()
+        self.channel = None
 
-    def add_tone(self, start_time_ms, frequency):
-        # t = int(start_time_ms * 44100)
-        t = start_time_ms
-        self.tones[t].append(frequency)
-
-        self.duration_ms = max(t, self.duration_ms)
-
-    def _make_buffer(self):
-        # n_samples = int(44100 * self.duration_ms / FACTOR)
-        n_samples = max(self.tones)
-        print("NSAMPLES = ", n_samples, "DURATION = ", self.duration_ms)
-        buf = np.zeros(n_samples, dtype = np.int16)
+    def add_tone(self, t, frequency):
         bits = 16
         max_sample = 2**(bits - 1) - 1
 
-        combined = {k: sum(v) for (k,v) in self.tones.items()}
-        min_hz = min(combined.values())
-        max_hz = max(combined.values())
+        freq = int(round(max_sample * frequency))
+        self.buffer.set_freq(t, freq)
 
-        seen = set()
-        for t in range(n_samples):
-            # t = int(FACTOR * (i / 44100))
-            note_hz = combined.get(t, 0)
-            norm_hz = 2 * ((note_hz - min_hz) / (max_hz - min_hz)) - 1
-            freq = int(round(max_sample * norm_hz))
-            buf[t] = freq
+    async def buffered_play(self, flush=False):
+        buf = self.buffer.get_next_chunk(flush=flush)
+        if buf is None:
+            return
 
-        return buf
+        if self.channel is None:
+            sound = pygame.sndarray.make_sound(buf)
+            sound.set_volume(0.2)
+            self.channel = sound.play(loops = 0)
+        else:
+            sound = pygame.sndarray.make_sound(buf)
+            sound.set_volume(0.2)
+            self.channel.queue(sound)
 
-    def play(self):
-        print("Making buffer")
-        buf = self._make_buffer()
+    async def wait_for_completion(self):
+        if self.buffer.current_pos < self.buffer.max_pos:
+            await self.buffered_play(flush=True)
 
-        print("Making sound")
-        sound = pygame.sndarray.make_sound(buf)
-        sound.set_volume(0.2)
-
-        print("Playing")
-        channel = sound.play(loops = 0)
-
-        print("Waiting")
-        import time
-        st = time.time()
-        print("STARTED AT:", st)
-        while channel.get_busy():
-            pygame.time.wait(10)  # ms
-            elapsed = time.time() - st
-            try:
-                print(elapsed, buf[int(elapsed * 44100)])
-            except:
-                pass
+        while self.channel and self.channel.get_busy():
+            await asyncio.sleep(0.01)
