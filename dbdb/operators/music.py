@@ -32,10 +32,16 @@ class PlayMusicOperator(Operator):
             except RuntimeError:
                 length = 1
 
+            try:
+                amplitude = row.field('amplitude')
+            except RuntimeError:
+                amplitude = 1
+
             timeline.add_tone(
                 start_time=row.field('time'),
                 frequency=row.field('freq'),
                 length=length,
+                amplitude=amplitude,
             )
 
             yield row

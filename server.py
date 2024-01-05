@@ -84,15 +84,15 @@ async def _do_run_query(plan, nodes):
 
     for node in nodes:
         args = {}
-        print("Configuring operator", node)
-        for parent, _, data in plan.in_edges(node, data=True):
-            key = data['input_arg']
-            if data.get("list_args"):
+        for parent, _, edge in plan.in_edges(node, data=True):
+            key = edge['input_arg']
+            row_iter = row_iterators[parent].consume()
+            if edge.get("list_args"):
                 if key not in args:
                     args[key] = []
-                args[key].append(row_iterators[parent])
+                args[key].append(row_iter)
             else:
-                args[key] = row_iterators[parent]
+                args[key] = row_iter
 
         print("Running operator", node, "with args", args)
         rows = await node.run(**args)
@@ -145,19 +145,6 @@ async def do_run_query(plan, nodes):
                 "error": str(e)
             }
         })
-
-
-def make_plan(sql):
-    parsed = dbdb.lang.lang.parse_query(sql)
-    plan, output_node = parsed.make_plan()
-    nodes = list(nx.topological_sort(plan))
-
-    parents = {}
-    for node in nodes:
-        parent_nodes = plan.predecessors(node)
-        parents[id(node)] = [id(n) for n in parent_nodes]
-
-    return plan, nodes, parents
 
 
 @app.post("/query")

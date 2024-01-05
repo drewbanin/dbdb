@@ -70,7 +70,6 @@ class Select:
             source_op = source.as_operator()
             plan.add_node(source_op, label=label)
 
-            print("dEBUG!", source.name(), self.scopes)
             if source.name() in self.scopes:
                 parent_node = self.scopes[source.name()]
                 plan.add_edge(parent_node, source_op, input_arg="rows")

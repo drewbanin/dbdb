@@ -43,7 +43,6 @@ class RenameScopeOperator(Operator):
         iterator = self.make_iterator(rows)
 
         self.iterator = iterator
-        import ipdb; ipdb.set_trace()
 
         derived_table = TableIdentifier(name=self.config.scope_name)
         mapped_fields = [

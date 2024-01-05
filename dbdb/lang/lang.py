@@ -313,6 +313,7 @@ CASE_WHEN_EXPR = pp.Group(
     CASE +
     pp.OneOrMore(WHEN_COND)("when_conds") +
     pp.Opt(ELSE + EXPRESSION.copy()("else_cond"))
+    + END
 )("case_when").setParseAction(case_when)
 
 

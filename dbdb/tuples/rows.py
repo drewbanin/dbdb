@@ -4,7 +4,8 @@ import tabulate
 from typing import NamedTuple
 import functools
 
-import numpy as np
+import asyncio
+import collections
 
 
 class RowTuple:
@@ -55,7 +56,6 @@ class RowTuple:
     def as_tuple(self):
         return tuple(self.data)
 
-TICKS = 0
 
 class Rows:
     def __init__(self, table, fields, iterator):
@@ -64,24 +64,17 @@ class Rows:
         self.iterator = iterator
         self.data = None
 
-    # def __iter__(self):
-    #     return self
-
-    # def __next__(self):
-    #     record = next(self.iterator)
-    #     return self._make_row(record)
+        self.consumers = []
+        self.seen = []
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        import asyncio
-        global TICKS
-        TICKS += 1
-        # if TICKS % 100 == 0:
-        #     await asyncio.sleep(0.0)
         record = await self.iterator.__anext__()
-        return self._make_row(record)
+        row =  self._make_row(record)
+        self.seen.append(row)
+        return row
 
     def _make_row(self, record):
         return RowTuple(self.fields, record)
@@ -91,6 +84,29 @@ class Rows:
 
     def nulls(self):
         return (None,) * len(self.fields)
+
+    def consume(self):
+        new_deque = collections.deque()
+        for val in self.seen:
+            new_deque.append(val)
+
+        self.consumers.append(new_deque)
+
+        async def gen(mydeque):
+            while True:
+                if not mydeque:
+                    try:
+                        newval = await self.__anext__()
+                    except StopAsyncIteration:
+                        return
+
+                    for consumer in self.consumers:
+                        consumer.append(newval)
+
+                yield mydeque.popleft()
+
+        return Rows(self.table, self.fields, gen(new_deque))
+
 
     @classmethod
     def merge(self, row_objs, iterator):
