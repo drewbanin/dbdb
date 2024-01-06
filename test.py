@@ -243,10 +243,49 @@ bass_freq as (
 play bass_freq at 60 bpm
 """
 
+avril  = """
+with notes as (
+    select
+        note,
+        frequency::float as freq
+
+    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
+
+),
+
+bass as (
+    select
+        note,
+        length::float as  length,
+        octave::int as octave,
+        amplitude::float as amplitude,
+        start_time::float as start_time,
+        start_time::float + length::float as end_time
+
+    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Avril')
+),
+
+bass_freq as (
+
+    select
+        bass.start_time as time,
+        bass.length,
+        bass.amplitude,
+        notes.freq * pow(2, bass.octave - 6) as freq
+
+    from bass
+    join notes on notes.note = bass.note
+
+)
+
+play bass_freq at 60 bpm
+"""
+
 sql = badguy
 sql = scale
 sql = yoshi
 sql = gerudo
+sql = avril
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))

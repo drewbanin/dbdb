@@ -44,6 +44,7 @@ class Timeline:
         for i in range(start_index, end_index):
             t = i / SAMPLE_RATE
             freq = sqr(t, frequency, amplitude)
+            # freq = sin(t, frequency, amplitude)
             self.buffer[i] += freq
             self.note_count[i] += 1
 

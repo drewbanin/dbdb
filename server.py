@@ -151,7 +151,14 @@ async def do_run_query(plan, nodes):
 async def run_query(query: Query, background_tasks: BackgroundTasks):
     sql = query.sql
     try:
-        plan, nodes, parents = make_plan(sql)
+        select = dbdb.lang.lang.parse_query(sql)
+        plan = select._plan
+        nodes = list(nx.topological_sort(plan))
+        parents = {}
+        for node in nodes:
+            parent_nodes = plan.predecessors(node)
+            parents[id(node)] = [id(n) for n in parent_nodes]
+
     except Exception as e:
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
@@ -170,7 +177,14 @@ async def explain_query(query: Query):
     sql = query.sql
 
     try:
-        plan, nodes, parents = make_plan(sql)
+        select = dbdb.lang.lang.parse_query(sql)
+        plan = select._plan
+        nodes = list(nx.topological_sort(plan))
+        parents = {}
+        for node in nodes:
+            parent_nodes = plan.predecessors(node)
+            parents[id(node)] = [id(n) for n in parent_nodes]
+
     except Exception as e:
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
