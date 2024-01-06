@@ -1,5 +1,6 @@
 from dbdb.operators.file_operator import TableScanOperator, TableGenOperator
 from dbdb.operators.google_sheets import GoogleSheetsOperator
+from dbdb.operators.midi import MIDIOperator
 from dbdb.operators.generate_series import GenerateSeriesOperator
 from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
@@ -163,11 +164,13 @@ class MusicPlayer:
 
         union_op = UnionOperator()
         for source in self.sources:
-            if source.name() not in self.scopes:
-                raise RuntimeError(f"Unknown table: {source.name()}")
-
-            parent_node = self.scopes[source.name()]
-            plan.add_edge(parent_node, union_op, input_arg="rows", list_args=True)
+            if source.name() in self.scopes:
+                parent_node = self.scopes[source.name()]
+                plan.add_edge(parent_node, union_op, input_arg="rows", list_args=True)
+            else:
+                source_op = source.as_operator()
+                plan.add_node(source_op)
+                plan.add_edge(source_op, union_op, input_arg='rows', list_args=True)
 
         music_op = PlayMusicOperator(bpm=self.bpm)
         plan.add_edge(union_op, music_op, input_arg="rows")
@@ -232,7 +235,7 @@ class SelectFunctionSource(SelectClause):
         self.table = table_identifier
 
         # TODO : Move this into function / module!
-        if self.function_name not in ('GOOGLE_SHEET', 'GENERATE_SERIES'):
+        if self.function_name not in ('GOOGLE_SHEET', 'GENERATE_SERIES', 'MIDI'):
             raise RuntimeError(f"Unsupported table function: {self.function_name}")
 
     def name(self):
@@ -254,6 +257,13 @@ class SelectFunctionSource(SelectClause):
             return GenerateSeriesOperator(
                 table=self.table,
                 count=count,
+            )
+        elif self.function_name == "MIDI":
+            fname = self.function_args[0]
+
+            return MIDIOperator(
+                table=self.table,
+                fname=fname,
             )
 
 

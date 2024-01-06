@@ -10,3 +10,5 @@ __pycache__
 # gsheets integration
 credentials.json
 token.json
+*.mid
+*.midi

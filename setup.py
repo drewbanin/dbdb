@@ -56,6 +56,8 @@ setup(
         "google-api-python-client",
         "google-auth-httplib2",
         "google-auth-oauthlib",
+
+        'mido',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

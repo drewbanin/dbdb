@@ -502,9 +502,14 @@ CTE_SELECT = pp.Group(TABLE_IDENT("cte_alias") + AS + LPAR + SELECT_STATEMENT + 
 CTE_LIST = WITH + pp.delimitedList(CTE_SELECT)("ctes")
 
 # Get it -- like a playlist?
+PLAY_SOURCE = (
+    ALIASED_TABLE_FUNCTION |
+    TABLE_IDENT
+)
+
 PLAY_LIST = pp.Group(
     PLAY +
-    pp.delimitedList(TABLE_IDENT)("sources") +
+    pp.delimitedList(PLAY_SOURCE)("sources") +
     pp.Opt(
         AT +
         LIT_NUM("bpm") +
