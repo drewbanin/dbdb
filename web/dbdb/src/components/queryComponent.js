@@ -10,10 +10,11 @@ import Spinner from '../spinner.gif';
 
 function QueryComponent() {
 
-    const { query, result, nodes, error } = useContext(QueryContext);
+    const { query, result, nodes, error, schema } = useContext(QueryContext);
 
     const [ queryText, setQueryText ] = query;
-    const [ _, setResult ] = result;
+    const [ rows, setRows ] = result;
+    const [ rowSchema, setSchema ] = schema;
     const [ nodeData, setNodeData ] = nodes;
     const [ errorData, setError ] = error;
 
@@ -23,7 +24,7 @@ function QueryComponent() {
 
         setError(null);
         setNodeData(null);
-        setResult(null);
+        setRows([]);
 
         setQueryRunning(true);
         postRequest("query", {sql: queryText}, (res) => {
@@ -42,7 +43,7 @@ function QueryComponent() {
 
         setError(null);
         setNodeData(null);
-        setResult(null);
+        setRows([]);
 
         setQueryRunning(true);
         postRequest("explain", {sql: queryText}, (res) => {
@@ -67,19 +68,29 @@ function QueryComponent() {
         const event = payload.event;
         const data = payload.data;
 
-        if (event === "QueryComplete") {
-            setResult(data);
+        if (event === "QueryStart") {
+            setRows((rows) => {
+                return []
+            });
+        } else if (event === "ResultRows") {
+            setRows((rows) => {
+                return [...rows, ...payload.data.rows]
+            });
+        } else if (event === "ResultSchema") {
+            setSchema(payload.data.columns)
+        } else if (event === "QueryComplete") {
+            publish("QUERY_COMPLETE", data.id);
             setQueryRunning(false);
         } else if (event === "QueryError") {
-            setResult(null);
+            // setResult(null);
             setQueryRunning(false);
             setError(data);
         } else {
-            publish(event, data);
+            publish(event, data, payload);
         }
       }
       sse.onerror = (e) => {
-        // error log here 
+        // error log here
         console.log("ERROR:", e);
         sse.close();
       }
@@ -97,27 +108,31 @@ function QueryComponent() {
                             <img className="queryLoading" src={Spinner} />
                         </span>}
                         <span className="light title">QUERY</span>
+                        <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>
                     </div>
                 </div>
             </div>
-            <CodeEditor
-              value={queryText}
-              language="sql"
-              onChange={(e) => setQueryText(e.target.value)}
-              padding={15}
-              data-color-mode="light"
-              style={{
-                fontSize: 14,
-                backgroundColor: "white",
-                fontFamily: 'MonaspaceNeon',
-                border: '1px solid black',
-              }}
-            />
-            <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
-            <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
-            {errorData && <div className="queryError">
-                <strong>Query Error:</strong> {errorData.error}
-            </div>}
+            <div className="fixedHeight">
+                <CodeEditor
+                  value={queryText}
+                  language="sql"
+                  onChange={(e) => setQueryText(e.target.value)}
+                  padding={15}
+                  data-color-mode="light"
+                  style={{
+                    fontSize: 14,
+                    backgroundColor: "white",
+                    fontFamily: 'MonaspaceNeon',
+                    border: '1px solid black',
+                    height: '100%',
+                  }}
+                />
+                <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
+                <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
+                {errorData && <div className="queryError">
+                    <strong>Query Error:</strong> {errorData.error}
+                </div>}
+            </div>
         </>
     )
 }

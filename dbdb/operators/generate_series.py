@@ -24,7 +24,7 @@ class GenerateSeriesOperator(Operator):
     async def make_iterator(self):
         buffer = np.arange(self.config.count)
         for i in buffer:
-            row = (i,)
+            row = (int(i),)
             yield row
 
             # would be cooler if range() was async...

@@ -1,9 +1,12 @@
 from dbdb.operators.base import Operator, OperatorConfig
-import itertools
 
 from dbdb.operators.music_tools import music_player
 from dbdb.operators.music_tools.track import Track
 from dbdb.operators.music_tools.timeline import Timeline
+from dbdb.tuples.identifiers import TableIdentifier
+from dbdb.tuples.rows import Rows
+
+import asyncio
 
 
 class MusicConfig(OperatorConfig):
@@ -26,7 +29,6 @@ class PlayMusicOperator(Operator):
         async for row in tuples:
             # self.stats.update_row_processed(row)
 
-            # dumb
             try:
                 length = row.field('length')
             except RuntimeError:
@@ -44,17 +46,30 @@ class PlayMusicOperator(Operator):
                 amplitude=amplitude,
             )
 
-            yield row
-
             # self.stats.update_row_emitted(row)
 
-        await timeline.wait_for_completion()
+        # Generate track so we can stream data to client
+        print("Generating track")
+        async for row in timeline.gen_track():
+            yield row
+
         self.stats.update_done_running()
 
     async def run(self, rows):
         music_player.init()
-
         self.stats.update_start_running()
+
+        temp_table = TableIdentifier.temporary()
+        fields = [
+            temp_table.field('time'),
+            temp_table.field('freq')
+        ]
+
         iterator = self.make_iterator(rows)
         self.iterator = iterator
-        return rows.new(iterator)
+
+        return Rows(
+            temp_table,
+            fields,
+            iterator,
+        )

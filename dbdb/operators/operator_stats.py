@@ -105,6 +105,11 @@ class OperatorStats:
         if (STAT_CALLBACK):
             STAT_CALLBACK("processing", self.get_stats())
 
+    def push_event(self, event_name, name, data):
+        if (STAT_CALLBACK):
+            # TODO : this third arg sucks
+            STAT_CALLBACK(name, data, event_name=event_name)
+
     def get_stats(self):
         return {
             "operator_id": self.operator_id,

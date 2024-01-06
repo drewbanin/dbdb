@@ -51,7 +51,6 @@ async def message_stream(request: Request):
                 num_events = len(EVENTS)
                 for i in range(num_events):
                     event = EVENTS.pop(0)
-                    print(event)
                     yield {
                         "event": "message",
                         "id": int(time.time()),
@@ -69,14 +68,22 @@ async def _do_run_query(plan, nodes):
 
     # Sample stats
 
-    def on_stat(name, stat):
+    EVENTS.append({
+        "event": "QueryStart",
+        "data": {
+            "id": id(plan),
+        }
+    })
+
+    def on_stat(name, stat, event_name='OperatorStats'):
         if name == "processing":
             # sample it
             if random.random() > 0.05:
                 return
 
         EVENTS.append({
-            "event": "OperatorStats",
+            "event": event_name,
+            "name": name,
             "data": stat
         })
 
@@ -100,18 +107,47 @@ async def _do_run_query(plan, nodes):
 
     leaf_node = nodes[-1]
 
-    preso = row_iterators[leaf_node]
-    await preso.display()
+    output = row_iterators[leaf_node]
+    output_consumer = output.consume()
 
-    columns = [f.name for f in preso.fields]
-    data = await preso.as_table()
+    columns = [f.name for f in output.fields]
+    EVENTS.append({
+        "event": "ResultSchema",
+        "data": {
+            "id": id(plan),
+            "columns": columns,
+        }
+    })
 
+    batch = []
+    async for row in output_consumer:
+        batch.append(row.as_tuple())
+        if len(batch) == 1000:
+            EVENTS.append({
+                "event": "ResultRows",
+                "data": {
+                    "id": id(plan),
+                    "rows": batch
+                }
+            })
+            batch = []
+    # flush the remaining items in the batch
+    if len(batch) > 0:
+        EVENTS.append({
+            "event": "ResultRows",
+            "data": {
+                "id": id(plan),
+                "rows": batch
+            }
+        })
+
+    await output.display()
+
+    data = await output.as_table()
     EVENTS.append({
         "event": "QueryComplete",
         "data": {
             "id": id(plan),
-            "columns": columns,
-            "rows": data
         }
     })
 

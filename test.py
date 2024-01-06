@@ -247,11 +247,24 @@ avril  = """
 play midi('avril_14.mid') at 60 bpm
 """
 
+debug = """
+with music as (
+  select
+    i as time,
+    sin(i / 10) as freq
+
+  from generate_series(100)
+)
+
+play music at 2646000 bpm
+"""
+
 sql = badguy
 sql = scale
 sql = yoshi
 sql = gerudo
 sql = avril
+sql = debug
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))

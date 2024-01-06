@@ -15,7 +15,7 @@ def sqr(t,f,a):
     return  ((sin(t,f,a) > 0) * 2 - 1) * a
 
 class Timeline:
-    def __init__(self, bpm, max_length=600):
+    def __init__(self, bpm, max_length=10):
         self.bpm = bpm
         self.buffer = np.zeros(SAMPLE_RATE * max_length, dtype = np.double)
         self.note_count = np.zeros(SAMPLE_RATE * max_length, dtype = np.double)
@@ -24,6 +24,8 @@ class Timeline:
         self._scale = self.scale_factor(bpm)
         self._note_offset = int(self._scale * 0.01)
         self._max_tone_pos = 0
+
+        self._sound = None
 
     def scale_factor(self, bpm):
         bps = bpm / 60.0
@@ -39,7 +41,7 @@ class Timeline:
         self._max_tone_pos = max(self._max_tone_pos, end_index)
 
         if start_index > len(self.buffer) or end_index > len(self.buffer):
-            raise RuntimeError(f"Max supported audio length is {self.max_length} seconds!")
+            return
 
         for i in range(start_index, end_index):
             t = i / SAMPLE_RATE
@@ -48,7 +50,7 @@ class Timeline:
             self.buffer[i] += freq
             self.note_count[i] += 1
 
-    async def wait_for_completion(self):
+    async def gen_track(self):
         bits = 16
         max_sample = 2**(bits - 1) - 1
         data = self.buffer[0:self._max_tone_pos]
@@ -56,14 +58,22 @@ class Timeline:
 
         averaged = np.nan_to_num(data / count)
         clipped = np.clip(averaged, -1, 1)
-
         normed = np.zeros(len(clipped), dtype = np.int16)
         for i, value in enumerate(clipped):
             normed[i] = int(round(max_sample * value))
 
-        sound = pygame.sndarray.make_sound(normed)
-        sound.set_volume(0.2)
-        channel = sound.play(loops = 0)
+        self._sound = pygame.sndarray.make_sound(normed)
+        self._sound.set_volume(0.2)
 
+        for i, value in enumerate(clipped):
+            ts = i / SAMPLE_RATE
+            yield (ts, value)
+
+
+    async def play_track(self):
+        if not self._sound:
+            raise RuntimeError("Sound has not been generated")
+
+        channel = self._sound.play(loops = 0)
         while channel.get_busy():
             await asyncio.sleep(0.01)

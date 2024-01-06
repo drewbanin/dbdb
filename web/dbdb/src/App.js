@@ -5,9 +5,8 @@ import './App.css';
 import 'reactflow/dist/style.css';
 
 import QueryComponent from './components/queryComponent.js';
-import DatabaseConfig from './components/databaseConfig.js';
 import OperatorViz from './components/operatorViz.js';
-import QueryStats from './components/queryStats.js';
+import Visualizer from './components/visualizer.tsx';
 import ResultTable from './components/resultTable.js';
 
 import { QueryContextProvider } from './Store.js';
@@ -30,14 +29,13 @@ function App() {
                             <div className="statsPanel" style={{ flexGrow: 0, minWidth: 500 }}>
                                 <div className="boxWrapper">
                                     <div className="flexColumn">
-                                        <QueryStats />
-                                        {false && <DatabaseConfig />}
+                                        <Visualizer />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="flexColumnBox" style={{ marginTop: 60 }}>
+                    <div className="flexColumnBox" style={{ marginTop: 90 }}>
                         <div className="flexRow">
                             <div className="flexRowBox boxWrapper" style={{ flexGrow: 1 }}>
                                 <div className="tabPicker light">

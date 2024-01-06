@@ -21,11 +21,13 @@ const customStyles = {
 }
 
 function ResultTable() {
-    const { result } = useContext(QueryContext);
+    const { result, schema } = useContext(QueryContext);
     const [ resultData ] = result;
+    const [ resultSchema ] = schema;
 
-    if (!resultData)
+    if (!resultData || !resultSchema) {
         return (<div style={{ marginTop: 10 }}>NO DATA</div>)
+    }
 
     const formatRow = (row) => {
         Object.keys(row).forEach((key) => {
@@ -43,21 +45,26 @@ function ResultTable() {
         return row;
     }
 
-    const columns = resultData.columns.map( (col) => {
+    const columns = resultSchema.map( (col, i) => {
         return {
             name: col,
-            selector: row => row[col],
+            selector: row => row[i],
         }
     })
 
-    const rows = resultData.rows.forEach((row) => {
+    // const displayRows = resultData.slice(0, 1000);
+    const rows = resultData.map((row) => {
         // this mutates
-        formatRow(row);
+        return formatRow(row);
     })
 
-
     return (
-        <DataTable columns={columns} data={resultData.rows} customStyles={customStyles}/>
+        <DataTable
+            columns={columns}
+            data={rows}
+            customStyles={customStyles}
+            pagination
+        />
     )
 }
 

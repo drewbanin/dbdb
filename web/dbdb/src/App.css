@@ -130,11 +130,14 @@ Button:disabled {
 
 .configBox {
     border: 1px solid black;
-    padding: 5px;
 }
 
 .configBox div {
     padding: 5px;
+}
+
+.fixedHeight {
+    height: 200px;
 }
 
 .bottomRow {
