@@ -35,6 +35,7 @@ class Select:
         having=None,
         order_by=None,
         limit=None,
+        unions=None,
         ctes=None,
 
         scopes=None,
@@ -47,24 +48,14 @@ class Select:
         self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
+        self.unions = []
 
         self.scopes = scopes or {}
-        self.play_music = play_music
 
         self._plan = None
         self._output_op = None
 
     def make_plan(self, plan=None):
-        """
-        Order of operations:
-        1. Table scan from FROM clause
-        2. Apply JOINs
-        3. Apply WHERE
-        5. Apply projections (including aggregates)
-        6. Apply ORDER clause
-        7. Apply LIMIT
-        """
-
         plan = plan or nx.DiGraph()
 
         def resolve_internal_reference(source, label):
@@ -116,6 +107,16 @@ class Select:
             plan.add_edge(output_op, project_op, input_arg="rows")
             output_op = project_op
 
+        if self.unions:
+            union_op = UnionOperator()
+            plan.add_node(union_op, label="Union")
+            plan.add_edge(output_op, union_op, input_arg="rows", list_args=True)
+            for union in self.unions:
+                _, output = union.make_plan(plan)
+                plan.add_edge(output, union_op, input_arg="rows", list_args=True)
+
+            output_op = union_op
+
         if self.order_by:
             order_by_op = self.order_by.as_operator()
             plan.add_node(order_by_op, label="Order")
@@ -144,38 +145,6 @@ class Select:
         Order: {self.order_by}
         Limit: {self.limit}
         """
-
-class MusicPlayer:
-    def __init__(self, sources, bpm, scopes):
-        self.sources = sources
-        self.bpm = bpm or 60
-        self.scopes = scopes
-
-        self._plan = None
-        self._output_op = None
-
-    def save_plan(self, plan):
-        plan, output_op = self.make_plan(plan)
-        self._plan = plan
-        self._output_op = output_op
-
-    def make_plan(self, plan):
-        plan = plan or nx.DiGraph()
-
-        union_op = UnionOperator()
-        for source in self.sources:
-            if source.name() in self.scopes:
-                parent_node = self.scopes[source.name()]
-                plan.add_edge(parent_node, union_op, input_arg="rows", list_args=True)
-            else:
-                source_op = source.as_operator()
-                plan.add_node(source_op)
-                plan.add_edge(source_op, union_op, input_arg='rows', list_args=True)
-
-        music_op = PlayMusicOperator(bpm=self.bpm)
-        plan.add_edge(union_op, music_op, input_arg="rows")
-
-        return plan, music_op
 
 
 class SelectClause:

@@ -26,7 +26,7 @@ function App() {
                                     <QueryComponent />
                                 </div>
                             </div>
-                            <div className="statsPanel" style={{ flexGrow: 0, minWidth: 500 }}>
+                            <div className="statsPanel" style={{ flexGrow: 0, minWidth: 500, maxWith: 500, width: 500 }}>
                                 <div className="boxWrapper">
                                     <div className="flexColumn">
                                         <Visualizer />

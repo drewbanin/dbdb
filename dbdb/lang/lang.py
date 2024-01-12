@@ -23,6 +23,7 @@ from dbdb.tuples.identifiers import (
 
 from dbdb.operators.joins import JoinType
 from dbdb.operators.aggregate import Aggregates
+from dbdb.operators.union import UnionOperator
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
@@ -72,6 +73,7 @@ RPAR = pp.Literal(')')
 WITH = pp.CaselessKeyword("WITH")
 SELECT = pp.CaselessKeyword("SELECT")
 FROM = pp.CaselessKeyword("FROM")
+UNION = pp.CaselessKeyword("UNION")
 AS = pp.CaselessKeyword("AS")
 ON = pp.CaselessKeyword("ON")
 AND = pp.CaselessKeyword("AND")
@@ -133,6 +135,7 @@ MATH = (
 )
 
 RESERVED = pp.Group(
+    UNION    |
     FROM     |
     WITH     |
     SELECT   |
@@ -463,73 +466,76 @@ ORDER_BY_LIST = pp.delimitedList(
 
 SELECT_STATEMENT = pp.Forward()
 
-SELECT_GRAMMAR = pp.Group(
+PLAIN_SELECT = pp.Group(
     SELECT +
 
     pp.delimitedList(
         COLUMN_EXPR
-    )('columns') +
+    )('columns').setName('column_list') +
 
     # from clause
     # TODO: This is optional...
-    FROM + (ALIASED_TABLE_FUNCTION("_from") | ALIASED_TABLE_IDENT("_from")) +
+    pp.Opt(
+        FROM + (ALIASED_TABLE_FUNCTION("_from") | ALIASED_TABLE_IDENT("_from"))
+    ).setName('from').setName('from') +
 
     pp.ZeroOrMore(
         JOIN_CLAUSE
-    )("joins") +
+    )("joins").setName('joins') +
 
     pp.Opt(
         WHERE + EXPRESSION
-    )("where") +
+    )("where").setName('where') +
 
     pp.Opt(
         GROUP_BY + pp.delimitedList(EXPRESSION)
-    )("group_by") +
-
-    pp.Opt(
-        ORDER_BY + ORDER_BY_LIST
-    )("order_by") +
-
-    # limit
-    pp.Opt(
-        LIMIT + LIT_NUM.setParseAction(as_literal)
-    )("limit")
+    )("group_by").setName('groups')
 )("select")
+
+SET_OPERATION = pp.Group(
+    PLAIN_SELECT +
+    UNION +
+    PLAIN_SELECT
+)("union").setName('union')
 
 # Subqueries and CTEs
 SUBQUERY = LPAR + SELECT_STATEMENT + RPAR + pp.Opt(pp.Opt(AS) + TABLE_IDENT)
 CTE_SELECT = pp.Group(TABLE_IDENT("cte_alias") + AS + LPAR + SELECT_STATEMENT + RPAR)("cte")
-CTE_LIST = WITH + pp.delimitedList(CTE_SELECT)("ctes")
 
-# Get it -- like a playlist?
-PLAY_SOURCE = (
-    ALIASED_TABLE_FUNCTION |
-    TABLE_IDENT
-)
-
-PLAY_LIST = pp.Group(
-    PLAY +
-    pp.delimitedList(PLAY_SOURCE)("sources") +
-    pp.Opt(
-        AT +
-        LIT_NUM("bpm") +
-        BPM
-    )
-)
-
-
-# Set final select statement (CTEs + select)
+# [ WITH cte, ... ]
+# { SELECT_STATEMENT | PLAIN_SELECT }
+# [ ORDER... ]
+# [ LIMIT... ]
 SELECT_STATEMENT << (
-    pp.Optional(CTE_LIST) +
+    pp.Opt(
+        WITH +
+        pp.delimitedList(CTE_SELECT)("ctes")
+    ).setName('CTEs') +
+
     (
-        SELECT_GRAMMAR("select") |
-        PLAY_LIST("play_list")
-    )
+        SET_OPERATION.setName('select.set') |
+        PLAIN_SELECT("select").setName('select.plain') |
+        SELECT_STATEMENT("select")
+    ) +
+
+    pp.Opt(
+        ORDER_BY + ORDER_BY_LIST
+    )("order_by").setName('order_by') +
+
+    # limit
+    pp.Opt(
+        LIMIT + LIT_NUM.setParseAction(as_literal)
+    )("limit").setName('limit')
+)
+
+SELECT_GRAMMAR = (
+    pp.stringStart() +
+    SELECT_STATEMENT +
+    pp.stringEnd()
 )
 
 from dbdb.lang.select import (
     Select,
-    MusicPlayer,
     SelectList,
     SelectProjection,
     SelectFilter,
@@ -663,20 +669,24 @@ def extract_limit(ast):
     limit = ast.limit[1]
     return SelectLimit(limit)
 
-def make_play_list_from_scope(play_list, scopes):
-    sources = [extract_source(s, scopes) for s in play_list.sources]
 
-    bpm = None
-    if play_list.bpm:
-        bpm = play_list.bpm.value()
+def extract_unions(ast):
+    if 'union' not in ast:
+        return None
 
-    return MusicPlayer(
-        sources=sources,
-        bpm=bpm,
-        scopes=scopes,
-    )
+    ast = ast.union.copy()
+    unions = []
+    while len(ast) > 0:
+        u1 = ast.pop(0)
+        ast.pop(0)
+        u2 = ast.pop(0)
+        unions += [u1, u2]
 
-def make_select_from_scope(ast_select, scopes):
+    select = unions.pop()
+    return unions, select
+
+
+def make_select_from_ast(ast_select, scopes):
     projections = extract_projections(ast_select)
     wheres = extract_wheres(ast_select)
     joins = extract_joins(ast_select, scopes)
@@ -686,6 +696,7 @@ def make_select_from_scope(ast_select, scopes):
 
     source = None
     if '_from' in ast_select:
+        # TODO : Handle when FROM is missing!
         source = extract_source(ast_select._from, scopes)
 
     return Select(
@@ -700,24 +711,37 @@ def make_select_from_scope(ast_select, scopes):
         scopes=scopes,
     )
 
+
+def make_select_from_scope(ast, scopes):
+    if ast.select:
+        unions = []
+        select = ast.select
+    elif ast.union:
+        unions, select = extract_unions(ast)
+    else:
+        import ipdb; ipdb.set_trace()
+        pass
+
+    select = make_select_from_ast(select, scopes)
+
+    unions = [make_select_from_ast(u, scopes) for u in unions]
+    select.unions = unions
+    return select
+
+
 def ast_to_select_obj(ast):
     scopes = {}
     plan = None
     for cte in ast.ctes:
         alias = cte.cte_alias
         scope_copy = scopes.copy()
-        select = make_select_from_scope(cte.select, scope_copy)
+        select = make_select_from_scope(cte, scope_copy)
         plan, output_node = select.make_plan(plan)
         scopes[alias.table_name] = output_node
 
-    if ast.select:
-        select = make_select_from_scope(ast.select, scopes)
-    elif ast.play_list:
-        select = make_play_list_from_scope(ast.play_list, scopes)
-    else:
-        raise RuntimeError("Invalid query: does not contain a SELECT or PLAY instruction...")
-
+    select = make_select_from_scope(ast, scopes)
     select.save_plan(plan)
+
     return select
 
 
@@ -729,6 +753,6 @@ def parse_query(query):
         FROM <table path>
         [LIMIT <count>]
     """
-    ast = SELECT_STATEMENT.parseString(query)
+    ast = SELECT_GRAMMAR.parseString(query)
     select_obj = ast_to_select_obj(ast)
     return select_obj

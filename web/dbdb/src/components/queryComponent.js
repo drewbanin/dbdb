@@ -5,8 +5,11 @@ import { postRequest } from '../Client.js';
 import { QueryContext } from '../Store.js';
 import { usePub } from '../Hooks.js';
 
-import CodeEditor from '@uiw/react-textarea-code-editor';
+import Editor, { useMonaco, loader } from '@monaco-editor/react';
+import CodeTheme from './theme.json';
+
 import Spinner from '../spinner.gif';
+
 
 function QueryComponent() {
 
@@ -19,6 +22,11 @@ function QueryComponent() {
     const [ errorData, setError ] = error;
 
     const [ queryRunning, setQueryRunning ] = useState(false);
+
+    loader.init().then((monaco) => {
+        monaco.editor.defineTheme('dbdb', CodeTheme);
+    });
+
     const runQuery = () => {
         if (queryRunning) return;
 
@@ -56,6 +64,11 @@ function QueryComponent() {
                 setQueryRunning(false);
             }
         })
+    };
+
+    const cancelQuery = () => {
+        if (!queryRunning) return;
+
     };
 
     const publish = usePub();
@@ -108,32 +121,68 @@ function QueryComponent() {
                             <img className="queryLoading" src={Spinner} />
                         </span>}
                         <span className="light title">QUERY</span>
-                        <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>
+                        { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
                     </div>
                 </div>
             </div>
-            <div className="fixedHeight">
-                <CodeEditor
-                  value={queryText}
-                  language="sql"
-                  onChange={(e) => setQueryText(e.target.value)}
-                  padding={15}
-                  data-color-mode="light"
-                  style={{
-                    fontSize: 14,
-                    backgroundColor: "white",
-                    fontFamily: 'MonaspaceNeon',
-                    border: '1px solid black',
-                    height: '100%',
-                  }}
+            <div className="fixedHeight" style={{ border: '1px solid black' }}>
+                <Editor
+                    height="100%"
+                    defaultLanguage="sql"
+                    defaultValue={queryText}
+                    value={queryText}
+                    theme='dbdb'
+                    onChange={setQueryText}
+                    options={{
+                        scrollbar: {
+                            horizontal: 'hidden',
+                            vertical: 'hidden',
+                        },
+                        minimap: {
+                            enabled: false
+                        },
+                        padding: {
+                            top: 5,
+                            bottom: 5,
+                        },
+                        overviewRulerBorder: false,
+                        overviewRulerLanes: 0,
+                        renderLineHighlight: 'none',
+                        fontFamily: 'MonaspaceNeon',
+                        fontSize: 14,
+                        lineNumbersMinChars: 3,
+                        renderIndentGuides: false,
+                        scrollBeyondLastLine: false,
+                    }}
                 />
                 <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
                 <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
+                {!!queryRunning && <Button
+                    style={{ backgroundColor: '#ff7575', float: 'right', marginRight: 0 }}
+                    onClick={ cancelQuery }>CANCEL</Button>}
                 {errorData && <div className="queryError">
                     <strong>Query Error:</strong> {errorData.error}
                 </div>}
             </div>
         </>
+
+
+        /*
+         *
+                <MonacoEditor
+                  value={queryText}
+                  defaultValue={queryText}
+                  language="sql"
+                />
+         *
+                  padding={15}
+                  style={{
+                    fontSize: 14,
+                    backgroundColor: "white",
+                    fontFamily: 'MonaspaceNeon',
+                    height: '100%',
+                  }}
+        */
     )
 }
 

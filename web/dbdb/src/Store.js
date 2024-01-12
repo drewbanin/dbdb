@@ -1,14 +1,12 @@
 import { React, useState, createContext } from "react";
 
-const DEFAULT_QUERY =`with music as (
-  select
-    i as time,
-    sin(i / 10) as freq
-
-  from generate_series(100)
-)
-
-play music at 2646000 bpm`;
+const DEFAULT_QUERY =`
+select
+  i / 10 as time,
+  1 as length,
+  440 as freq
+from generate_series(10)
+`.trim();
 
 
 const QueryContext = createContext();

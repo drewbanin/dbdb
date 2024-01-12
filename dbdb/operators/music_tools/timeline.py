@@ -15,7 +15,7 @@ def sqr(t,f,a):
     return  ((sin(t,f,a) > 0) * 2 - 1) * a
 
 class Timeline:
-    def __init__(self, bpm, max_length=10):
+    def __init__(self, bpm, max_length=60):
         self.bpm = bpm
         self.buffer = np.zeros(SAMPLE_RATE * max_length, dtype = np.double)
         self.note_count = np.zeros(SAMPLE_RATE * max_length, dtype = np.double)
@@ -45,8 +45,8 @@ class Timeline:
 
         for i in range(start_index, end_index):
             t = i / SAMPLE_RATE
-            freq = sqr(t, frequency, amplitude)
-            # freq = sin(t, frequency, amplitude)
+            # freq = sqr(t, frequency, amplitude)
+            freq = sin(t, frequency, amplitude)
             self.buffer[i] += freq
             self.note_count[i] += 1
 

@@ -32,9 +32,6 @@ with gen as (
 play gen
 """
 
-
-
-
 badguy = """
 with notes as (
     select
@@ -72,8 +69,8 @@ melody as (
 bass_freq as (
 
     select
-        bass.start_time as time,
-        bass.length,
+        bass.start_time / 2 as time,
+        bass.length / 2 as length,
         notes.freq * pow(2, bass.octave - 4) as freq
 
     from bass
@@ -84,8 +81,8 @@ bass_freq as (
 melody_freq as (
 
     select
-        melody.start_time as time,
-        melody.length,
+        melody.start_time / 2 as time,
+        melody.length / 2 as length,
         notes.freq * pow(2, melody.octave - 4) as freq
 
     from melody
@@ -93,7 +90,9 @@ melody_freq as (
 
 )
 
-play bass_freq, melody_freq at 130 bpm
+select 'square' as func, * from bass_freq
+union
+select 'sin' as func, * from melody_freq
 """
 
 
@@ -202,7 +201,9 @@ melody_freq as (
 
 )
 
-play bass_freq, melody_freq at 30 bpm
+select 'square' as func, * from bass_freq
+union
+select 'sin' as func, * from melody_freq
 """
 
 gerudo  = """
@@ -240,31 +241,26 @@ bass_freq as (
 
 )
 
-play bass_freq at 60 bpm
+select * from bass_freq
 """
 
 avril  = """
-play midi('avril_14.mid') at 60 bpm
+select midi('avril_14.mid') at 60 bpm
 """
 
 debug = """
-with music as (
-  select
-    i as time,
-    sin(i / 10) as freq
-
-  from generate_series(100)
-)
-
-play music at 2646000 bpm
+select i from generate_series(2)
+union
+select i from generate_series(2)
 """
 
 sql = badguy
 sql = scale
 sql = yoshi
-sql = gerudo
 sql = avril
 sql = debug
+
+sql = gerudo
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))

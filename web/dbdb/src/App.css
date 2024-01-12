@@ -214,3 +214,12 @@ Button:disabled {
     padding: 0px;
     margin: 0px;
 }
+
+.line-numbers {
+    color: #000000AA !important;
+}
+
+.active-line-number {
+    color: #000000 !important;
+    font-weight: bold;
+}
