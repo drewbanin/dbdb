@@ -3,9 +3,11 @@ import { React, useState, createContext } from "react";
 const DEFAULT_QUERY =`
 select
   i / 10 as time,
-  1 as length,
-  440 as freq
-from generate_series(10)
+  1 / 10 as length,
+  440 as freq,
+  0.01 as amp,
+  'sin' as func
+from generate_series(100)
 `.trim();
 
 
