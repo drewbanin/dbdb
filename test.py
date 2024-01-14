@@ -69,8 +69,8 @@ melody as (
 bass_freq as (
 
     select
-        bass.start_time / 2 as time,
-        bass.length / 2 as length,
+        bass.start_time / 2 + 0.01 as time,
+        bass.length / 2 - 0.02 as length,
         notes.freq * pow(2, bass.octave - 4) as freq
 
     from bass
@@ -81,8 +81,8 @@ bass_freq as (
 melody_freq as (
 
     select
-        melody.start_time / 2 as time,
-        melody.length / 2 as length,
+        melody.start_time / 2 + 0.01 as time,
+        melody.length / 2 - 0.02 as length,
         notes.freq * pow(2, melody.octave - 4) as freq
 
     from melody
@@ -90,7 +90,7 @@ melody_freq as (
 
 )
 
-select 'square' as func, * from bass_freq
+select 'sin' as func, * from bass_freq
 union
 select 'sin' as func, * from melody_freq
 """
@@ -138,7 +138,7 @@ joined as (
 
 )
 
-play joined at 60 bpm
+select * from joined
 """
 
 yoshi  = """

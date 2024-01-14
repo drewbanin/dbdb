@@ -38,7 +38,8 @@ const createBuffer = (rows) => {
       SAMPLE_RATE,
     );
 
-    const buffer = audioBuffer.getChannelData(0);
+    const freqBuf = new Float32Array(totalTime * SAMPLE_RATE);
+    const countBuf = new Float32Array(totalTime * SAMPLE_RATE);
 
     rows.forEach(row => {
         const startTime = row.time;
@@ -56,8 +57,8 @@ const createBuffer = (rows) => {
         const offsetStartIndex = startIndex + beatOffset;
         const offsetEndIndex = endIndex - beatOffset;
 
-        if (offsetEndIndex > buffer.length || offsetStartIndex > buffer.length) {
-            console.log("End index=", endIndex, "is out of bounds", buffer.length);
+        if (offsetEndIndex > freqBuf.length || offsetStartIndex > freqBuf.length) {
+            console.log("End index=", endIndex, "is out of bounds", freqBuf.length);
             return
         } else if (offsetStartIndex > offsetEndIndex) {
             console.log("End time is before start time? how?");
@@ -70,9 +71,34 @@ const createBuffer = (rows) => {
             const waveFunc = (funcName == 'sin') ? sin : sqr;
             const value = waveFunc(time, freq, amplitude)
 
-            buffer[i] += value;
+            freqBuf[i] += value;
+            countBuf[i] += 1;
         }
     })
+
+    const buffer = audioBuffer.getChannelData(0);
+    for (let i=0; i < freqBuf.length; i++) {
+        const count = countBuf[i];
+        const freq = freqBuf[i];
+
+        let normed;
+        if (count === 0) {
+            normed = 0;
+        } else {
+            normed = freq / count;
+        }
+
+        let clipped;
+        if (normed > 1) {
+            clipped = 1;
+        } else if (normed < -1) {
+            clipped = -1;
+        } else {
+            clipped = normed;
+        }
+
+        buffer[i] = clipped;
+    }
 
     const source = audioCtx.createBufferSource();
     source.buffer = audioBuffer;
@@ -88,8 +114,11 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   }
 
   // find tones that are playing at t=offset
+  const beatOffset = 0.00;
   const relevantRows = rows.filter(row => {
-      return row.time <= offset && (row.time + row.length) > offset
+      const startT = row.time + beatOffset;
+      const endT = row.time + row.length - beatOffset;
+      return startT <= offset && endT > offset
   })
 
   const maxFreq = rows.reduce((acc, val) => {
@@ -136,67 +165,106 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   return (
     <ResponsiveChartContainer
       series={[ formattedYVals ]}
-      xAxis={[{ scaleType: 'band', data: xVals, min: 0, max: xDomain }]}
-      yAxis={[{ min: 0, max: 1 }]}
+      xAxis={[{ scaleType: 'band', id: "x", data: xVals, min: 0, max: xDomain, tickNumber: 4 }]}
+      yAxis={[{ id: "y", min: 0, max: 1 }]}
       margin={{
-        left: 35,
+        left: 15,
         right: 35,
         top: 20,
         bottom: 35,
       }}
     >
         <BarPlot />
-        <ChartsTooltip trigger={"item"} />
-        <ChartsXAxis position="bottom" />
-        <ChartsYAxis position="left" />
+        <ChartsTooltip trigger={"axis"} />
+        <ChartsXAxis axisId="x" position="bottom" />
     </ResponsiveChartContainer>
   );
 }
 
 function TimeDomainViz({ playing, rows, offset }) {
+  const yBuffer = useRef();
+  const maxY = useRef(1);
+
   if (!playing) {
       return null
   }
 
+  const beatOffset = 0.01;
   const relevantRows = rows.filter(row => {
-      return row.time <= offset && (row.time + row.length) > offset
+      const startT = row.time + beatOffset;
+      const endT = row.time + row.length - beatOffset;
+      return startT <= offset && endT >= offset
   })
 
   const xDomain = 10000;
   const xVals = [];
   const yVals = [];
+
   for (let i=0; i < xDomain; i++) {
       xVals.push(i);
 
       const scaleFactor = SAMPLE_RATE * 10;
-      // const yVal = sin(i / scaleFactor, 440, 1)
 
       const freqs = relevantRows.map(row => {
+          const amp = row.amp || 1;
           const func = row.func === 'sin' ? sin : sqr;
-          return func(i / scaleFactor, row.freq, 1)
+          return func(i / scaleFactor, row.freq, amp)
       })
 
       const yTotal = freqs.reduce((acc, val) => acc + val, 0);
-      const yVal = freqs.length === 0 ? 0 : yTotal / freqs.length;
+      // const yVal = freqs.length === 0 ? 0 : yTotal / freqs.length;
+      const yVal = yTotal;
       yVals.push(yVal);
   }
 
+  let vizY;
+  if (!yBuffer.current) {
+      // initialize the buffer
+      // Each element has a starting point, ending point, and step
+
+      const newYBuf = yVals.map(val => {
+        return {to: val, current: val, step: 0}
+      })
+
+      yBuffer.current = newYBuf;
+      vizY = yVals;
+
+  } else {
+      // grab yBuffer and add `from` to step value to get towards `to`
+      // ideally we would spline (?) this, but can go linear for now...
+
+      const maxSteps = 5;
+      const animatedVals = yBuffer.current.map((existing, i) => {
+          const targetYVal = yVals[i];
+          const increment = (targetYVal - existing.current) / maxSteps;
+          let newVal = existing.current + increment;
+
+          if (Math.abs(newVal) > maxY.current) {
+              maxY.current = Math.abs(newVal);
+          }
+
+          return {to: targetYVal, current: newVal, step: existing.step + 1, increment: increment}
+      })
+
+      vizY = animatedVals.map(val => val.current);
+      yBuffer.current = animatedVals;
+  }
 
   return (
     <ResponsiveChartContainer
-      series={[{ data: yVals, label: 'v', type: 'line', color: '#000000' }]}
-      xAxis={[{ scaleType: 'linear', data: xVals, min: 0, max: xDomain }]}
-      yAxis={[{ min: -1, max: 1 }]}
+      series={[{ data: vizY, label: 'v', type: 'line', color: '#000000' }]}
+      xAxis={[{ scaleType: 'linear', data: xVals, min: 0, max: xDomain, tickNumber: 5 }]}
+      yAxis={[{ min: -maxY.current, max: maxY.current, tickNumber: 2 }]}
       margin={{
-        left: 35,
+        left: 15,
         right: 35,
         top: 20,
         bottom: 35,
       }}
     >
         <LinePlot />
+        <ChartsTooltip trigger={"axis"} />
         <ChartsXAxis position="bottom" />
-        <ChartsYAxis position="left" />
     </ResponsiveChartContainer>
   );
 }
@@ -209,6 +277,7 @@ function Visualizer() {
     const [ playing, setPlaying ] = useState(null);
     const [ playTime, setPlayTime ] = useState(null);
     const [ pausedAt, setPausedAt ] = useState(null);
+    const [ muted, setMuted ] = useState(false);
 
     const source = useRef(null);
     const audioCtx = useRef(null);
@@ -245,6 +314,9 @@ function Visualizer() {
             audioCtx.current.suspend();
             setPausedAt(currentTime);
         }
+    }
+
+    const muteUnmuteSound = () => {
     }
 
     useEffect(() => {
@@ -310,6 +382,13 @@ function Visualizer() {
                                     className="light title">TIME</button>
 
                                 <div style={{ margin: 0, float: 'right' }}>
+                                    <button
+                                        style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
+                                        onClick={ e => muteUnmuteSound() }
+                                        className="light title">
+                                        { muted ? 'UNMUTE' : 'MUTE' }
+                                    </button>
+
                                     <button
                                         style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                         onClick={ e => playPauseSound() }
