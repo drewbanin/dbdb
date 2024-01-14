@@ -26,6 +26,7 @@ const SAMPLE_RATE = 44100;
 
 const createBuffer = (rows) => {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.suspend();
 
     const numChannels = 1;
 
@@ -103,9 +104,12 @@ const createBuffer = (rows) => {
     const source = audioCtx.createBufferSource();
     source.buffer = audioBuffer;
 
-    source.connect(audioCtx.destination);
+    const gain = audioCtx.createGain();
 
-    return [source, audioCtx, totalTime];
+    source.connect(gain);
+    gain.connect(audioCtx.destination)
+
+    return [source, audioCtx, gain, totalTime];
 }
 
 function FrequencyDomainViz({ playing, rows, offset }) {
@@ -117,7 +121,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   const beatOffset = 0.00;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
-      const endT = row.time + row.length - beatOffset;
+      const endT = row.time + (row.length || 1) - beatOffset;
       return startT <= offset && endT > offset
   })
 
@@ -129,9 +133,9 @@ function FrequencyDomainViz({ playing, rows, offset }) {
       }
   }, 0)
 
-  const xDomain = maxFreq + 50;
-  // want to create 100 steps...
-  const stepSize = Math.floor(maxFreq / 50);
+  const xDomain = maxFreq + 1;
+  let stepSize = Math.floor(xDomain / 50);
+
   const xVals = [];
   const yVals = [];
 
@@ -165,7 +169,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   return (
     <ResponsiveChartContainer
       series={[ formattedYVals ]}
-      xAxis={[{ scaleType: 'band', id: "x", data: xVals, min: 0, max: xDomain, tickNumber: 4 }]}
+      xAxis={[{ scaleType: 'band', id: "x", data: xVals, min: 0, max: xDomain }]}
       yAxis={[{ id: "y", min: 0, max: 1 }]}
       margin={{
         left: 15,
@@ -192,7 +196,7 @@ function TimeDomainViz({ playing, rows, offset }) {
   const beatOffset = 0.01;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
-      const endT = row.time + row.length - beatOffset;
+      const endT = row.time + (row.length || 1) - beatOffset;
       return startT <= offset && endT >= offset
   })
 
@@ -276,15 +280,18 @@ function Visualizer() {
 
     const [ playing, setPlaying ] = useState(null);
     const [ playTime, setPlayTime ] = useState(null);
-    const [ pausedAt, setPausedAt ] = useState(null);
+
+    const [ audioState, setAudioState ] = useState('waiting');
     const [ muted, setMuted ] = useState(false);
 
     const source = useRef(null);
     const audioCtx = useRef(null);
+    const gain = useRef(null);
     const state = {}
 
     useSub('QUERY_COMPLETE', (queryId) => {
         setPlaying(queryId);
+        setAudioState('waiting');
     });
 
     const mappedRows = rows.map(row => {
@@ -299,7 +306,9 @@ function Visualizer() {
         source.current.stop();
 
         setPlayTime(0);
-        setPlaying(false);
+        setPlaying(null);
+        setAudioState('done');
+
         state.source = null;
         state.context = null;
     }
@@ -307,16 +316,27 @@ function Visualizer() {
     const playPauseSound = () => {
         const currentTime = playTime;
 
-        if (pausedAt !== null) {
+        if (audioState == 'waiting') {
+            source.current.start();
+            setAudioState('playing');
             audioCtx.current.resume();
-            setPausedAt(null);
-        } else {
+        } else if (audioState == 'playing') {
+            setAudioState('paused');
             audioCtx.current.suspend();
-            setPausedAt(currentTime);
+        } else if (audioState == 'paused') {
+            setAudioState('playing');
+            audioCtx.current.resume();
         }
     }
 
     const muteUnmuteSound = () => {
+        if (muted) {
+            gain.current.gain.value = 1;
+        } else {
+            gain.current.gain.value = 0;
+        }
+
+        setMuted(!muted);
     }
 
     useEffect(() => {
@@ -325,7 +345,7 @@ function Visualizer() {
         }
 
         console.log("Playing for query:", playing, mappedRows);
-        const [ newSource, ctx, totalTime ] = createBuffer(mappedRows);
+        const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
 
         state.endTime = totalTime;
         state.source = newSource;
@@ -333,13 +353,16 @@ function Visualizer() {
 
         audioCtx.current = ctx;
         source.current = newSource;
+        gain.current = newGain;
 
-        newSource.start();
-    }, [playing, source, audioCtx])
+        audioCtx.current.suspend();
+        // newSource.start();
+        setAudioState('waiting');
+    }, [playing, source, audioCtx, gain])
 
     useEffect(() => {
       const interval = setInterval(() => {
-        if (!state.context) {
+        if (!state.context || audioCtx.current.state === 'suspended') {
             return
         }
 
@@ -348,14 +371,15 @@ function Visualizer() {
         if (state.context.currentTime > state.endTime) {
           console.log("done playing", state.context.currentTime, state.endTime)
           state.source.stop()
-          setPlaying(false);
+          setPlaying(null);
+          setAudioState('done');
         }
       }, 10);
 
       return () => { console.log("Cancelling interval"); clearInterval(interval); }
     }, [playing, setPlaying, setPlayTime]);
 
-    const [ vizType, setVizType ] = useState('time');
+    const [ vizType, setVizType ] = useState('freq');
 
     const showTime = vizType === 'time';
     const showFreq = vizType === 'freq';
@@ -366,6 +390,23 @@ function Visualizer() {
     // const samples = rows.slice(startIndex, endIndex).map(val => val[1]);
     // console.log("???", startIndex, endIndex, samples.length)
     
+    console.log('playTime?', playTime)
+    const isPlaying = audioState == 'playing' || audioState == 'paused';
+
+    let playPauseLabel;
+    let showMediaControls;
+    let isReady = mappedRows.length > 0;
+    if (audioState == 'waiting' || audioState == 'paused') {
+        playPauseLabel = 'PLAY';
+        showMediaControls = isReady;
+    } else if (audioState == 'playing') {
+        playPauseLabel = 'PAUSE';
+        showMediaControls = isReady;
+    } else if (audioState == 'done') {
+        playPauseLabel = audioState
+        showMediaControls = false;
+    }
+
     return (
         <>
             <div className="panelHeader">
@@ -381,7 +422,7 @@ function Visualizer() {
                                     onClick={ e => setVizType('time') }
                                     className="light title">TIME</button>
 
-                                <div style={{ margin: 0, float: 'right' }}>
+                                { showMediaControls && <div style={{ margin: 0, float: 'right' }}>
                                     <button
                                         style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                         onClick={ e => muteUnmuteSound() }
@@ -392,22 +433,21 @@ function Visualizer() {
                                     <button
                                         style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                         onClick={ e => playPauseSound() }
-                                        className="light title">
-                                        { pausedAt === null ? 'PAUSE' : 'PLAY' }
+                                        className="light title"> {playPauseLabel}
                                     </button>
 
                                     <button
                                         style={{ margin: 0, verticalAlign: 'top' }}
                                         onClick={ e => stopSound() }
                                         className="light title">STOP</button>
-                                </div>
+                                </div>}
                             </>
                     </div>
                 </div>
             </div>
             <div className="configBox fixedHeight">
-                {showFreq && <FrequencyDomainViz playing={playing} rows={mappedRows} offset={playTime} />}
-                {showTime && <TimeDomainViz playing={playing} rows={mappedRows} offset={playTime} />}
+                {showFreq && <FrequencyDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
+                {showTime && <TimeDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
             </div>
         </>
     )
