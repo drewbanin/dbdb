@@ -17,7 +17,7 @@
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    justify-content: normal;
+    justify-content: flex-start;
     align-items: normal;
     align-content: normal;
 }
@@ -223,3 +223,5 @@ Button:disabled {
     color: #000000 !important;
     font-weight: bold;
 }
+
+iframe#webpack-dev-server-client-overlay{display:none!important}

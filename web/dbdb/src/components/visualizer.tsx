@@ -9,6 +9,10 @@ import { BarChart } from '@mui/x-charts/BarChart';
 
 import { useAnimationFrame } from '../animate.js';
 
+import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
+import { SparkLineChart } from '@mui/x-charts/SparkLineChart';
+
 const sin = (t, f, a) => {
     return a * Math.sin(2 * Math.PI * t * f);
 }
@@ -69,7 +73,7 @@ const createBuffer = (rows) => {
         for (let i=offsetStartIndex; i < offsetEndIndex; i++) {
             const time = i / SAMPLE_RATE;
 
-            const waveFunc = (funcName == 'sin') ? sin : sqr;
+            const waveFunc = (funcName == 'sqr') ? sqr : sin;
             const value = waveFunc(time, freq, amplitude)
 
             freqBuf[i] += value;
@@ -211,7 +215,7 @@ function TimeDomainViz({ playing, rows, offset }) {
 
       const freqs = relevantRows.map(row => {
           const amp = row.amp || 1;
-          const func = row.func === 'sin' ? sin : sqr;
+          const func = row.func === 'sqr' ? sqr : sin;
           return func(i / scaleFactor, row.freq, amp)
       })
 
@@ -273,12 +277,11 @@ function TimeDomainViz({ playing, rows, offset }) {
   );
 }
 
-function Visualizer() {
+export function Visualizer() {
     const { result, schema } = useContext(QueryContext);
     const [ rows, setRows ] = result;
     const [ dataSchema, setSchema ] = schema;
 
-    const [ playing, setPlaying ] = useState(null);
     const [ playTime, setPlayTime ] = useState(null);
 
     const [ audioState, setAudioState ] = useState('waiting');
@@ -290,7 +293,7 @@ function Visualizer() {
     const state = {}
 
     useSub('QUERY_COMPLETE', (queryId) => {
-        setPlaying(queryId);
+        console.log("Query is complete: ", queryId);
         setAudioState('waiting');
     });
 
@@ -306,7 +309,6 @@ function Visualizer() {
         source.current.stop();
 
         setPlayTime(0);
-        setPlaying(null);
         setAudioState('done');
 
         state.source = null;
@@ -340,11 +342,12 @@ function Visualizer() {
     }
 
     useEffect(() => {
-        if (!playing || mappedRows.length === 0) {
+        console.log("cHECKING USE EFFECT?", mappedRows.length);
+        if (mappedRows.length === 0) {
             return
         }
 
-        console.log("Playing for query:", playing, mappedRows);
+        console.log("Playing for query:", mappedRows.length, "rows");
         const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
 
         state.endTime = totalTime;
@@ -358,7 +361,7 @@ function Visualizer() {
         audioCtx.current.suspend();
         // newSource.start();
         setAudioState('waiting');
-    }, [playing, source, audioCtx, gain])
+    }, [rows, source, audioCtx, gain])
 
     useEffect(() => {
       const interval = setInterval(() => {
@@ -371,13 +374,12 @@ function Visualizer() {
         if (state.context.currentTime > state.endTime) {
           console.log("done playing", state.context.currentTime, state.endTime)
           state.source.stop()
-          setPlaying(null);
           setAudioState('done');
         }
       }, 10);
 
       return () => { console.log("Cancelling interval"); clearInterval(interval); }
-    }, [playing, setPlaying, setPlayTime]);
+    }, [setPlayTime, setAudioState]);
 
     const [ vizType, setVizType ] = useState('freq');
 
@@ -453,4 +455,48 @@ function Visualizer() {
     )
 }
 
-export default Visualizer;
+export function VizPlaceHolder() {
+    const { schema, result } = useContext(QueryContext);
+    const [ dataSchema, setSchema ] = schema;
+    const [ rows, setRows ] = result;
+
+    const viz = (dataSchema || []).map((colName, index) => {
+        if (rows.length == 0) {
+            return null;
+        }
+
+        const exampleRow = rows[0][index];
+        if (typeof exampleRow !== 'number') {
+            return null;
+        }
+
+        const data = rows.map(r => r[index]);
+        return (
+            <Box sx={{ flexGrow: 1 }} key={"viz" + index}>
+                <span style={{ fontSize: 12, borderBottom: '1px solid #000000' }}>
+                    Column: {colName.toUpperCase()}
+                </span>
+                <SparkLineChart data={data} height={50} colors={["#000000"]} />
+            </Box>
+
+        )
+    })
+
+    const vizData = viz.filter(v => v !== null);
+
+    return (<>
+            <div className="panelHeader">
+                <div style={{ padding: 5 }}>
+                    <div className="helpText">VIZ
+                    </div>
+                </div>
+            </div>
+            <div className="configBox fixedHeight"
+                 style={{ overflowY: 'scroll', overflowX: 'clip' }}>
+                <Stack direction="column" sx={{ width: '95%' }} >
+                    {vizData}
+                </Stack>
+            </div>
+        </>);
+
+}

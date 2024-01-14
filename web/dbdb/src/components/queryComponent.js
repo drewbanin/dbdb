@@ -10,6 +10,9 @@ import CodeTheme from './theme.json';
 
 import Spinner from '../spinner.gif';
 
+import Dropdown from 'react-dropdown';
+import 'react-dropdown/style.css';
+
 
 function QueryComponent() {
 
@@ -112,6 +115,11 @@ function QueryComponent() {
       };
     }, []);
 
+    const options = [
+      'one', 'two', 'three'
+    ];
+    const defaultOption = options[0];
+
     return (
         <>
             <div className="panelHeader">
@@ -122,6 +130,9 @@ function QueryComponent() {
                         </span>}
                         <span className="light title">QUERY</span>
                         { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
+
+                        <div style={{  }}>
+                        </div>
                     </div>
                 </div>
             </div>
