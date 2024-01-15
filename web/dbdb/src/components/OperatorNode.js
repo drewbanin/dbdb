@@ -1,19 +1,17 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Handle, Position } from 'reactflow';
 
+import { QueryContext } from '../Store.js';
 import { useSub } from '../Hooks.js';
 import Spinner from '../spinner.gif';
 
 import { formatBytes, formatNumber } from '../Helpers.js';
- 
-export const OperatorNode = ({ data }) => {
-  const [ statData, setStatData ] = useState({});
 
-  useSub('OperatorStats', (stats) => {
-      if (stats.operator_id === data.id) {
-          setStatData(stats);
-      }
-  });
+export const OperatorNode = ({ data }) => {
+  const { nodeStats } = useContext(QueryContext);
+  const [ nodeStatData, setNodeStatData ] = nodeStats;
+
+  const statData = nodeStatData[data.id] || {};
 
   const operatorType = statData.operator_type;
   const isTableScan = operatorType === "Table Scan";
@@ -22,6 +20,7 @@ export const OperatorNode = ({ data }) => {
   const state = statData.state || 'pending';
   const rows_processed = formatNumber(statData.rows_processed, 0);
   const rows_emitted = formatNumber(statData.rows_emitted, 0);
+  const elapsed = formatNumber(statData.elapsed_time);
   const table_name = (data.details || {}).table;
 
   const getCustomStat = (statData, statName, formatFunc) => {
@@ -34,7 +33,7 @@ export const OperatorNode = ({ data }) => {
           return formatFunc(value);
       } else {
         return value;
-      } 
+      }
   }
 
   const bytesRead = getCustomStat(statData, 'bytes_read', formatBytes);
@@ -53,22 +52,12 @@ export const OperatorNode = ({ data }) => {
         </div>
         <div className="operator-stats">
             <ul>
-                <li>STATE: {state.toUpperCase()}</li>
-                <li>PROCESSED: {rows_processed}</li>
-                <li>EMITTED: {rows_emitted}</li>
-
-                {isTableScan && (
-                    <>
-                        <li>&nbsp;</li>
-                        <li>BYTES READ: {bytesRead}</li>
-                        <li>BYTES TOTAL: {bytesTotal}</li>
-                        <li>PAGES READ: {pagesRead}</li>
-                    </>
-                )}
-
                 {!!table_name && (
                     <li>FILE: {table_name}</li>
                 )}
+                <li>PROG: {state.toUpperCase()}</li>
+                <li>ROWS: {rows_emitted}</li>
+                <li>TIME: {elapsed || 0}</li>
 
             </ul>
         </div>

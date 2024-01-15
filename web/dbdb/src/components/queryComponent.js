@@ -18,12 +18,13 @@ import QUERIES from '../queries.js';
 
 function QueryComponent() {
 
-    const { query, result, nodes, error, schema } = useContext(QueryContext);
+    const { query, result, nodes, error, schema, nodeStats } = useContext(QueryContext);
 
     const [ queryText, setQueryText ] = query;
     const [ rows, setRows ] = result;
     const [ rowSchema, setSchema ] = schema;
     const [ nodeData, setNodeData ] = nodes;
+    const [ nodeStatData, setNodeStatData ] = nodeStats;
     const [ errorData, setError ] = error;
 
     const [ queryRunning, setQueryRunning ] = useState(false);
@@ -79,6 +80,7 @@ function QueryComponent() {
     const publish = usePub();
 
     useEffect(() => {
+      console.log("Creating SSE stream")
       const sse = new EventSource('http://localhost:8000/stream', { withCredentials: false });
       sse.onmessage = e => {
         const payload = JSON.parse(e.data);
@@ -103,6 +105,13 @@ function QueryComponent() {
             // setResult(null);
             setQueryRunning(false);
             setError(data);
+        } else if (event === "OperatorStats") {
+            const operatorId = data.operator_id;
+            setNodeStatData(d => {
+                const newData = {...d}
+                newData[operatorId] = data;
+                return newData
+            })
         } else {
             publish(event, data, payload);
         }
@@ -110,9 +119,10 @@ function QueryComponent() {
       sse.onerror = (e) => {
         // error log here
         console.log("ERROR:", e);
-        sse.close();
+        // sse.close();
       }
       return () => {
+        console.log("closing SSE")
         sse.close();
       };
     }, []);
@@ -182,9 +192,6 @@ function QueryComponent() {
                 />
                 <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
                 <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
-                {!!queryRunning && <Button
-                    style={{ backgroundColor: '#ff7575', float: 'right', marginRight: 0 }}
-                    onClick={ cancelQuery }>CANCEL</Button>}
                 {errorData && <div className="queryError">
                     <strong>Query Error:</strong> {errorData.error}
                 </div>}

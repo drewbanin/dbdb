@@ -98,15 +98,15 @@ class NestedLoopJoinOperator(JoinOperator):
             is_outer = True
 
         for i, lval in enumerate(lvals):
-            # self.stats.update_row_processed(lval)
+            self.stats.update_row_processed(lval)
             matched = False
             for rval in rvals:
-                # self.stats.update_row_processed(rval)
+                self.stats.update_row_processed(rval)
                 merged = lval.merge(rval)
                 if self.config.expression.eval(merged):
                     matched = True
                     yield merged
-                    # self.stats.update_row_emitted(merged)
+                    self.stats.update_row_emitted(merged)
 
             # If there was not match & it's an outer join,
             # emit a row w/ right side null

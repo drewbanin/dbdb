@@ -18,9 +18,9 @@ class UnionOperator(Operator):
     async def make_iterator(self, row_producers):
         for rows in row_producers:
             async for row in rows:
-                # self.stats.update_row_processed(row)
+                self.stats.update_row_processed(row)
                 yield row
-                # self.stats.update_row_emitted(row)
+                self.stats.update_row_emitted(row)
 
         self.stats.update_done_running()
 

@@ -57,8 +57,8 @@ class GoogleSheetsOperator(Operator):
 
     def details(self):
         return {
-            "table": "idk?",
-            "columns": "idk?"
+            "table": self.config.tab_id,
+            "columns": [],
         }
 
     def col_to_letter(self, col):

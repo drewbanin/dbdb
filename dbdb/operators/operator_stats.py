@@ -36,6 +36,9 @@ class OperatorStats:
     def update_start_running(self):
         self.state = STATE_WAITING
 
+        if self.start_time is None:
+            self.start_time = time.time()
+
         if (STAT_CALLBACK):
             STAT_CALLBACK("waiting", self.get_stats())
 

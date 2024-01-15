@@ -25,12 +25,15 @@ class GenerateSeriesOperator(Operator):
         buffer = np.arange(self.config.count)
         for i in buffer:
             row = (int(i),)
+            self.stats.update_row_processed(row)
             yield row
+            self.stats.update_row_emitted(row)
 
             # would be cooler if range() was async...
             if i % 100 == 0:
                 await asyncio.sleep(0.0)
             # self.stats.update_row_emitted(row)
+
 
         self.stats.update_done_running()
 

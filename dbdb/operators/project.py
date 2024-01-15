@@ -22,6 +22,7 @@ class ProjectOperator(Operator):
     async def make_iterator(self, tuples):
         projections = self.config.project
         async for row in tuples:
+            self.stats.update_row_processed(row)
             # self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
@@ -33,6 +34,7 @@ class ProjectOperator(Operator):
                     projected.append(value)
 
             yield projected
+            self.stats.update_row_emitted(projected)
             # self.stats.update_row_emitted(row)
         self.stats.update_done_running()
 
