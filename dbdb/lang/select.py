@@ -222,10 +222,12 @@ class SelectFunctionSource(SelectClause):
             )
         elif self.function_name == "GENERATE_SERIES":
             count = self.function_args[0]
+            delay = self.function_args[1] if len(self.function_args) == 2 else None
 
             return GenerateSeriesOperator(
                 table=self.table,
                 count=count,
+                delay=delay,
             )
         elif self.function_name == "MIDI":
             fname = self.function_args[0]

@@ -58,8 +58,8 @@ class MIDIOperator(Operator):
 
     def details(self):
         return {
-            "table": "idk?",
-            "columns": "idk?"
+            "table": self.config.fname,
+            "columns": []
         }
 
     async def make_iterator(self):
@@ -70,6 +70,7 @@ class MIDIOperator(Operator):
             now_playing = {}
             t = 0
             for msg in track:
+                self.stats.update_row_processed(msg)
                 t += msg.time
                 if msg.type == 'set_tempo':
                     bpm = mido.tempo2bpm(msg.tempo)
@@ -88,7 +89,7 @@ class MIDIOperator(Operator):
                     note, octave = number_to_note(msg.note)
                     frequency = note_to_frequency(note, octave)
 
-                    yield (
+                    row = (
                         start_time,
                         note,
                         int(octave),
@@ -96,6 +97,8 @@ class MIDIOperator(Operator):
                         duration,
                         1,
                     )
+                    yield row
+                    self.stats.update_row_emitted(row)
 
         self.stats.update_done_running()
 

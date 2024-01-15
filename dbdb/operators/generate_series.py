@@ -9,10 +9,12 @@ class GenerateSeriesConfig(OperatorConfig):
     def __init__(
         self,
         table,
-        count
+        count,
+        delay=None
     ):
         self.table = table
         self.count = count
+        self.delay = delay
 
 
 class GenerateSeriesOperator(Operator):
@@ -26,13 +28,10 @@ class GenerateSeriesOperator(Operator):
         for i in buffer:
             row = (int(i),)
             self.stats.update_row_processed(row)
+
+            await asyncio.sleep(self.config.delay or 0.0)
             yield row
             self.stats.update_row_emitted(row)
-
-            # would be cooler if range() was async...
-            if i % 100 == 0:
-                await asyncio.sleep(0.0)
-            # self.stats.update_row_emitted(row)
 
 
         self.stats.update_done_running()

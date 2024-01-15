@@ -4,6 +4,7 @@ import Button from 'react-bootstrap/Button';
 import { postRequest } from '../Client.js';
 import { QueryContext } from '../Store.js';
 import { usePub } from '../Hooks.js';
+import { cleanDag } from '../DAG.js';
 
 import Editor, { useMonaco, loader } from '@monaco-editor/react';
 import CodeTheme from './theme.json';
@@ -47,7 +48,8 @@ function QueryComponent() {
                 setError({error: res.detail});
                 setNodeData(null)
             } else {
-                setNodeData(res);
+                const cleaned = cleanDag(res);
+                setNodeData(cleaned);
             }
         })
     };
@@ -66,7 +68,8 @@ function QueryComponent() {
                 setQueryRunning(false)
                 setNodeData(null)
             } else {
-                setNodeData(res);
+                const cleaned = cleanDag(res);
+                setNodeData(cleaned);
                 setQueryRunning(false);
             }
         })

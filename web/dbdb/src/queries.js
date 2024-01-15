@@ -1,5 +1,5 @@
 
-const SIMPLE = `
+const MATH = `
 select
     10 as line,
     sin(i / 100) as sine,
@@ -8,6 +8,10 @@ select
     sqr(2 * i / 100) as square_two
 
 from generate_series(4410)
+`.trim();
+
+const DELAY = `
+select * from generate_series(100, 0.1)
 `.trim();
 
 const SHEET = `
@@ -20,10 +24,11 @@ from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
 
 const SWEEP = `
 select
-    i / 10 as time,
-    50 + 10 * i as freq,
-    0.1 as length
-from generate_series(50)
+    i / 2 as time,
+    50 + 25 * i as freq,
+    0.5 as length,
+    'sin' as func
+from generate_series(15)
 `.trim();
 
 
@@ -155,7 +160,8 @@ select * from midi('avril_14.mid')
 
 const QUERIES = {
 
-    SIMPLE: SIMPLE,
+    DELAY: DELAY,
+    MATH: MATH,
     SHEET: SHEET,
     SWEEP: SWEEP,
     SCALE: SCALE,
