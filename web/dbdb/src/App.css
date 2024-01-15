@@ -225,3 +225,32 @@ Button:disabled {
 }
 
 iframe#webpack-dev-server-client-overlay{display:none!important}
+
+.styled-dropdown-control {
+    width: 100px !important;
+    height: 24px !important;
+    font-size: 12px !important;
+    border: 1px solid black !important;
+    border-radius: 0 !important;
+    color: black !important;
+
+    padding: 5px !important;
+}
+
+.Dropdown-arrow {
+    border-color: #000 transparent transparent !important;
+    top: 10px !important;
+}
+
+.Dropdown-menu {
+    border: 1px solid black !important;
+}
+
+.Dropdown-option {
+    color: black !important;
+    font-size: 12px !important;
+}
+
+.Dropdown-option.is-selected {
+    background-color: #CBC3E3 !important;
+}

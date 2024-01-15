@@ -13,6 +13,8 @@ import Spinner from '../spinner.gif';
 import Dropdown from 'react-dropdown';
 import 'react-dropdown/style.css';
 
+import QUERIES from '../queries.js';
+
 
 function QueryComponent() {
 
@@ -115,24 +117,36 @@ function QueryComponent() {
       };
     }, []);
 
-    const options = [
-      'one', 'two', 'three'
-    ];
-    const defaultOption = options[0];
+    const queryOptions = QUERIES;
+
+    const setFromExample = (opt) => {
+        setQueryText(opt.value);
+    }
 
     return (
         <>
             <div className="panelHeader">
-                <div style={{ padding: 5 }}>
+                <div style={{ padding: 5, height: '24px' }}>
                     <div className="helpText">
-                        {queryRunning && <span>
-                            <img className="queryLoading" src={Spinner} />
-                        </span>}
-                        <span className="light title">QUERY</span>
-                        { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
+                        <div style={{ display: 'inline-block', marginTop: 5 }}>
+                            <span className="light title">QUERY</span>
+                            { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
+                            {queryRunning && <span>
+                                <img className="queryLoading" src={Spinner} />
+                            </span>}
 
-                        <div style={{  }}>
                         </div>
+
+                        <div style={{ display: 'inline-block', float: 'right'  }}>
+                            <Dropdown
+                                className="styled-dropdown"
+                                controlClassName="styled-dropdown-control"
+                                placeholder="EXAMPLES"
+                                onChange={setFromExample}
+                                options={queryOptions} />
+                        </div>
+
+                        <div style={{ clear: 'left' }}></div>
                     </div>
                 </div>
             </div>

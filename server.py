@@ -172,7 +172,7 @@ async def _do_run_query(plan, nodes):
 async def do_run_query(plan, nodes):
     try:
         await _do_run_query(plan, nodes)
-    except RuntimeError as e:
+    except (RuntimeError, TypeError, ValueError) as e:
         print("GOT AN ERROR!", e)
         EVENTS.append({
             "event": "QueryError",

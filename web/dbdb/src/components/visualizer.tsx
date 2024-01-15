@@ -262,7 +262,7 @@ function TimeDomainViz({ playing, rows, offset }) {
     <ResponsiveChartContainer
       series={[{ data: vizY, label: 'v', type: 'line', color: '#000000' }]}
       xAxis={[{ scaleType: 'linear', data: xVals, min: 0, max: xDomain, tickNumber: 5 }]}
-      yAxis={[{ min: -maxY.current, max: maxY.current, tickNumber: 2 }]}
+      yAxis={[{ min: -maxY.current - 0.1, max: maxY.current + 0.1, tickNumber: 2 }]}
       margin={{
         left: 15,
         right: 35,
@@ -290,6 +290,7 @@ export function Visualizer() {
     const source = useRef(null);
     const audioCtx = useRef(null);
     const gain = useRef(null);
+    const endTime = useRef(null);
     const state = {}
 
     useSub('QUERY_COMPLETE', (queryId) => {
@@ -310,9 +311,6 @@ export function Visualizer() {
 
         setPlayTime(0);
         setAudioState('done');
-
-        state.source = null;
-        state.context = null;
     }
 
     const playPauseSound = () => {
@@ -342,7 +340,7 @@ export function Visualizer() {
     }
 
     useEffect(() => {
-        console.log("cHECKING USE EFFECT?", mappedRows.length);
+        console.log("CHECKING USE EFFECT?", mappedRows.length);
         if (mappedRows.length === 0) {
             return
         }
@@ -350,9 +348,7 @@ export function Visualizer() {
         console.log("Playing for query:", mappedRows.length, "rows");
         const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
 
-        state.endTime = totalTime;
-        state.source = newSource;
-        state.context = ctx;
+        endTime.current = totalTime;
 
         audioCtx.current = ctx;
         source.current = newSource;
@@ -364,35 +360,35 @@ export function Visualizer() {
     }, [rows, source, audioCtx, gain])
 
     useEffect(() => {
+      console.log("Running effect?", audioState);
+
+      if (audioState === 'done') {
+          console.log("Audio state is done - exiting");
+          return
+      }
+
       const interval = setInterval(() => {
-        if (!state.context || audioCtx.current.state === 'suspended') {
+        if (!audioCtx.current || audioCtx.current.state === 'suspended') {
             return
         }
 
-        setPlayTime(state.context.currentTime);
+        setPlayTime(audioCtx.current.currentTime);
 
-        if (state.context.currentTime > state.endTime) {
-          console.log("done playing", state.context.currentTime, state.endTime)
-          state.source.stop()
+        if (audioCtx.current.currentTime > endTime.current) {
+          console.log("done playing", audioCtx.current.currentTime, endTime.current)
+          source.current.stop()
           setAudioState('done');
         }
       }, 10);
 
       return () => { console.log("Cancelling interval"); clearInterval(interval); }
-    }, [setPlayTime, setAudioState]);
+    }, [setPlayTime, setAudioState, audioState, audioCtx, endTime]);
 
     const [ vizType, setVizType ] = useState('freq');
 
     const showTime = vizType === 'time';
     const showFreq = vizType === 'freq';
 
-    // const samples = rows ? rows.map((val) => val[1]) : [];
-    // const startIndex = Math.floor(playTime * 44100);
-    // const endIndex = startIndex + 441;
-    // const samples = rows.slice(startIndex, endIndex).map(val => val[1]);
-    // console.log("???", startIndex, endIndex, samples.length)
-    
-    console.log('playTime?', playTime)
     const isPlaying = audioState == 'playing' || audioState == 'paused';
 
     let playPauseLabel;
@@ -409,6 +405,7 @@ export function Visualizer() {
         showMediaControls = false;
     }
 
+    console.log("Rendering at t=", playTime);
     return (
         <>
             <div className="panelHeader">
