@@ -2,10 +2,10 @@
 const MATH = `
 select
     i / 100 as sin_x,
-    sin(i / 100) as sin_y,
-    '#ff0000' as sin_color
+    sin(i / 100) + sin (1.1 * i / 100) as sin_y,
+    '#CBC3E3' as sin_color
 
-from generate_series(1000)
+from generate_series(10000)
 `.trim();
 
 const DELAY = `
@@ -43,9 +43,9 @@ with scale as (
     from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Scale')
 )
 
-select *, frequency as freq from scale
+select note, time, length, func, frequency as freq from scale
 union
-select *, frequency * 2 as freq from scale
+select note, time, length, func, frequency * 2 as freq from scale
 `.trim();
 
 
@@ -166,7 +166,7 @@ const QUERIES = {
     SCALE: SCALE,
     FAIRY: FAIRY,
     YOSHI: YOSHI,
-    APHEX: APHEX,
+    "AVRIL 14": APHEX,
 }
 
 

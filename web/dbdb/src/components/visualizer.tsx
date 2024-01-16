@@ -4,7 +4,7 @@ import { useSub } from '../Hooks.js';
 import { formatBytes, formatNumber } from '../Helpers.js';
 import { QueryContext } from '../Store.js';
 
-import { ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip, ScatterChart, ScatterPlot } from '@mui/x-charts';
+import { pieArcLabelClasses, ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip, ScatterChart, ScatterPlot, PiePlot } from '@mui/x-charts';
 import { BarChart } from '@mui/x-charts/BarChart';
 
 import { useAnimationFrame } from '../animate.js';
@@ -185,6 +185,54 @@ function FrequencyDomainViz({ playing, rows, offset }) {
         <BarPlot />
         <ChartsTooltip trigger={"axis"} />
         <ChartsXAxis axisId="x" position="bottom" />
+    </ResponsiveChartContainer>
+  );
+}
+
+function PieViz({ playing, rows, offset }) {
+  if (!playing) {
+      return null
+  }
+
+  const maxFreq = Math.max(...rows.map(row => row.freq))
+
+  // find tones that are playing at t=offset
+  const beatOffset = 0.00;
+  const relevantRows = rows.filter(row => {
+      const startT = row.time + beatOffset;
+      const endT = row.time + (row.length || 1) - beatOffset;
+      return startT <= offset && endT > offset
+  })
+
+  const series = relevantRows.map((row, i) => {
+      const grayness = Math.floor((row.freq / maxFreq) * 240)
+      const color = `rgb(${grayness}, ${grayness}, ${grayness})`;
+
+      return {
+          id: i,
+          value: row.amp || 1,
+          label: Math.floor(row.freq) + "hz",
+          color: color,
+      }
+  })
+
+  return (
+    <ResponsiveChartContainer
+      series={[ { data: series, type: 'pie', arcLabel: 'label' } ]}
+      sx={{
+        [`& .${pieArcLabelClasses.root}`]: {
+          fill: 'white',
+          fontSize: 12
+        },
+      }}
+      margin={{
+        left: 15,
+        right: 35,
+        top: 20,
+        bottom: 35,
+      }}
+    >
+        <PiePlot />
     </ResponsiveChartContainer>
   );
 }
@@ -388,6 +436,7 @@ export function Visualizer() {
 
     const showTime = vizType === 'time';
     const showFreq = vizType === 'freq';
+    const showPie = vizType === 'pie';
 
     const isPlaying = audioState == 'playing' || audioState == 'paused';
 
@@ -417,9 +466,13 @@ export function Visualizer() {
                                     onClick={ e => setVizType('freq') }
                                     className="light title">FREQ</button>
                                 <button
-                                    style={{ margin: 0, verticalAlign: 'top' }}
+                                    style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                     onClick={ e => setVizType('time') }
                                     className="light title">TIME</button>
+                                <button
+                                    style={{ margin: 0, verticalAlign: 'top' }}
+                                    onClick={ e => setVizType('pie') }
+                                    className="light title">BEN</button>
 
                                 { showMediaControls && <div style={{ margin: 0, float: 'right' }}>
                                     <button
@@ -447,6 +500,7 @@ export function Visualizer() {
             <div className="configBox fixedHeight">
                 {showFreq && <FrequencyDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
                 {showTime && <TimeDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
+                {showPie && <PieViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
             </div>
         </>
     )
@@ -523,7 +577,7 @@ export function XYViz() {
                 <ResponsiveChartContainer
                   series={viz}
                   margin={{
-                    left: 35,
+                    left: 40,
                     right: 35,
                     top: 20,
                     bottom: 35,
