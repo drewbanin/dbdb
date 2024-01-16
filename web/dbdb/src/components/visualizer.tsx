@@ -4,7 +4,7 @@ import { useSub } from '../Hooks.js';
 import { formatBytes, formatNumber } from '../Helpers.js';
 import { QueryContext } from '../Store.js';
 
-import { ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip } from '@mui/x-charts';
+import { ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip, ScatterChart, ScatterPlot } from '@mui/x-charts';
 import { BarChart } from '@mui/x-charts/BarChart';
 
 import { useAnimationFrame } from '../animate.js';
@@ -452,34 +452,65 @@ export function Visualizer() {
     )
 }
 
-export function VizPlaceHolder() {
+export function XYViz() {
     const { schema, result } = useContext(QueryContext);
     const [ dataSchema, setSchema ] = schema;
     const [ rows, setRows ] = result;
 
-    const viz = (dataSchema || []).map((colName, index) => {
-        if (rows.length == 0) {
-            return null;
+    // collects series into list of {name, x, y}
+    
+    const series = {};
+    (dataSchema || []).forEach((colName, index) => {
+        let col = null;
+        let axis = null;
+        let color = null;
+
+        if (colName.endsWith("_x")) {
+            axis = 'x';
+            col = colName.replace('_x', '');
+        } else if (colName.endsWith("_y")) {
+            axis = 'y';
+            col = colName.replace('_y', '');
+        } else if (colName.endsWith('_color')) {
+            col = colName.replace('_color', '');
+            color = true
         }
 
-        const exampleRow = rows[0][index];
-        if (typeof exampleRow !== 'number') {
-            return null;
+        if (axis && col) {
+            if(!series[col]) {
+                series[col] = {name: col}
+            }
+
+            const data = rows.map(r => r[index]);
+            series[col][axis] = data;
+        } else if (color && col) {
+            if(!series[col]) {
+                series[col] = {name: col}
+            }
+
+            series[col]['color'] = rows.map(r => r[index]);
         }
-
-        const data = rows.map(r => r[index]);
-        return (
-            <Box sx={{ flexGrow: 1 }} key={"viz" + index}>
-                <span style={{ fontSize: 12, borderBottom: '1px solid #000000' }}>
-                    Column: {colName.toUpperCase()}
-                </span>
-                <SparkLineChart data={data} height={50} colors={["#000000"]} />
-            </Box>
-
-        )
     })
 
-    const vizData = viz.filter(v => v !== null);
+    const seriesNames = Object.keys(series);
+
+                // <SparkLineChart data={data} height={50} colors={["#000000"]} />
+    const viz = seriesNames.map(name => {
+        const ser = series[name];
+        const color = (ser.color && ser.color.length) ? ser.color[0] : '#000000';
+        return {
+            label: name.toUpperCase(),
+            type: 'scatter',
+            color: color,
+            data: ser.x.map((x, i) => {
+                return {
+                    x: ser.x[i],
+                    y: ser.y[i],
+                    id: 'x-' + ser.x[i] + '-y-' + ser.y[i],
+                }
+            })
+        }
+    })
 
     return (<>
             <div className="panelHeader">
@@ -488,11 +519,35 @@ export function VizPlaceHolder() {
                     </div>
                 </div>
             </div>
-            <div className="configBox fixedHeight"
-                 style={{ overflowY: 'scroll', overflowX: 'clip' }}>
-                <Stack direction="column" sx={{ width: '95%' }} >
-                    {vizData}
-                </Stack>
+            <div className="configBox fixedHeight">
+                <ResponsiveChartContainer
+                  series={viz}
+                  margin={{
+                    left: 35,
+                    right: 35,
+                    top: 20,
+                    bottom: 35,
+                  }}
+                >
+                    <ChartsXAxis position="bottom" />
+                    <ChartsYAxis position="left" />
+                    <ScatterPlot />
+                </ResponsiveChartContainer>
+            </div>
+        </>);
+
+}
+
+export function PlaceholderViz() {
+    return (<>
+            <div className="panelHeader">
+                <div style={{ padding: 5 }}>
+                    <div className="helpText">VIZ
+                    </div>
+                </div>
+            </div>
+            <div className="configBox fixedHeight">
+                <div>RUN A QUERY</div>
             </div>
         </>);
 

@@ -1,13 +1,11 @@
 
 const MATH = `
 select
-    10 as line,
-    sin(i / 100) as sine,
-    sin(2 * i / 100) as sine_two,
-    sqr(i / 100) as square,
-    sqr(2 * i / 100) as square_two
+    i / 100 as sin_x,
+    sin(i / 100) as sin_y,
+    '#ff0000' as sin_color
 
-from generate_series(4410)
+from generate_series(1000)
 `.trim();
 
 const DELAY = `
@@ -16,8 +14,9 @@ select * from generate_series(100, 0.1)
 
 const SHEET = `
 select
+    index::int as note_x,
     note,
-    frequency::float as freq
+    frequency::float as note_y
 from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
 `.trim();
 

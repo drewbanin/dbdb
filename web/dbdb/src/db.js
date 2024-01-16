@@ -6,7 +6,7 @@ import 'reactflow/dist/style.css';
 
 import QueryComponent from './components/queryComponent.js';
 import OperatorViz from './components/operatorViz.js';
-import { Visualizer, VizPlaceHolder } from './components/visualizer.tsx';
+import { Visualizer, XYViz, PlaceholderViz } from './components/visualizer.tsx';
 import ResultTable from './components/resultTable.js';
 
 import { QueryContext, QueryContextProvider } from './Store.js';
@@ -20,6 +20,7 @@ function Database() {
     const fields = dataSchema || [];
 
     const isMusic = fields.indexOf('time') >= 0 && fields.indexOf('freq') >= 0;
+    const isXY = fields.filter(f => f.endsWith('_x')).length > 0;
 
     return (
         <div className="flexColumn">
@@ -34,7 +35,8 @@ function Database() {
                         <div className="boxWrapper">
                             <div className="flexColumn">
                                 {isMusic && <Visualizer />}
-                                {!isMusic && <VizPlaceHolder />}
+                                {isXY && <XYViz />}
+                                {(!isXY && !isMusic) &&  <PlaceholderViz />}
                             </div>
                         </div>
                     </div>

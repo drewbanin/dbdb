@@ -6,6 +6,9 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   useReactFlow,
+
+  getIncomers,
+  getOutgoers,
 } from 'reactflow';
 
 import Dagre from 'dagre';
@@ -61,6 +64,64 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
     [nodes, edges]
   );
 
+  const selectNode = (e, node) => {
+      console.log("Selected node", node);
+
+      const enumParents = (node) => {
+          const parents = getIncomers(node, nodes, edges);
+
+          let ret = [];
+          parents.forEach(p => {
+              const pp = enumParents(p);
+              ret = ret.concat(pp);
+          })
+
+          return [node, ...ret]
+      }
+
+      const enumChildren = (node) => {
+          const children = getOutgoers(node, nodes, edges);
+
+          let ret = [];
+          children.forEach(p => {
+              const cc = enumChildren(p);
+              ret = ret.concat(cc);
+          })
+
+          return [node, ...ret]
+      }
+
+
+      const parents = enumParents(node);
+      const children = enumChildren(node);
+
+      const toHighlight = parents.concat(children).map(n => n.id);
+
+      const newEdges = edges.map(edge => {
+          // if parent and child are in toHighlight, then highlight it!
+          const lowlight = "#cccccc";
+          const highlight = "#000000";
+
+          if (toHighlight.indexOf(edge.source) >= 0 && toHighlight.indexOf(edge.target) >= 0) {
+              edge.style = {color: highlight, stroke: highlight}
+              edge.markerEnd = {...edge.markerEnd, color:  highlight};
+              edge.data.highlight = true;
+          } else {
+              edge.style = {color: lowlight, stroke: lowlight}
+              edge.markerEnd = {...edge.markerEnd, color: lowlight};
+              edge.data.highlight = false;
+          }
+
+          return {...edge}
+      })
+
+      const lowEdges = newEdges.filter(e => !e.data.highlight);
+      const highEdges = newEdges.filter(e => e.data.highlight);
+
+      // Render highlighted edges after (above) non-highlighted edges
+      setEdges([...lowEdges, ...highEdges]);
+  }
+
   const nodeTypes = useMemo(() => ({
       operator: OperatorNode
   }), []);
@@ -72,6 +133,7 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
+      onNodeClick={selectNode}
       fitView
       fitViewOptions={{ padding: 0.3, includeHiddenNodes: true, nodes: nodes }}
       proOptions={{ hideAttribution: true }}
@@ -115,6 +177,7 @@ function OperatorViz(props) {
     nodeIds.forEach((id) => {
         const edges = nodeData.edges[id];
         edges.forEach((edgeId) => {
+            console.log("CREATING EDGE??")
             RFEdges.push({
                 id: `${id}--${edgeId}`,
                 source: edgeId + '',
@@ -124,7 +187,9 @@ function OperatorViz(props) {
                 //label: "hi hi hi",
                 sourceHandle: 'right',
                 targetHandle: 'left',
-                style: {color: 'black'},
+                style: {
+                    color: 'black'
+                },
                 markerEnd: {
                       type: MarkerType.ArrowClosed,
                       width: 20,

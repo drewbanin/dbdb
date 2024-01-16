@@ -254,3 +254,7 @@ iframe#webpack-dev-server-client-overlay{display:none!important}
 .Dropdown-option.is-selected {
     background-color: #CBC3E3 !important;
 }
+
+.configBox circle {
+    r: 2px !important;
+}
