@@ -13,11 +13,8 @@ select * from generate_series(100, 0.1)
 `.trim();
 
 const SHEET = `
-select
-    index::int as note_x,
-    note,
-    frequency::float as note_y
-from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
+select *
+from google_sheet('1FdRv_eVVo5GxtXthiScIyA3L7Z7h21eXWMMDcaFfGMI', 'Example')
 `.trim();
 
 
@@ -40,7 +37,7 @@ with scale as (
         length::float as length,
         'sin' as func
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Scale')
+    from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'Scale')
 )
 
 select note, time, length, func, frequency as freq from scale
@@ -55,7 +52,7 @@ with notes as (
         note,
         frequency::float as freq
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
+    from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'Notes')
 
 ),
 
@@ -68,7 +65,7 @@ bass as (
         start_time::float as start_time,
         start_time::float + length::float as end_time
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'YoshiBass')
+    from google_sheet('1E0Zp6G_2URi3HiFRUk1PlMlAHeWopiJ7LZy6kugGG1Y', 'Bass')
 ),
 
 bass_freq as (
@@ -93,7 +90,7 @@ melody as (
         start_time::float as start_time,
         start_time::float + length::float as end_time
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'YoshiMelody')
+    from google_sheet('1E0Zp6G_2URi3HiFRUk1PlMlAHeWopiJ7LZy6kugGG1Y', 'Melody')
 ),
 
 melody_freq as (
@@ -121,11 +118,11 @@ with notes as (
         note,
         frequency::float as freq
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Notes')
+    from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'Notes')
 
 ),
 
-bass as (
+melody as (
     select
         note,
         length::float as  length,
@@ -134,23 +131,23 @@ bass as (
         start_time::float as start_time,
         start_time::float + length::float as end_time
 
-    from google_sheet('1n9NnBdqvDhDaLz7txU3QQ0NOA4mia9sUiIX6n5MD9WU', 'Fairy')
+    from google_sheet('1Q_9SttYWqcIfJ2r2fLUY01yPXrKn300aA32h58YB7lY', 'Zelda')
 ),
 
-bass_freq as (
+melody_freq as (
 
     select
-        bass.start_time as time,
-        bass.length,
-        bass.amplitude,
-        notes.freq * pow(2, bass.octave - 5) as freq
+        melody.start_time as time,
+        melody.length,
+        melody.amplitude,
+        notes.freq * pow(2, melody.octave - 5) as freq
 
-    from bass
-    join notes on notes.note = bass.note
+    from melody
+    join notes on notes.note = melody.note
 
 )
 
-select * from bass_freq
+select * from melody_freq
 `.trim();
 
 const APHEX = `
@@ -164,8 +161,8 @@ const QUERIES = {
     SHEET: SHEET,
     SWEEP: SWEEP,
     SCALE: SCALE,
-    FAIRY: FAIRY,
     YOSHI: YOSHI,
+    FAIRY: FAIRY,
     "AVRIL 14": APHEX,
 }
 
