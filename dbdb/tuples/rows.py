@@ -2,6 +2,10 @@ from dbdb.tuples.identifiers import TableIdentifier
 
 import tabulate
 from typing import NamedTuple
+import functools
+
+import asyncio
+import collections
 
 
 class RowTuple:
@@ -13,14 +17,15 @@ class RowTuple:
         elif isinstance(data, (tuple, list)):
             self.data = data
         else:
-            raise RuntimeError("bad input to RowTuple")
+            import ipdb; ipdb.set_trace()
+            raise RuntimeError(f"bad input to RowTuple: {data}")
 
     def field(self, name):
         found = None
         for i, field in enumerate(self.fields):
-            matched = field.is_match(name)
+            matched = field == "*" or field.is_match(name)
             if matched and found is not None:
-                raise RuntimeError("Ambiguous column")
+                raise RuntimeError(f"Ambiguous column: {name}")
             elif matched:
                 found = i
 
@@ -28,6 +33,16 @@ class RowTuple:
             raise RuntimeError(f"field {name} not found in table")
 
         return self.data[found]
+
+    def has_field(self, name):
+        for f in self.fields:
+            if field.is_match(f):
+                return True
+        return False
+
+
+    def nulls(self):
+        return (None,) * len(self.fields)
 
     def index(self, index):
         return self.data[index]
@@ -49,12 +64,17 @@ class Rows:
         self.iterator = iterator
         self.data = None
 
-    def __iter__(self):
+        self.consumers = []
+        self.seen = []
+
+    def __aiter__(self):
         return self
 
-    def __next__(self):
-        record = next(self.iterator)
-        return self._make_row(record)
+    async def __anext__(self):
+        record = await self.iterator.__anext__()
+        row =  self._make_row(record)
+        self.seen.append(row)
+        return row
 
     def _make_row(self, record):
         return RowTuple(self.fields, record)
@@ -64,6 +84,29 @@ class Rows:
 
     def nulls(self):
         return (None,) * len(self.fields)
+
+    def consume(self):
+        new_deque = collections.deque()
+        for val in self.seen:
+            new_deque.append(val)
+
+        self.consumers.append(new_deque)
+
+        async def gen(mydeque):
+            while True:
+                if not mydeque:
+                    try:
+                        newval = await self.__anext__()
+                    except StopAsyncIteration:
+                        return
+
+                    for consumer in self.consumers:
+                        consumer.append(newval)
+
+                yield mydeque.popleft()
+
+        return Rows(self.table, self.fields, gen(new_deque))
+
 
     @classmethod
     def merge(self, row_objs, iterator):
@@ -84,16 +127,30 @@ class Rows:
         table = TableIdentifier.temporary()
         return Rows(table, fields, iterator)
 
-    def materialize(self):
+    async def materialize(self):
+        consumer = self.consume()
         if not self.data:
-            self.data = tuple([self._make_row(row) for row in self.iterator])
+            self.data = tuple([self._make_row(row) async for row in consumer])
 
         return self.data
 
-    def display(self, num_rows=10):
+    async def as_table(self):
+        data = await self.materialize()
+
+        raw = tuple([r.data for r in data])
+        fields = [f.name for f in self.fields]
+
+        accum = []
+        for row in raw:
+            as_dict = dict(zip(fields, row))
+            accum.append(as_dict)
+
+        return accum
+
+    async def display(self, num_rows=10):
         # We need to materialize the iterator otherwise
         # printing the table will consume all rows :/
-        data = self.materialize()
+        data = await self.materialize()
         raw = tuple([r.data for r in data])
 
         if num_rows is not None:

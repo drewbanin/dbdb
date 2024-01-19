@@ -1,5 +1,6 @@
 
 import itertools
+import functools
 
 
 class Identifier:
@@ -20,6 +21,14 @@ class TableIdentifier(Identifier):
         # Zip our parts with candidate parts; determine if they match
         # Reverse both lists so we match from most significant to least
         # If candidate is None but our part is present, that's a match!
+
+        # If a field is aliased, it can no longer be addressed by its name
+        can_alias = self.alias is not None and len(candidate_parts) > 0
+        if can_alias and candidate_parts[0] == self.alias:
+            return True
+        elif can_alias:
+            return False
+
         our_parts = self.provided_parts()
         candidate_reversed = candidate_parts[::-1]
         ours_reversed = our_parts[::-1]
@@ -44,11 +53,11 @@ class TableIdentifier(Identifier):
         return parts
 
     @classmethod
-    def new(cls, ident_str):
+    def new(cls, ident_str, alias=None):
         parts = ident_str.split(".")
         rest = 3 - len(parts)
         args = [None] * rest + parts
-        return cls(*args)
+        return cls(*args, alias=alias)
 
     @classmethod
     def temporary(cls):
@@ -67,6 +76,7 @@ class FieldIdentifier(Identifier):
         self.name = name
         self.parent = parent
 
+    @functools.cache
     def is_match(self, candidate):
         candidate_parts = candidate.split(".")
         assert len(candidate_parts) > 0, f"Got empty candidate: {candidate}"
@@ -78,9 +88,10 @@ class FieldIdentifier(Identifier):
         return self.parent.is_match(candidate_parts)
 
     def __str__(self):
-        parent_qualifier = self.parent.provided_parts()
-        qualified = parent_qualifier + [self.name]
-        return ".".join(qualified)
+        # parent_qualifier = self.parent.provided_parts()
+        # qualified = parent_qualifier + [self.name]
+        # return ".".join(qualified)
+        return self.name
 
     def __repr__(self):
         return self.__str__()

@@ -29,20 +29,38 @@ class TableScanConfig(OperatorConfig):
 class TableScanOperator(Operator):
     Config = TableScanConfig
 
-    def update_stats(self, tuples):
-        self.cache['rows_seen'] += 1
-        self.cache.update(self.reader.stats())
+    def name(self):
+        return "Table Scan"
 
-    def make_iterator(self, tuples):
+    def details(self):
+        return {
+            "table": self.config.table_ref,
+            "columns": self.config.columns,
+        }
+
+    async def make_iterator(self, tuples):
         for record in tuples:
-            yield record
-            self.update_stats(record)
+            self.stats.update_row_processed(record)
 
-    def run(self):
-        self.cache['rows_seen'] = 0
+            yield record
+            self.stats.update_custom_stats(self.reader.stats())
+            self.stats.update_row_emitted(record)
+
+        self.stats.update_done_running()
+
+    async def run(self):
+        self.stats.update_start_running()
 
         self.reader = FileReader(self.config.table_ref)
-        column_names = [c.name for c in self.config.columns]
+
+        column_data = file_format.read_header(self.reader)
+        scanned_columns = [c.to_dict() for c in column_data]
+        column_names = [c.column_name for c in column_data]
+
+        self.stats.update_custom_stats({
+            "scanned_columns": scanned_columns,
+            "file_ref": self.reader.table_ref,
+        })
 
         tuples = file_format.read_pages(
             reader=self.reader,
@@ -50,6 +68,8 @@ class TableScanOperator(Operator):
         )
 
         iterator = self.make_iterator(tuples)
+        self.iterator = iterator
+
         return Rows(
             self.config.table,
             self.config.columns,
@@ -70,5 +90,5 @@ class TableGenOperator(OperatorConfig):
 class TableGenOperator(Operator):
     Config = TableGenOperator
 
-    def run(self):
+    async def run(self):
         return self.config.rows

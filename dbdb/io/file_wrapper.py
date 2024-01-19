@@ -3,6 +3,8 @@
 # Records stats
 
 from contextlib import contextmanager
+import time
+import asyncio
 
 
 class FileHandleProxy:
@@ -35,10 +37,10 @@ class FileHandleProxy:
 
     def stats(self):
         return {
-            'bytes_read': f"{self.bytes_read:,}",
-            'bytes_read_pct': f"{100 * self.bytes_read / self.size:0.2f}%",
-            'bytes_total': f"{self.size:,}",
-            'reads': f"{self.reads:,}",
+            'bytes_read': self.bytes_read,
+            'bytes_total': self.size,
+            'reads': self.reads,
+            'bytes_read_pct': self.bytes_read / self.size,
         }
 
 

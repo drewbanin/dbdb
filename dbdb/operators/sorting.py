@@ -25,28 +25,41 @@ class SortingConfig(OperatorConfig):
 class SortOperator(Operator):
     Config = SortingConfig
 
+    def name(self):
+        return "Sort"
+
     def sort_func(self, row):
         # function that returns a tuple of sort orders...
         # this will sort "ascending", so make sure that
         # we account for sort order in here... somehow...
 
+        self.stats.update_row_processed(row)
         sort_keys = []
-        for ascending, key_f in self.config.order:
-            if ascending:
-                key = key_f(row)
+        for ascending, projection in self.config.order:
+            if projection.is_int():
+                key = row.data[projection.value() - 1]
             else:
-                key = ReverseSort(key_f(row))
+                key = projection.eval(row)
+
+            if not ascending:
+                key = ReverseSort(key)
 
             sort_keys.append(key)
 
         return sort_keys
 
-    def make_iterator(self, tuples):
-        yield from sorted(
-            tuples,
+    async def make_iterator(self, rows):
+        data = await rows.materialize()
+        for row in sorted(
+            data,
             key=self.sort_func,
-        )
+        ):
+            self.stats.update_row_emitted(row)
+            yield row
 
-    def run(self, rows):
+        self.stats.update_done_running()
+
+    async def run(self, rows):
+        self.stats.update_start_running()
         iterator = self.make_iterator(rows)
         return rows.new(iterator)

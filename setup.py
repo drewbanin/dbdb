@@ -45,8 +45,19 @@ setup(
         # TODO
         'hexdump==3.3',
         'networkx==2.8',
-        'pyparsing==3.0.8',
+        #'pyparsing==3.0.8',
+        'pyparsing',
         'tabulate==0.8.9',
+        'Pympler==1.0.1',
+        'fastapi[all]==0.104.1',
+        "uvicorn",
+        "sse-starlette",
+
+        "google-api-python-client",
+        "google-auth-httplib2",
+        "google-auth-oauthlib",
+
+        'mido',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -13,19 +13,39 @@ class LimitConfig(OperatorConfig):
 class LimitOperator(Operator):
     Config = LimitConfig
 
-    def make_iterator(self, tuples):
+    def name(self):
+        return "Limit"
+
+    def details(self):
+        return {
+            "Limit": self.config.limit
+        }
+
+    async def make_iterator(self, tuples):
         limit = self.config.limit
 
         # Do not read _any_ rows if limit is zero
         if limit == 0:
             raise StopIteration()
 
-        for i, val in enumerate(tuples):
-            yield val
+        i = 0
+        async for row in tuples:
+            self.stats.update_row_processed(row)
 
-            if i >= limit - 1:
-                break
+            if i < limit:
+                yield row
+                self.stats.update_row_emitted(row)
 
-    def run(self, rows):
+            # This is dumb! We would ideally break, but we
+            # actually need to go back and drain our parent
+            # iterators or else they will "hang".
+            i += 1
+
+        self.stats.update_done_running()
+
+    async def run(self, rows):
+        self.stats.update_start_running()
         iterator = self.make_iterator(rows)
+        self.iterator = iterator
+
         return rows.new(iterator)

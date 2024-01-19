@@ -61,8 +61,6 @@ def encode_null_bitmap(data):
 
 
 def decode_null_bitmap(bitfield_buffer, data, num_records):
-    with_nulls = []
-
     bitfield_bytes = struct.iter_unpack(">B", bitfield_buffer)
 
     byte_size = 8
@@ -75,17 +73,18 @@ def decode_null_bitmap(bitfield_buffer, data, num_records):
 
             elements_created += 1
             if present:
-                with_nulls.append(data[element_index])
+                value = data[element_index]
+                if isinstance(value, bytes):
+                    value = value.decode().strip('\x00')
+                yield value
                 element_index += 1
             else:
-                with_nulls.append(None)
+                yield None
 
             # Make sure that we don't encode Nulls at the end of the buffer
             # for unset bits
             if elements_created >= num_records:
                 break
-
-    return with_nulls
 
 
 class DataEncoder:

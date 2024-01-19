@@ -1,6 +1,7 @@
 
 import tabulate
 import uuid
+from dbdb.operators.operator_stats import OperatorStats
 
 
 def pipeline(*iterables):
@@ -25,9 +26,32 @@ class Operator:
         self.operator_id = uuid.uuid4()
         self.cache = {}
         self.config = self.Config(**config)
+        self.stats = OperatorStats(
+            operator_id=id(self),
+            operator_type=self.name()
+        )
 
-    def run(self):
+        self.iterator = None
+
+    async def run(self):
         raise NotImplementedError()
+
+    def close(self):
+        if self.iterator:
+            self.iterator.aclose()
+
+    def name(self):
+        raise NotImplementedError()
+
+    def details(self):
+        return {}
+
+    def to_dict(self):
+        return {
+            "id": id(self),
+            "name": self.name(),
+            "details": self.details()
+        }
 
     def print_cache(self):
         rows = []

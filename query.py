@@ -9,7 +9,7 @@ from dbdb.operators.project import ProjectOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
     HashJoinOperator,
-    JoinTypes
+    JoinStrategy
 )
 
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
@@ -18,6 +18,7 @@ from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier, GlobIdenti
 from dbdb.expressions import Expression, Equality, EqualityTypes
 
 import itertools
+import networkx as nx
 
 from dbdb.lang.select import (
     Select,
@@ -33,30 +34,68 @@ from dbdb.lang.select import (
 )
 
 
+
 sql = """
 select
-  my_table.my_string as my_field,
-  avg(debug.my_number + 10) as my_avg
+  my_table.my_string as my_string,
+  sum(my_table.is_odd + 10) as my_avg
 
 from my_table
-inner join debug on debug.my_string = my_table.my_string
-left outer join debug on debug.my_string = my_table.my_string or 1=1
-where is_odd = true
-  and is_odd is not false
-order by my_table.my_string, 2
-limit 3
+group by 1
+order by 1
+limit 10
 """
 
+sql = """
+select user_id from people order by 1
+"""
+
+
+
 import dbdb.lang.lang
+import asyncio
 
-res = dbdb.lang.lang.parse_query(sql)
-print(res)
 
-res.pprint()
+async def run():
 
-import sys
-sys.exit(0)
+    query = dbdb.lang.lang.parse_query(sql)
+    print(query)
 
+    plan = query.make_plan()
+    print(plan)
+
+    nodes = list(nx.topological_sort(plan))
+
+    parents = {}
+    for node in nodes:
+        parent_nodes = plan.predecessors(node)
+        parents[id(node)] = [id(n) for n in parent_nodes]
+
+    row_iterators = {}
+    for node in nodes:
+        args = {}
+        for parent, _, data in plan.in_edges(node, data=True):
+            key = data['input_arg']
+            args[key] = row_iterators[parent]
+
+        print("Running operator", node, "with args", args)
+        rows = await node.run(**args)
+        row_iterators[node] = rows
+
+    leaf_node = nodes[-1]
+    print("Leaf:", leaf_node)
+
+    preso = row_iterators[leaf_node]
+    await preso.display()
+
+    for node in nodes:
+        node.close()
+
+
+asyncio.run(run())
+print("done?")
+
+"""
 my_table = TableIdentifier.new("my_table")
 
 debug_identifier = TableIdentifier.new("debug")
@@ -134,76 +173,54 @@ query = Select(
         limit=3
     )
 )
-
-plan = query.make_plan()
-print(plan)
-
-print(query)
-
-import grandalf
-from grandalf.layouts import SugiyamaLayout
-import matplotlib.pyplot as plt
-import networkx as nx
-
-fig = plt.figure(figsize=(12,12))
-ax = plt.subplot(111)
-ax.set_title('Execution graph', fontsize=10)
-plt.title('Execution plan')
-
-labels = {
-    n: data.get('label')
-    for n, data in plan.nodes(data=True)
-}
-
-graph = grandalf.utils.convert_nextworkx_graph_to_grandalf(plan)
-
-class defaultview(object):
-    w, h = 10, 10
-
-for v in graph.V():
-    v.view = defaultview()
-
-sug = SugiyamaLayout(graph.C[0])
-sug.init_all() # roots=[V[0]])
-sug.draw() # This is a bit of a misnomer, as grandalf doesn't actually come with any visualization methods. This method instead calculates positions
-pos = {v.data: (v.view.xy[0], v.view.xy[1]) for v in graph.C[0].sV} # Extracts the positions
+"""
 
 
-nx.draw(
-    plan,
-    pos,
-    labels=labels,
-    node_size=1800,
-    node_color="#ddd",
-)
 
-plt.tight_layout()
-plt.savefig("Graph.png", format="PNG")
+# import grandalf
+# from grandalf.layouts import SugiyamaLayout
+# import matplotlib.pyplot as plt
+# 
+# fig = plt.figure(figsize=(12,12))
+# ax = plt.subplot(111)
+# ax.set_title('Execution graph', fontsize=10)
+# plt.title('Execution plan')
+# 
+# labels = {
+#     n: data.get('label')
+#     for n, data in plan.nodes(data=True)
+# }
+# 
+# graph = grandalf.utils.convert_nextworkx_graph_to_grandalf(plan)
+# 
+# class defaultview(object):
+#     w, h = 10, 10
+# 
+# for v in graph.V():
+#     v.view = defaultview()
+# 
+# sug = SugiyamaLayout(graph.C[0])
+# sug.init_all() # roots=[V[0]])
+# sug.draw() # This is a bit of a misnomer, as grandalf doesn't actually come with any visualization methods. This method instead calculates positions
+# pos = {v.data: (v.view.xy[0], v.view.xy[1]) for v in graph.C[0].sV} # Extracts the positions
+# 
+# 
+# nx.draw(
+#     plan,
+#     pos,
+#     labels=labels,
+#     node_size=1800,
+#     node_color="#ddd",
+# )
+# 
+# plt.tight_layout()
+# plt.savefig("Graph.png", format="PNG")
 
 
 # OK... so now that we have a DAG.... go ahead and call run()
 # on each operator with the inputs from its parent edges? How do
 # we do that part...?
 
-nodes = list(nx.topological_sort(plan))
-
-row_iterators = {}
-for node in nodes:
-    args = {}
-    for parent, _, data in plan.in_edges(node, data=True):
-        key = data['input_arg']
-        args[key] = row_iterators[parent]
-
-    print("Running operator", node, "with args", args)
-    rows = node.run(**args)
-    row_iterators[node] = rows
-
-leaf_node = nodes[-1]
-print("Leaf:", leaf_node)
-
-
-preso = row_iterators[leaf_node]
-preso.display()
 
 
 

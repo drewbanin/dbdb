@@ -1,5 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.operators import functions
+from dbdb.operators import aggregations
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier
 
@@ -20,15 +20,15 @@ class Aggregates(enum.Enum):
 
 
 _agg_funcs = {
-    Aggregates.MIN: functions.agg_min,
-    Aggregates.MAX: functions.agg_max,
-    Aggregates.SUM: functions.agg_sum,
-    Aggregates.AVG: functions.agg_avg,
+    Aggregates.MIN: aggregations.AggregationMin,
+    Aggregates.MAX: aggregations.AggregationMax,
+    Aggregates.SUM: aggregations.AggregationSum,
+    Aggregates.AVG: aggregations.AggregationAverage,
 
-    Aggregates.COUNT: functions.agg_count,
-    Aggregates.COUNTD: functions.agg_countd,
+    Aggregates.COUNT: aggregations.AggregationCount,
+    Aggregates.COUNTD: aggregations.AggregationCountDistinct,
 
-    Aggregates.LISTAGG: functions.agg_list,
+    Aggregates.LISTAGG: aggregations.AggregationListAgg,
 }
 
 
@@ -45,19 +45,24 @@ Identity = object()
 class AggregateConfig(OperatorConfig):
     def __init__(
         self,
-        fields,
+        group_by_list,
+        projections,
     ):
-        self.fields = fields
+        self.group_by_list = group_by_list
+        self.projections = projections
 
 
 class AggregateOperator(Operator):
     Config = AggregateConfig
 
+    def name(self):
+        return "Aggregate"
+
     def grouping_set(self, exprs, values):
         groups = {}
 
         for value in values:
-            key = tuple(expr_f(value) for _, expr_f, _ in exprs)
+            key = tuple(expr.eval(value) for expr in exprs)
             if key not in groups:
                 groups[key] = []
 
@@ -65,33 +70,132 @@ class AggregateOperator(Operator):
 
         return groups
 
-    def make_iterator(self, grouping):
-        for (key, values) in grouping.items():
-            result = []
-            scalar_index = 0
-            for agg_type, expr, project in self.config.fields:
-                if agg_type == Aggregates.SCALAR:
-                    result.append(key[scalar_index])
-                    scalar_index += 1
+    async def make_iterator(self, scalar_fields, grouping, rows):
+        projections = self.config.projections.projections
+
+        resolve_funcs = []
+        for i, projection in enumerate(projections):
+            if i not in scalar_fields:
+                agg_class = lookup(projection.expr.agg_type)
+                resolve_funcs.append(agg_class)
+
+        grouped_sets = {}
+        async for row in rows:
+            self.stats.update_row_processed(row)
+            grouping_values = []
+            agg_values = []
+            for i, projection in enumerate(projections):
+                if i in scalar_fields:
+                    value = projection.expr.eval(row)
+                    grouping_values.append(value)
                 else:
-                    aggregate_func = lookup(agg_type)
-                    # res is a scalar value
-                    res = aggregate_func(expr(val) for val in values)
-                    result.append(res)
+                    # Calc value inside the func - this is dumb
+                    # would be better to make the agg func do this
+                    values = [fe.eval(row) for fe in projection.expr.func_expr]
+                    agg_values.append(values)
 
-            yield tuple(result)
+            grouping_set = tuple(grouping_values)
+            if grouping_set not in grouped_sets:
+                grouped_sets[grouping_set] = [agg() for agg in resolve_funcs]
 
-    def run(self, rows):
-        scalars = [p for p in self.config.fields if p[0] == Aggregates.SCALAR]
-        field_names = tuple([field for _, _, field in self.config.fields])
+            resolver = grouped_sets[grouping_set]
 
-        grouping = self.grouping_set(scalars, rows)
-        iterator = self.make_iterator(grouping)
+            for (agg, value) in zip(resolver, agg_values):
+                agg.process(value)
+
+        # OK - I now understand why we implemented this without
+        # a notion of iterator streaming before -- we cannot return
+        # any results until the aggregation has completed! how could
+        # we? Maybe if there is an ANY_VALUE() function we could return
+        # early or something... could also apply this for window functions
+        # in the future too... but this was kind of a big waste of time lmao
+
+        # TODO : this is dumb and assumed groups will come before aggs
+        for (grouped, agged) in grouped_sets.items():
+            grouped_values = list(grouped)
+            agged_values = [agg.result() for agg in agged]
+            merged = tuple(grouped_values + agged_values)
+            yield merged
+            self.stats.update_row_emitted(merged)
+
+        self.stats.update_done_running()
+
+    def field_names(self, table):
+        from dbdb.lang.lang import ColumnIdentifier, FunctionCall
+
+        fields = []
+        unnamed_col_counter = 0
+        for field in self.config.projections.projections:
+            if field.alias:
+                field_name = field.alias
+            elif isinstance(field.expr, ColumnIdentifier):
+                field_name = field.expr.column
+            elif isinstance(field.expr, FunctionCall):
+                field_name = field.expr.func_name.lower()
+            else:
+                field_name = f"col_{unnamed_col_counter}"
+                unnamed_col_counter += 1
+
+            fields.append(table.field(field_name))
+        return fields
+
+    async def run(self, rows):
+        self.stats.update_start_running()
+        from dbdb.lang.lang import Literal
+        # Check group by fields against aggregate fields
+        # and make sure it all tracks
+
+        groupings = self.config.group_by_list
+        projections = self.config.projections.projections
+
+        grouped_fields = set()
+        for grouping in groupings:
+            if isinstance(grouping, Literal) and grouping.is_int():
+                # GROUP BY <INT>
+                index = grouping.value()
+                # TODO: Check for out of range
+                group_field = projections[index - 1]
+                fields_to_group = group_field.get_non_aggregated_fields()
+                agg_fields = group_field.get_aggregated_fields()
+                if len(agg_fields) > 0:
+                    raise RuntimeError("you're bad at writing SQL")
+
+                grouped_fields.update(fields_to_group)
+            else:
+                # GROUP BY <EXPR>
+                import ipdb; ipdb.set_trace()
+                pass
+
+        scalar_fields = []
+
+        for i, projection in enumerate(projections):
+            # Check that referenced fields are either grouped or aggregated...
+            # Also, no expr should have both agg'd and unagg'd fields...
+
+            aggregated = projection.get_aggregated_fields()
+            scalar = projection.get_non_aggregated_fields()
+
+            if len(scalar) > 0 and len(aggregated) > 0:
+                raise RuntimeError("You're bad at writing SQL")
+
+            for field in scalar:
+                if field not in grouped_fields:
+                    raise RuntimeError(
+                        f"Field {field} is neither grouped"
+                        " nor aggregated"
+                    )
+
+            if len(scalar) > 0:
+                scalar_fields.append(i)
+
+        iterator = self.make_iterator(scalar_fields, grouping, rows)
+        self.iterator = iterator
 
         # This gets a temporary name because we do not know the name
         # of this table... in fact... there is none!? I might need to
         # think about that more because fields are still scoped to their
         # parent locations.. which is kind of confusing.... hm....
         table_identifier = TableIdentifier.temporary()
-        fields = [table_identifier.field(f) for f in field_names]
+        fields = self.field_names(table_identifier)
+
         return Rows(table_identifier, fields, iterator)

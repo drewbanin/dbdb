@@ -1,13 +1,21 @@
 from dbdb.operators.file_operator import TableScanOperator, TableGenOperator
+from dbdb.operators.google_sheets import GoogleSheetsOperator
+from dbdb.operators.midi import MIDIOperator
+from dbdb.operators.generate_series import GenerateSeriesOperator
 from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
 from dbdb.operators.project import ProjectOperator
+from dbdb.operators.music import PlayMusicOperator
+from dbdb.operators.union import UnionOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
     HashJoinOperator,
+    JoinStrategy,
+    JoinType
 )
 
+from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
@@ -23,75 +31,110 @@ class Select:
         where=None,
         source=None,
         joins=None,
+        group_by=None,
         having=None,
         order_by=None,
         limit=None,
+        unions=None,
+        ctes=None,
+
+        scopes=None,
+        play_music=None,
     ):
         self.projections = projections
         self.where = where
         self.source = source
         self.joins = joins or []
+        self.group_by = group_by
         self.order_by = order_by
         self.limit = limit
+        self.unions = []
 
-    def make_plan(self):
-        """
-        Order of operations:
-        1. Table scan from FROM clause
-        2. Apply JOINs
-        3. Apply WHERE
-        5. Apply projections (including aggregates)
-        6. Apply ORDER clause
-        7. Apply LIMIT
-        """
+        self.scopes = scopes or {}
 
-        plan = nx.DiGraph()
+        self._plan = None
+        self._output_op = None
+
+    def make_plan(self, plan=None):
+        plan = plan or nx.DiGraph()
+
+        def resolve_internal_reference(source, label):
+            source_op = source.as_operator()
+            plan.add_node(source_op, label=label)
+
+            if source.name() in self.scopes:
+                parent_node = self.scopes[source.name()]
+                plan.add_edge(parent_node, source_op, input_arg="rows")
+
+            return source_op
 
         # FROM
-        source_op = self.source.as_operator()
-        plan.add_node(source_op, label="FROM", is_root=True)
+        source_op = resolve_internal_reference(self.source, label="FROM")
 
         # JOIN
-        table_op = source_op
+        output_op = source_op
         for join in self.joins:
             join_op = join.as_operator()
             plan.add_node(join_op, label="JOIN")
-            plan.add_edge(table_op, join_op, input_arg="left_rows")
+            plan.add_edge(output_op, join_op, input_arg="left_rows")
 
-            join_to_op = join.to.as_operator()
-            # TODO: How do we make this its own node?
-            plan.add_node(join_to_op, label="FROM (join)", is_root=True)
+            join_to_op = resolve_internal_reference(join.to, label="FROM (join)")
             plan.add_edge(join_to_op, join_op, input_arg="right_rows")
 
             # Future operations are on the output of this operation
-            table_op = join_op
+            output_op = join_op
 
         # WHERE
         if self.where:
             filter_op = self.where.as_operator()
             plan.add_node(filter_op, label="Filter")
-            plan.add_edge(table_op, filter_op, input_arg="rows")
-            table_op = filter_op
+            plan.add_edge(output_op, filter_op, input_arg="rows")
+            output_op = filter_op
 
-        # Projections
-        project_op = self.projections.as_operator()
-        plan.add_node(project_op, label="Project")
-        plan.add_edge(table_op, project_op, input_arg="rows")
-        table_op = project_op
+        # GROUP BY
+        if self.group_by:
+            aggregate_op = self.group_by.as_operator()
+            plan.add_node(aggregate_op, label="Aggregate")
+            plan.add_edge(output_op, aggregate_op, input_arg="rows")
+            output_op = aggregate_op
+            # We can do the actual grouping here.... should this
+            # just be it's own operator? why not??????
+            # I feel like i already tried this though...
+        else:
+            # Scalar projections
+            project_op = self.projections.as_operator()
+            plan.add_node(project_op, label="Project")
+            plan.add_edge(output_op, project_op, input_arg="rows")
+            output_op = project_op
+
+        if self.unions:
+            union_op = UnionOperator()
+            plan.add_node(union_op, label="Union")
+            plan.add_edge(output_op, union_op, input_arg="rows", list_args=True)
+            for union in self.unions:
+                _, output = union.make_plan(plan)
+                plan.add_edge(output, union_op, input_arg="rows", list_args=True)
+
+            output_op = union_op
 
         if self.order_by:
             order_by_op = self.order_by.as_operator()
             plan.add_node(order_by_op, label="Order")
-            plan.add_edge(table_op, order_by_op, input_arg="rows")
-            table_op = order_by_op
+            plan.add_edge(output_op, order_by_op, input_arg="rows")
+            output_op = order_by_op
 
         if self.limit:
             limit_op = self.limit.as_operator()
             plan.add_node(limit_op, label="Limit")
-            plan.add_edge(table_op, limit_op, input_arg="rows")
-            table_op = limit_op
+            plan.add_edge(output_op, limit_op, input_arg="rows")
+            output_op = limit_op
 
-        return plan
+        return plan, output_op
+
+    def save_plan(self, plan):
+        plan, output_op = self.make_plan(plan)
+        self._plan = plan
+        self._output_op = output_op
 
     def __str__(self):
         return f"""
@@ -114,51 +157,21 @@ class SelectList(SelectClause):
         self.projections = projections
 
     def as_operator(self):
-        # TODO : It's not super smart to mix projections and aliases here..
-        # Do i need a new operator that just does the grouping part? That
-        # Would feed forward tuples that contained the grouping set of tuples..
-        # which could be kind of interesting! It should totally be its own node
-        # in the execution graph.... but splitting up the projecting and agg
-        # from the grouping part feels kind of annoying... hmm.....
-        is_scalar = all(p.is_scalar() for p in self.projections)
-
-        if is_scalar:
-            return self.scalar_projection()
-        else:
-            return self.aggregate_projection()
-
-    def scalar_projection(self):
         return ProjectOperator(
-            project=[p.scalar_tuple() for p in self.projections]
-        )
-
-    def aggregate_projection(self):
-        return AggregateOperator(
-            fields=[p.agg_tuple() for p in self.projections]
+            project=self.projections
         )
 
 
 class SelectProjection(SelectClause):
-    def __init__(self, expr, aggregate, alias):
+    def __init__(self, expr, alias):
         self.expr = expr
-        self.aggregate = aggregate
         self.alias = alias
 
-    def scalar_tuple(self):
-        return (
-            self.expr,
-            self.alias
-        )
+    def get_aggregated_fields(self):
+        return self.expr.get_aggregated_fields()
 
-    def agg_tuple(self):
-        return (
-            self.aggregate,
-            self.expr,
-            self.alias
-        )
-
-    def is_scalar(self):
-        return self.aggregate == Aggregates.SCALAR
+    def get_non_aggregated_fields(self):
+        return self.expr.get_non_aggregated_fields()
 
 
 class SelectFilter(SelectClause):
@@ -171,11 +184,69 @@ class SelectFilter(SelectClause):
         )
 
 
+class SelectReferenceSource(SelectClause):
+    def __init__(self, table_identifier):
+        self.table = table_identifier
+
+    def name(self):
+        return self.table.name
+
+    def as_operator(self):
+        return RenameScopeOperator(
+            scope_name=self.table.name
+        )
+
+
+class SelectFunctionSource(SelectClause):
+    def __init__(self, function_name, function_args, table_identifier):
+        self.function_name = function_name
+        self.function_args = function_args
+        self.table = table_identifier
+
+        # TODO : Move this into function / module!
+        if self.function_name not in ('GOOGLE_SHEET', 'GENERATE_SERIES', 'MIDI'):
+            raise RuntimeError(f"Unsupported table function: {self.function_name}")
+
+    def name(self):
+        return self.table.name
+
+    def as_operator(self):
+        if self.function_name == "GOOGLE_SHEET":
+            sheet_id = self.function_args[0]
+            tab_id = self.function_args[1] if len(self.function_args) == 2 else None
+
+            return GoogleSheetsOperator(
+                table=self.table,
+                sheet_id=sheet_id,
+                tab_id=tab_id
+            )
+        elif self.function_name == "GENERATE_SERIES":
+            count = self.function_args[0]
+            delay = self.function_args[1] if len(self.function_args) == 2 else None
+
+            return GenerateSeriesOperator(
+                table=self.table,
+                count=count,
+                delay=delay,
+            )
+        elif self.function_name == "MIDI":
+            fname = self.function_args[0]
+
+            return MIDIOperator(
+                table=self.table,
+                fname=fname,
+            )
+
+
+
 class SelectFileSource(SelectClause):
     def __init__(self, file_path, table_identifier, columns):
         self.file_path = file_path
         self.table_identifier = table_identifier
         self.columns = columns
+
+    def name(self):
+        return self.table_identifier.name
 
     def as_operator(self):
         return TableScanOperator(
@@ -190,6 +261,9 @@ class SelectMemorySource(SelectClause):
         self.table_identifier = table_identifier
         self.rows = rows
 
+    def name(self):
+        return self.table_identifier.name
+
     def as_operator(self):
         return TableGenOperator(
             table=self.table_identifier,
@@ -198,16 +272,34 @@ class SelectMemorySource(SelectClause):
 
 
 class SelectJoin(SelectClause):
-    def __init__(self, to, inner, expression, join_type):
+    def __init__(self, to, expression, join_type, join_strategy):
         self.to = to
-        self.inner = inner
         self.expression = expression
         self.join_type = join_type
+        self.join_strategy = join_strategy
 
     def as_operator(self):
-        return self.join_type.create(
-            inner=self.inner,
+        return self.join_strategy.create(
+            join_type=self.join_type,
             expression=self.expression
+        )
+
+    @classmethod
+    def new(cls, to, expression, join_type):
+        # TODO: Pick this dynamically?
+        join_strategy = JoinStrategy.NestedLoop
+        return cls(to, expression, join_type, join_strategy)
+
+
+class SelectGroupBy(SelectClause):
+    def __init__(self, group_by_list, projections):
+        self.group_by_list = group_by_list
+        self.projections = projections
+
+    def as_operator(self):
+        return AggregateOperator(
+            group_by_list=self.group_by_list,
+            projections=self.projections,
         )
 
 
@@ -222,6 +314,15 @@ class SelectOrder(SelectClause):
             order=order
         )
 
+    @classmethod
+    def parse_tokens(cls, string, loc, tokens):
+        order_by_list = []
+        for token in tokens:
+            order_by = SelectOrderBy.parse_tokens(token)
+            order_by_list.append(order_by)
+
+        return cls(order_by_list)
+
 
 class SelectOrderBy(SelectClause):
     def __init__(self, ascending, expression):
@@ -231,10 +332,22 @@ class SelectOrderBy(SelectClause):
     def as_tuple(self):
         return (self.ascending, self.expression)
 
+    @classmethod
+    def parse_tokens(cls, tokens):
+        ascending = True
+        if len(tokens) == 2:
+            ascending = tokens[1].upper() == 'ASC'
+
+        # TODO: Do we handle int literals here or elsewhere?
+        return cls(
+            ascending=ascending,
+            expression=tokens[0]
+        )
+
 
 class SelectLimit(SelectClause):
     def __init__(self, limit):
         self.limit = limit
 
     def as_operator(self):
-        return LimitOperator(limit=self.limit)
+        return LimitOperator(limit=self.limit.val)
