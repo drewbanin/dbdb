@@ -40,14 +40,18 @@ def number_to_note(number: int) -> tuple:
 
     return note, octave
 
+
 class MIDIConfig(OperatorConfig):
     def __init__(
         self,
         table,
-        fname,
+        function_args,
     ):
         self.table = table
-        self.fname = fname
+        if len(function_args) != 1:
+            raise RuntimeError("MIDI function expects 1 arg")
+
+        self.fname = function_args[0]
 
 
 class MIDIOperator(Operator):
@@ -55,6 +59,10 @@ class MIDIOperator(Operator):
 
     def name(self):
         return "MIDI Reader"
+
+    @classmethod
+    def function_name(cls):
+        return "MIDI"
 
     def details(self):
         return {

@@ -22,13 +22,15 @@ class GoogleSheetsConfig(OperatorConfig):
     def __init__(
         self,
         table,
-        sheet_id,
-        tab_id=None,
+        function_args,
     ):
         self.table = table
 
-        self.sheet_id = sheet_id
-        self.tab_id = tab_id
+        if len(function_args) not in [1, 2]:
+            raise RuntimeError("GOOGLE_SHEETS function expects 1 or 2 args")
+
+        self.sheet_id = function_args[0]
+        self.tab_id = function_args[1] if len(function_args) == 2 else None
 
         check_api_key()
         self.service = build("sheets", "v4", developerKey=API_KEY)
@@ -39,6 +41,10 @@ class GoogleSheetsOperator(Operator):
 
     def name(self):
         return "Google Sheet"
+
+    @classmethod
+    def function_name(cls):
+        return "GOOGLE_SHEET"
 
     def details(self):
         return {
