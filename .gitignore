@@ -12,3 +12,4 @@ credentials.json
 token.json
 *.mid
 *.midi
+.env.sh

@@ -154,6 +154,20 @@ const APHEX = `
 select * from midi('avril_14.mid')
 `.trim();
 
+const ALTMAN = `
+with music as (
+    select * from ask_gpt('Show the first 10 seconds of a 240bpm dubstep song using columns time (start time in seconds), freq (frequency of each note in hertz) and length (length of each note in seconds). Make sure that your song includes a "drop". You can include both a bass and melody track by using the value "bass" or "melody" in the instrument column.')
+)
+
+select
+    music.time::float as time,
+    music.length::float as length,
+    music.freq::float as freq,
+    func
+
+from music
+`.trim();
+
 const QUERIES = {
 
     DELAY: DELAY,
@@ -164,6 +178,7 @@ const QUERIES = {
     YOSHI: YOSHI,
     FAIRY: FAIRY,
     "AVRIL 14": APHEX,
+    ALTMAN: ALTMAN,
 }
 
 

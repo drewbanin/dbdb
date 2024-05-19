@@ -52,6 +52,7 @@ setup(
         'fastapi[all]==0.104.1',
         "uvicorn",
         "sse-starlette",
+        "openai",
 
         "google-api-python-client",
         "google-auth-httplib2",

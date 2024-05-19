@@ -1,12 +1,14 @@
 from dbdb.operators.google_sheets import GoogleSheetsOperator
 from dbdb.operators.midi import MIDIOperator
 from dbdb.operators.generate_series import GenerateSeriesOperator
+from dbdb.operators.llm import AskGPTOperator
 
 
 FUNCS = [
     GoogleSheetsOperator,
     MIDIOperator,
     GenerateSeriesOperator,
+    AskGPTOperator,
 ]
 
 FUNC_MAP = {f.function_name(): f for f in FUNCS}
