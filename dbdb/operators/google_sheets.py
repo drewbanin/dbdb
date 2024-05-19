@@ -3,15 +3,20 @@ from dbdb.tuples.rows import Rows
 from dbdb.const import ROOT_DIR
 
 import itertools
-import os.path
+import json
+import os
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+API_KEY = os.getenv('DBDB_GSHEETS_API_KEY')
+
+
+def check_api_key():
+    if not API_KEY:
+        raise RuntimeError("dbdb was not initialized with a gsheets API key & can't query google sheets :/")
+
 
 class GoogleSheetsConfig(OperatorConfig):
     def __init__(
@@ -25,28 +30,8 @@ class GoogleSheetsConfig(OperatorConfig):
         self.sheet_id = sheet_id
         self.tab_id = tab_id
 
-        creds = self._get_creds()
-        self.service = build("sheets", "v4", credentials=creds)
-
-    def _get_creds(self):
-        token_path = os.path.join(ROOT_DIR, "token.json")
-        creds_path = os.path.join(ROOT_DIR, "credentials.json")
-
-        print("GSHEETS - Getting creds")
-        creds = None
-        if os.path.exists(token_path):
-            print("GSHEETS - Getting creds from file")
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                print("GSHEETS - Getting creds - running oauth flow")
-                flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-                creds = flow.run_local_server(port=0)
-            with open(token_path, "w") as token:
-                token.write(creds.to_json())
-
-        return creds
+        check_api_key()
+        self.service = build("sheets", "v4", developerKey=API_KEY)
 
 
 class GoogleSheetsOperator(Operator):
@@ -115,13 +100,22 @@ class GoogleSheetsOperator(Operator):
         return [self.config.table.field(col) for col in cols[0]]
 
     async def run(self):
+        check_api_key()
+
         self.stats.update_start_running()
 
-        # self.reader = FileReader(self.config.table_ref)
         service = self.config.service
         sheet = service.spreadsheets()
 
-        fields = self.get_columns(sheet)
+        try:
+            fields = self.get_columns(sheet)
+        except HttpError as e:
+            err_data = json.loads(e.content).get('error', {})
+            err_code = err_data.get('code', 'Unknown')
+            err_status = err_data.get('status', 'Unknown')
+            err_msg = err_data.get('message', 'Unknown')
+            raise RuntimeError(f"{err_status} ({err_code}): {err_msg}")
+
         iterator = self.make_iterator(sheet, fields)
 
         return Rows(
