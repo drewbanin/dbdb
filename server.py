@@ -231,4 +231,6 @@ async def explain_query(query: Query):
         "edges": parents,
     }
 
-
+@app.get("/healthcheck")
+def healthcheck():
+    return {"status": "ok"}

@@ -1,0 +1,16 @@
+fly.toml
+web/dbdb/node_modules
+env/
+.git
+
+**/*.pyc
+**/*.pyo
+**/*.mo
+.gitignore
+.git/
+**/__pycache__/
+Dockerfile
+db.sqlite3
+**/*.md
+
+.env.sh

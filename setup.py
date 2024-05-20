@@ -20,7 +20,7 @@ with open(os.path.join(this_directory, 'README.md')) as f:
 
 package_name = "dbdb"
 package_version = "0.0.1"
-description = "The Drew Banin database (dbdb)"
+description = "dbdb is a columnar database and musical instrument"
 
 
 setup(
@@ -32,34 +32,9 @@ setup(
     long_description_content_type='text/markdown',
 
     author="Drew Banin",
-    author_email="drew@dbtlabs.com",
+    author_email="drewbanin@gmail.com",
     url="https://github.com/drewbanin/dbdb",
     packages=find_namespace_packages(include='dbdb'),
-    entry_points={
-        'console_scripts': [
-            'dbdb-cli=dbdb:cli',
-            'dbdb-server=dbdb:server'
-        ]
-    },
-    install_requires=[
-        # TODO
-        'hexdump==3.3',
-        'networkx==2.8',
-        #'pyparsing==3.0.8',
-        'pyparsing',
-        'tabulate==0.8.9',
-        'Pympler==1.0.1',
-        'fastapi[all]==0.104.1',
-        "uvicorn",
-        "sse-starlette",
-        "openai",
-
-        "google-api-python-client",
-        "google-auth-httplib2",
-        "google-auth-oauthlib",
-
-        'mido',
-    ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: Apache Software License',
