@@ -5,6 +5,7 @@ import { postRequest } from '../Client.js';
 import { QueryContext } from '../Store.js';
 import { usePub } from '../Hooks.js';
 import { cleanDag } from '../DAG.js';
+import { makeRoute } from '../routes.js';
 
 import Editor, { useMonaco, loader } from '@monaco-editor/react';
 import CodeTheme from './theme.json';
@@ -84,7 +85,8 @@ function QueryComponent() {
 
     useEffect(() => {
       console.log("Creating SSE stream")
-      const sse = new EventSource('http://localhost:8000/stream', { withCredentials: false });
+      const route = makeRoute('stream');
+      const sse = new EventSource(route, { withCredentials: false });
       sse.onmessage = e => {
         const payload = JSON.parse(e.data);
 

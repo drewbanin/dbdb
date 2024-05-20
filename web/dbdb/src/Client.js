@@ -1,7 +1,9 @@
 
+import { makeRoute } from './routes.js';
+
 function postRequest(path, body, callback) {
     fetch(
-        `http://localhost:8000/${path}`,
+        makeRoute(path),
         {
            method: 'POST',
            body: JSON.stringify(body),
