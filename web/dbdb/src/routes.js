@@ -1,8 +1,8 @@
 
 export function makeRoute(path) {
-    if (process.env.NODE_ENV == 'production') {
-        return `/${path}`;
-    } else {
+    if (window.location.host.startsWith('localhost')) {
         return `http://localhost:8000/${path}`;
+    } else {
+        return `/${path}`;
     }
 }
