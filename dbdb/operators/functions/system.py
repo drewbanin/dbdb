@@ -1,13 +1,12 @@
 
 import math
-import numpy as np
 import asyncio
 
 class DBDB_SIN:
     @classmethod
     def eval(cls, args, row):
         value = args[0].eval(row)
-        return np.sin(value)
+        return math.sin(value)
 
 
 class DBDB_SQR:
@@ -17,7 +16,7 @@ class DBDB_SQR:
     @classmethod
     def eval(cls, args, row):
         value = args[0].eval(row)
-        value = np.sin(value)
+        value = math.sin(value)
         if value > 0:
             return 1
         else:

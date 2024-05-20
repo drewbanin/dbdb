@@ -3,7 +3,6 @@ from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows
 
 import asyncio
-import numpy as np
 
 class GenerateSeriesConfig(OperatorConfig):
     def __init__(
@@ -31,7 +30,7 @@ class GenerateSeriesOperator(Operator):
         return "GENERATE_SERIES"
 
     async def make_iterator(self):
-        buffer = np.arange(self.config.count)
+        buffer = range(self.config.count)
         for i in buffer:
             row = (int(i),)
             self.stats.update_row_processed(row)

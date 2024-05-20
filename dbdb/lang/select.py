@@ -3,7 +3,6 @@ from dbdb.operators.sorting import SortOperator
 from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
 from dbdb.operators.project import ProjectOperator
-from dbdb.operators.music import PlayMusicOperator
 from dbdb.operators.union import UnionOperator
 from dbdb.operators.joins import (
     NestedLoopJoinOperator,
@@ -37,7 +36,6 @@ class Select:
         ctes=None,
 
         scopes=None,
-        play_music=None,
     ):
         self.projections = projections
         self.where = where
