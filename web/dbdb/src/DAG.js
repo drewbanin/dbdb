@@ -30,6 +30,7 @@ const cleanDag = (data) => {
     const newNodes = nodes.filter(n => n.name !== 'Scope');
 
     return {
+        ...data,
         nodes: newNodes,
         edges: edges,
         query_id: query_id,

@@ -5,12 +5,14 @@ import networkx as nx
 import time
 import json
 import random
+import os
 from pydantic import BaseModel
 from typing import Dict, List
 
 from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from sse_starlette.sse import EventSourceResponse
 import asyncio
@@ -31,47 +33,123 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
-EVENTS = []
+EVENTS = {}
 STREAM_DELAY = 0.1  # second
+
+# This is a very fly.io way of making sure that requests
+# to stream responses get routed to the machine that
+# processed the original query. I wish this was less
+# coupled to fly.io specifically, but what can you do.
+FLY_MACHINE_UNSET = "local"
+FLY_MACHINE_ID = os.getenv('FLY_MACHINE_ID', FLY_MACHINE_UNSET)
+QUERY_CACHE = {}
+
+
+def push_cache(query_id, data):
+    QUERY_CACHE[query_id] = data
+
+
+def pop_cache(query_id):
+    if query_id not in QUERY_CACHE:
+        return
+
+    return QUERY_CACHE.pop(query_id)
+
+
+def add_event(query_id, payload):
+    if query_id not in EVENTS:
+        EVENTS[query_id] = [payload]
+    else:
+        EVENTS[query_id].append(payload)
+
+
+def pop_events(query_id):
+    event_list = EVENTS.get(query_id, [])
+
+    # This looks dumb but is actually smart. We need to pop
+    # from the left of the queue at the same time that another
+    # task could be adding to the right of the queue. Instead
+    # of looping over the list, snapshot the elements to pop
+    # up-front and then loop that last. We'll get the other
+    # elements on the next task.
+    num_events = len(event_list)
+    for i in range(num_events):
+        event = event_list.pop(0)
+
+        event_type = event['event']
+        is_done = (event_type == 'QueryComplete')
+
+        yield {
+            "id": int(time.time()),
+            "event": "message",
+            "data": json.dumps(event),
+        }, is_done
+
+
+def unset_query(query_id):
+    del QUERY_CACHE[query_id]
+    del EVENTS[query_id]
+
+
+@app.middleware("http")
+async def check_machine_id(request: Request, call_next):
+    machine_id = request.query_params.get('machine_id')
+    if FLY_MACHINE_ID == FLY_MACHINE_UNSET:
+        return await call_next(request)
+
+    elif not machine_id:
+        return await call_next(request)
+
+    elif FLY_MACHINE_ID == machine_id:
+        return await call_next(request)
+
+    else:
+        return JSONResponse(
+            content={},
+            headers={
+                "fly-replay": f"instance={machine_id}"
+            }
+        )
 
 
 @app.get('/stream')
-async def message_stream(request: Request):
+async def message_stream(request: Request, query_id: str):
+    print(f"Client connected (query={query_id})")
     async def event_generator():
-        while True:
+        more_events = True
+        while more_events:
             # If client closes connection, stop sending events
             if await request.is_disconnected():
+                print(f"Client disconnected (query={query_id})")
                 break
 
-            # Checks for new messages and return them to client if any
-            if len(EVENTS) > 0:
-                num_events = len(EVENTS)
-                for i in range(num_events):
-                    event = EVENTS.pop(0)
-                    yield {
-                        "event": "message",
-                        "id": int(time.time()),
-                        "data": json.dumps(event),
-                    }
+            for (event, is_done) in pop_events(query_id):
+                yield event
+                if is_done:
+                    more_events = False
+                    break
 
             await asyncio.sleep(STREAM_DELAY)
+
+        unset_query(query_id)
+        print(f"Client request completed (query={query_id})")
 
     return EventSourceResponse(event_generator())
 
 
-async def _do_run_query(plan, nodes):
+async def _do_run_query(query_id, plan, nodes):
     start_time = time.time()
     row_iterators: Dict[str, List] = {}
 
     # Sample stats
-
-    EVENTS.append({
+    add_event(query_id, {
         "event": "QueryStart",
         "data": {
-            "id": id(plan),
+            "id": query_id,
         }
     })
 
@@ -81,7 +159,7 @@ async def _do_run_query(plan, nodes):
             if random.random() > 0.05:
                 return
 
-        EVENTS.append({
+        add_event(query_id, {
             "event": event_name,
             "name": name,
             "data": stat
@@ -111,10 +189,10 @@ async def _do_run_query(plan, nodes):
     output_consumer = output.consume()
 
     columns = [f.name for f in output.fields]
-    EVENTS.append({
+    add_event(query_id, {
         "event": "ResultSchema",
         "data": {
-            "id": id(plan),
+            "id": query_id,
             "columns": columns,
         }
     })
@@ -123,20 +201,20 @@ async def _do_run_query(plan, nodes):
     async for row in output_consumer:
         batch.append(row.as_tuple())
         if len(batch) == 1000:
-            EVENTS.append({
+            add_event(query_id, {
                 "event": "ResultRows",
                 "data": {
-                    "id": id(plan),
+                    "id": query_id,
                     "rows": batch
                 }
             })
             batch = []
     # flush the remaining items in the batch
     if len(batch) > 0:
-        EVENTS.append({
+        add_event(query_id, {
             "event": "ResultRows",
             "data": {
-                "id": id(plan),
+                "id": query_id,
                 "rows": batch
             }
         })
@@ -144,12 +222,7 @@ async def _do_run_query(plan, nodes):
     await output.display()
 
     data = await output.as_table()
-    EVENTS.append({
-        "event": "QueryComplete",
-        "data": {
-            "id": id(plan),
-        }
-    })
+    push_cache(query_id, data)
 
     total_bytes_read = 0
     for node in nodes:
@@ -159,25 +232,33 @@ async def _do_run_query(plan, nodes):
     end_time = time.time()
     elapsed = end_time - start_time
 
-    EVENTS.append({
+    add_event(query_id, {
         "event": "QueryStats",
         "data": {
-            "id": id(plan),
+            "id": query_id,
             "elapsed": elapsed,
             "bytes_read": total_bytes_read,
         }
     })
 
+    add_event(query_id, {
+        "event": "QueryComplete",
+        "data": {
+            "id": query_id,
+        }
+    })
 
-async def do_run_query(plan, nodes):
+
+
+async def do_run_query(query_id, plan, nodes):
     try:
-        await _do_run_query(plan, nodes)
+        await _do_run_query(query_id, plan, nodes)
     except (RuntimeError, TypeError, ValueError) as e:
         print("GOT AN ERROR!", e)
-        EVENTS.append({
+        add_event(query_id, {
             "event": "QueryError",
             "data": {
-                "id": id(plan),
+                "id": query_id,
                 "error": str(e)
             }
         })
@@ -186,6 +267,7 @@ async def do_run_query(plan, nodes):
 @app.post("/query")
 async def run_query(query: Query, background_tasks: BackgroundTasks):
     sql = query.sql
+
     try:
         select = dbdb.lang.lang.parse_query(sql)
         plan = select._plan
@@ -199,10 +281,12 @@ async def run_query(query: Query, background_tasks: BackgroundTasks):
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
 
-    background_tasks.add_task(do_run_query, plan, nodes)
+    query_id = str(id(plan))
+    background_tasks.add_task(do_run_query, query_id, plan, nodes)
 
     return {
-        "query_id": id(plan),
+        "query_id": query_id,
+        "machine_id": FLY_MACHINE_ID,
         "nodes": [node.to_dict() for node in nodes],
         "edges": parents,
     }
@@ -225,8 +309,9 @@ async def explain_query(query: Query):
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
 
+    query_id = id(plan)
     return {
-        "query_id": id(plan),
+        "query_id": query_id,
         "nodes": [node.to_dict() for node in nodes],
         "edges": parents,
     }

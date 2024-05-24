@@ -84,8 +84,17 @@ function QueryComponent() {
     const publish = usePub();
 
     useEffect(() => {
-      console.log("Creating SSE stream")
-      const route = makeRoute('stream');
+      if (!nodeData || !nodeData.query_id) {
+          console.log("No query id set - not streaming", nodeData)
+          return;
+      }
+
+      const queryId = nodeData.query_id;
+      const machineId = nodeData.machine_id;
+      console.log("Creating SSE stream for query:", queryId, "and machine:", machineId)
+      const routePrefix = makeRoute('stream');
+      const route = routePrefix + "?query_id=" + queryId + "&machine_id=" + machineId;
+
       const sse = new EventSource(route, { withCredentials: false });
       sse.onmessage = e => {
         const payload = JSON.parse(e.data);
@@ -121,16 +130,16 @@ function QueryComponent() {
             publish(event, data, payload);
         }
       }
-      sse.onerror = (e) => {
+      sse.onerror = (e, data) => {
         // error log here
-        console.log("ERROR:", e);
-        // sse.close();
+        console.log("closing SSE")
+        sse.close();
       }
       return () => {
         console.log("closing SSE")
         sse.close();
       };
-    }, []);
+    }, [nodeData]);
 
     const queryOptions = QUERIES;
 
