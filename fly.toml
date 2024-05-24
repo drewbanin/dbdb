@@ -24,7 +24,7 @@ primary_region = 'ewr'
   grace_period = "1s"
   interval = "10s"
   method = "GET"
-  path = "/healtcheck"
+  path = "/healthcheck"
   timeout = "2s"
 
 [[vm]]
