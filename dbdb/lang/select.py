@@ -65,7 +65,14 @@ class Select:
             return source_op
 
         # FROM
-        source_op = resolve_internal_reference(self.source, label="FROM")
+        source_op = None
+        if self.source is None:
+            source_op = SelectMemorySource(
+                table_identifier="EmptyTable",
+                rows=1
+            ).as_operator()
+        else:
+            source_op = resolve_internal_reference(self.source, label="FROM")
 
         # JOIN
         output_op = source_op

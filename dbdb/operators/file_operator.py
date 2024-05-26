@@ -77,7 +77,7 @@ class TableScanOperator(Operator):
         )
 
 
-class TableGenOperator(OperatorConfig):
+class TableGenOperatorConfig(OperatorConfig):
     def __init__(
         self,
         table,
@@ -88,7 +88,26 @@ class TableGenOperator(OperatorConfig):
 
 
 class TableGenOperator(Operator):
-    Config = TableGenOperator
+    Config = TableGenOperatorConfig
+
+    def name(self):
+        return "Row Generator"
+
+    async def make_iterator(self):
+        record = []
+        self.stats.update_row_processed(record)
+        yield record
+        self.stats.update_row_emitted(record)
+        self.stats.update_done_running()
 
     async def run(self):
-        return self.config.rows
+        self.stats.update_start_running()
+
+        columns = []
+        iterator = self.make_iterator()
+
+        return Rows(
+            self.config.table,
+            columns,
+            iterator,
+        )

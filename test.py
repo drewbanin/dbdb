@@ -254,13 +254,11 @@ union
 select i from generate_series(2)
 """
 
-sql = badguy
-sql = scale
-sql = yoshi
-sql = avril
-sql = debug
+single_select = """
+select 1 as id
+"""
 
-sql = gerudo
+sql = single_select
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))
@@ -268,4 +266,4 @@ nodes = list(nx.topological_sort(select._plan))
 from server import _do_run_query
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(_do_run_query(select._plan, nodes))
+loop.run_until_complete(_do_run_query("abc123", select._plan, nodes))
