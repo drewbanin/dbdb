@@ -9,11 +9,13 @@ from dbdb.io.types import (
     DataType,
     DataEncoding,
     DataCompression,
-    DataSorting
+    DataSorting,
+    DEFAULT_STRING_SIZE,
 )
 
 from dbdb.io import constants
 from dbdb.io import encoder, compressor
+from typing import Optional
 
 
 def sort_together(sort_index, to_sort):
@@ -40,21 +42,22 @@ def pack(buffers):
 class ColumnInfo(object):
     def __init__(
         self,
-        column_type,
-        column_name,
+        column_type: DataType,
+        column_name: str,
 
-        encoding=None,
-        sorting=None,
-        compression=None,
-        column_width=None,
-        column_data_size=None
+        encoding: DataEncoding = None,
+        sorting: DataSorting = None,
+        compression: DataCompression = None,
+        column_width: Optional[int] = None,
+        column_data_size: Optional[int] = None
     ):
         self.column_type = column_type
 
+        column_width = column_width or 0
         if self.column_type == DataType.STR and column_width > 0:
             self.column_width = column_width
         elif self.column_type == DataType.STR:
-            self.column_width = DataType.DEFAULT_STRING_SIZE
+            self.column_width = DEFAULT_STRING_SIZE
         else:
             self.column_width = 0
 
@@ -480,3 +483,15 @@ def read_pages(reader, columns):
             page_iterators.append(iterator)
 
         yield from zip(*page_iterators)
+
+def infer_type(value):
+    if type(value) == int:
+        return DataType.INT32
+    elif type(value) == float:
+        return DataType.FLOAT
+    elif type(value) == str:
+        return DataType.STR
+    elif type(value) == bool:
+        return DataType.BOOL
+    else:
+        raise RuntimeError(f"Cannot infer column type for value: {value} ({type(value)})")

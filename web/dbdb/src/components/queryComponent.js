@@ -27,8 +27,10 @@ function QueryComponent() {
     const [ rowSchema, setSchema ] = schema;
     const [ nodeData, setNodeData ] = nodes;
     const [ nodeStatData, setNodeStatData ] = nodeStats;
+
     const [ errorData, setError ] = error;
 
+    const [ queryStatus, setQueryStatus ] = useState(null);
     const [ queryRunning, setQueryRunning ] = useState(false);
 
     loader.init().then((monaco) => {
@@ -39,6 +41,7 @@ function QueryComponent() {
         if (queryRunning) return;
 
         setError(null);
+        setQueryStatus(null);
         setNodeData(null);
         setRows([]);
 
@@ -115,6 +118,8 @@ function QueryComponent() {
         } else if (event === "QueryComplete") {
             publish("QUERY_COMPLETE", data.id);
             setQueryRunning(false);
+        } else if (event === "QueryMutationStatus") {
+             setQueryStatus(data.status);
         } else if (event === "QueryError") {
             // setResult(null);
             setQueryRunning(false);
@@ -209,26 +214,11 @@ function QueryComponent() {
                 {errorData && <div className="queryError">
                     <strong>Query Error:</strong> {errorData.error}
                 </div>}
+                {!errorData && queryStatus && <div className="queryStatus">
+                    <strong>Status:</strong> {queryStatus}
+                </div>}
             </div>
         </>
-
-
-        /*
-         *
-                <MonacoEditor
-                  value={queryText}
-                  defaultValue={queryText}
-                  language="sql"
-                />
-         *
-                  padding={15}
-                  style={{
-                    fontSize: 14,
-                    backgroundColor: "white",
-                    fontFamily: 'MonaspaceNeon',
-                    height: '100%',
-                  }}
-        */
     )
 }
 

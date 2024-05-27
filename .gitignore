@@ -13,3 +13,4 @@ token.json
 *.mid
 *.midi
 .env.sh
+data/*.dumb

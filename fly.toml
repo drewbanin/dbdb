@@ -28,3 +28,8 @@ primary_region = 'ewr'
 [[statics]]
   guest_path = "/workspace/web/dbdb/build/"
   url_prefix = "/"
+
+[mounts]
+  source = "dbdb-data"
+  destination = "/dbdb-data"
+  initial_size = "1gb"

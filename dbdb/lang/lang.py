@@ -15,6 +15,23 @@ from dbdb.lang.expr_types import (
     JoinCondition,
 )
 
+from dbdb.lang.select import (
+    Select,
+    SelectList,
+    SelectProjection,
+    SelectFilter,
+    SelectFileSource,
+    SelectFunctionSource,
+    SelectReferenceSource,
+    SelectMemorySource,
+    SelectJoin,
+    SelectGroupBy,
+    SelectOrder,
+    SelectOrderBy,
+    SelectLimit,
+    CreateTableAs
+)
+
 from dbdb.tuples.identifiers import (
     TableIdentifier,
     FieldIdentifier,
@@ -78,6 +95,10 @@ AS = pp.CaselessKeyword("AS")
 ON = pp.CaselessKeyword("ON")
 AND = pp.CaselessKeyword("AND")
 OR = pp.CaselessKeyword("OR")
+
+
+CREATE = pp.CaselessKeyword("CREATE")
+TABLE = pp.CaselessKeyword("TABLE")
 
 IS = pp.CaselessKeyword("IS").setParseAction(handle_is)
 IS_NOT = (IS + pp.CaselessKeyword("NOT")).setParseAction(handle_is_not)
@@ -528,28 +549,24 @@ SELECT_STATEMENT << (
     )("limit").setName('limit')
 )
 
-SELECT_GRAMMAR = (
+CREATE_TABLE_AS_STATEMENT = pp.Group(
+    CREATE +
+    TABLE +
+    TABLE_IDENT("table_name") +
+    AS +
+    LPAR +
+    pp.Group(SELECT_STATEMENT)("table_select") +
+    RPAR
+)("create")
+
+GRAMMAR = (
     pp.stringStart() +
-    SELECT_STATEMENT +
+    (
+        CREATE_TABLE_AS_STATEMENT
+        | SELECT_STATEMENT
+    ) +
     pp.stringEnd()
 )
-
-from dbdb.lang.select import (
-    Select,
-    SelectList,
-    SelectProjection,
-    SelectFilter,
-    SelectFileSource,
-    SelectFunctionSource,
-    SelectReferenceSource,
-    SelectMemorySource,
-    SelectJoin,
-    SelectGroupBy,
-    SelectOrder,
-    SelectOrderBy,
-    SelectLimit,
-)
-
 
 def extract_projections(ast):
     projections = []
@@ -719,8 +736,7 @@ def make_select_from_scope(ast, scopes):
     elif ast.union:
         unions, select = extract_unions(ast)
     else:
-        import ipdb; ipdb.set_trace()
-        pass
+        raise RuntimeError("Saw a SELECT that is niether a single select or union?")
 
     select = make_select_from_ast(select, scopes)
 
@@ -745,14 +761,26 @@ def ast_to_select_obj(ast):
     return select
 
 
+def ast_to_create_obj(ast):
+    ast = ast.create
+
+    table_ident = ast.table_name
+    table_select_ast = ast.table_select
+    table_select_obj = ast_to_select_obj(table_select_ast)
+
+    ctas = CreateTableAs(
+        table_name=table_ident.table_name,
+        select=table_select_obj
+    )
+
+    ctas.save_plan()
+    return ctas
+
+
 def parse_query(query):
-    """
-    Expected format
-        SELECT
-            <column>, [<column>, ...]
-        FROM <table path>
-        [LIMIT <count>]
-    """
-    ast = SELECT_GRAMMAR.parseString(query)
-    select_obj = ast_to_select_obj(ast)
-    return select_obj
+    ast = GRAMMAR.parseString(query)
+    if ast.create:
+        query = ast_to_create_obj(ast)
+    else:
+        query = ast_to_select_obj(ast)
+    return query

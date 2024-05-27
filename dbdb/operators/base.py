@@ -43,6 +43,9 @@ class Operator:
     def name(self):
         raise NotImplementedError()
 
+    def is_mutation(self):
+        return False
+
     def details(self):
         return {}
 

@@ -14,10 +14,17 @@ class FileHandleProxy:
         self.bytes_read = 0
         self.reads = 0
 
+        self.bytes_written = 0
+        self.writes = 0
+
+        # Set after initialization for reads
+        self.size = 0
+
+    def read_size(self):
         # Initialize file size (for stats)
-        fh.seek(0, 2)
-        self.size = fh.tell()
-        fh.seek(0)
+        self.fh.seek(0, 2)
+        self.size = self.fh.tell()
+        self.fh.seek(0)
 
     def read(self, count):
         if count is None:
@@ -29,6 +36,16 @@ class FileHandleProxy:
 
         return self.fh.read(count)
 
+    def write(self, data):
+        if data is None:
+            raise RuntimeError("called write() with no data")
+
+        # Keep track of scans
+        self.bytes_written += len(data)
+        self.writes += 1
+
+        return self.fh.write(data)
+
     def tell(self):
         return self.fh.tell()
 
@@ -37,9 +54,16 @@ class FileHandleProxy:
 
     def stats(self):
         return {
+            # Reads
             'bytes_read': self.bytes_read,
-            'bytes_total': self.size,
             'reads': self.reads,
+
+            # Writes
+            'bytes_written': self.bytes_written,
+            'writes': self.writes,
+
+            # Progress (reads)
+            'bytes_total': self.size,
             'bytes_read_pct': self.bytes_read / self.size,
         }
 
@@ -47,16 +71,26 @@ class FileHandleProxy:
 class FileReader:
     def __init__(self, table_ref):
         self.table_ref = table_ref
+        self.table_path = self.make_path(table_ref)
         self.handle = None
 
+    @classmethod
+    def make_path(cls, table_name):
+        return f"data/{table_name}.dumb"
+
     @contextmanager
-    def open(self):
-        with open(self.table_ref, 'rb') as fh:
+    def open(self, mode='rb'):
+        with open(self.table_path, mode) as fh:
             self.handle = FileHandleProxy(fh)
+            if mode == 'rb':
+                self.handle.read_size()
             yield self.handle
 
     def read(self, count=None):
         self.handle.read(count)
+
+    def write(self, data):
+        self.handle.write(data)
 
     def stats(self):
         return self.handle.stats()

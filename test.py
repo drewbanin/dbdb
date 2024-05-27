@@ -258,7 +258,15 @@ single_select = """
 select 1 as id
 """
 
-sql = single_select
+ctas = """
+create table debug as (
+    select 1 as id, 'drew' as name
+    union
+    select 2 as id, 'tiff' as name
+)
+"""
+
+sql = ctas
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))

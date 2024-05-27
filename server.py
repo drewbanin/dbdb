@@ -188,19 +188,20 @@ async def _do_run_query(query_id, plan, nodes):
     output = row_iterators[leaf_node]
     output_consumer = output.consume()
 
-    columns = [f.name for f in output.fields]
-    add_event(query_id, {
-        "event": "ResultSchema",
-        "data": {
-            "id": query_id,
-            "columns": columns,
-        }
-    })
+    if not leaf_node.is_mutation():
+        columns = [f.name for f in output.fields]
+        add_event(query_id, {
+            "event": "ResultSchema",
+            "data": {
+                "id": query_id,
+                "columns": columns,
+            }
+        })
 
     batch = []
     async for row in output_consumer:
         batch.append(row.as_tuple())
-        if len(batch) == 1000:
+        if len(batch) == 1000 and not leaf_node.is_mutation():
             add_event(query_id, {
                 "event": "ResultRows",
                 "data": {
@@ -210,7 +211,7 @@ async def _do_run_query(query_id, plan, nodes):
             })
             batch = []
     # flush the remaining items in the batch
-    if len(batch) > 0:
+    if len(batch) > 0 and not leaf_node.is_mutation():
         add_event(query_id, {
             "event": "ResultRows",
             "data": {
@@ -219,7 +220,7 @@ async def _do_run_query(query_id, plan, nodes):
             }
         })
 
-    await output.display()
+    # await output.display()
 
     data = await output.as_table()
     push_cache(query_id, data)
@@ -241,13 +242,23 @@ async def _do_run_query(query_id, plan, nodes):
         }
     })
 
+    if leaf_node.is_mutation():
+        status = leaf_node.status_line()
+
+        add_event(query_id, {
+            "event": "QueryMutationStatus",
+            "data": {
+                "id": query_id,
+                "status": f"{status} in {elapsed:0.2f}s"
+            }
+        })
+
     add_event(query_id, {
         "event": "QueryComplete",
         "data": {
             "id": query_id,
         }
     })
-
 
 
 async def do_run_query(query_id, plan, nodes):

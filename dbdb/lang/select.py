@@ -13,6 +13,7 @@ from dbdb.operators.joins import (
 
 from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
+from dbdb.operators.create import CreateTableAsOperator
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
 from dbdb.expressions import Expression, Equality, EqualityTypes
@@ -150,9 +151,50 @@ class Select:
         """
 
 
+class CreateTableAs:
+    def __init__(
+        self,
+        table_name,
+        select,
+    ):
+        self.table_name = table_name
+        self.select = select
+
+        self._plan = None
+        self._output_op = None
+
+    def save_plan(self):
+        plan, output_op = self.make_plan()
+        self._plan = plan
+        self._output_op = output_op
+
+    def make_plan(self):
+        plan = self.select._plan
+        select_output_op = self.select._output_op
+
+        create_op = CreateTableAsClause(
+            table_name = self.table_name
+        ).as_operator()
+
+        plan.add_node(create_op, label="Create")
+        plan.add_edge(select_output_op, create_op, input_arg="rows")
+
+        return plan, create_op
+
+
 class SelectClause:
     def as_operator(self):
         raise NotImplementedError()
+
+
+class CreateTableAsClause(SelectClause):
+    def __init__(self, table_name):
+        self.table_name = table_name
+
+    def as_operator(self):
+        return CreateTableAsOperator(
+            table_name=self.table_name
+        )
 
 
 class SelectList(SelectClause):
