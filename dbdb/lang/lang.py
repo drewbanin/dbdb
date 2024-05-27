@@ -795,7 +795,7 @@ def ast_to_select_obj(ast):
 def ast_to_create_obj(ast):
     ast = ast.create
 
-    table_ident = ast.table_name
+    table_source = ast.table_name
     table_select_ast = ast.table_select
     table_select_obj = ast_to_select_obj(table_select_ast)
 
@@ -807,7 +807,7 @@ def ast_to_create_obj(ast):
     )
 
     ctas = CreateTableAs(
-        table=table_ident,
+        table=table_id,
         select=table_select_obj
     )
 

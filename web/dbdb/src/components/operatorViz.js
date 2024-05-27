@@ -23,7 +23,7 @@ const getLayoutedElements = (nodes, edges, options) => {
     rankdir: options.direction,
     nodesep: 100,
     edgesep: 100,
-    ranksep: 50,
+    ranksep: 100,
   });
 
   edges.forEach((edge) => g.setEdge(edge.source, edge.target));

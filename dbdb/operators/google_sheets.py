@@ -48,7 +48,7 @@ class GoogleSheetsOperator(Operator):
 
     def details(self):
         return {
-            "table": self.config.tab_id,
+            "sheet_tab_id": self.config.tab_id,
             "columns": [],
         }
 

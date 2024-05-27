@@ -21,7 +21,9 @@ export const OperatorNode = ({ data }) => {
   const rows_processed = formatNumber(statData.rows_processed, 0);
   const rows_emitted = formatNumber(statData.rows_emitted, 0);
   const elapsed = formatNumber(statData.elapsed_time);
+
   const table_name = (data.details || {}).qualified_table_name;
+  const tab_name = (data.details || {}).sheet_tab_id;
 
   const getCustomStat = (statData, statName, formatFunc) => {
       if (!statData || !statData.custom) {
@@ -53,7 +55,10 @@ export const OperatorNode = ({ data }) => {
         <div className="operator-stats">
             <ul>
                 {!!table_name && (
-                    <li>FILE: {table_name}</li>
+                    <li>NAME: {table_name}</li>
+                )}
+                {!!tab_name && (
+                    <li>NAME: {tab_name}</li>
                 )}
                 <li>PROG: {state.toUpperCase()}</li>
                 <li>ROWS: {rows_emitted}</li>

@@ -259,10 +259,8 @@ select 1 as id
 """
 
 ctas = """
-create table mydb.my_schema.debug as (
-    select 1 as id, 'drew' as name
-    union
-    select 2 as id, 'tiff' as name
+create table dbdb.my_schema.debug_tbl as (
+    select * from mydb.my_schema.debug
 )
 """
 
@@ -270,7 +268,7 @@ single_select = """
 select * from mydb.my_schema.debug
 """
 
-sql = single_select
+sql = ctas
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))
