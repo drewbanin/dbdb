@@ -163,8 +163,7 @@ class AggregateOperator(Operator):
                 grouped_fields.update(fields_to_group)
             else:
                 # GROUP BY <EXPR>
-                import ipdb; ipdb.set_trace()
-                pass
+                raise RuntimeError("Grouping by expressions is not current supported")
 
         scalar_fields = []
 

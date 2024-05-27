@@ -39,8 +39,11 @@ class ColumnIdentifier(ASTToken):
 
 
 class TableIdent(ASTToken):
-    def __init__(self, table_name, alias=None):
+    def __init__(self, table_name, schema=None, database=None, alias=None):
         self.table_name = table_name
+        self.schema = schema
+        self.database = database
+
         self.alias = alias
 
     def eval(self, row):

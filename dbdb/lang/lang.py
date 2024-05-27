@@ -211,6 +211,31 @@ def make_table_identifier(string, loc, toks):
     return TableIdent(table)
 
 
+def make_qualified_table_identifier(string, loc, toks):
+    table_parts = [t.table_name for t in toks[0]]
+
+    database = None
+    schema = None
+
+    if len(table_parts) == 1:
+        table_name = table_parts[0]
+
+    elif len(table_parts) == 2:
+        schema = table_parts[0]
+        table_name = table_parts[1]
+
+    elif len(table_parts) == 3:
+        database = table_parts[0]
+        schema = table_parts[1]
+        table_name = table_parts[2]
+
+    return TableIdent(
+        table_name=table_name,
+        schema=schema,
+        database=database
+    )
+
+
 def make_aliased_table_identifier(string, loc, toks):
     table = toks[0]
     if len(toks) > 1:
@@ -236,6 +261,10 @@ TABLE_IDENT = IDENT.copy() \
     .set_name("table_ident") \
     .setParseAction(make_table_identifier)
 
+
+NAMESPACED_TABLE_IDENT = pp.Group(
+    pp.delimitedList(TABLE_IDENT, delim=".", max=3)
+)("qualified_table_ident").setParseAction(make_qualified_table_identifier)
 
 
 
@@ -282,7 +311,8 @@ def call_window_function(string, loc, toks):
     func_expr = toks[0].func_expression
     agg_type = Aggregates.SCALAR
 
-    import ipdb; ipdb.set_trace()
+    raise RuntimeError("Window functions are not currently supported")
+
     return FunctionCall(func_name, func_expr, agg_type)
 
 
@@ -466,7 +496,7 @@ def make_join_clause(string, loc, tokens):
 
 
 ALIASED_TABLE_IDENT = (
-    TABLE_IDENT + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
+    NAMESPACED_TABLE_IDENT + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
 ).setParseAction(make_aliased_table_identifier)
 
 ALIASED_TABLE_FUNCTION = (
@@ -552,7 +582,7 @@ SELECT_STATEMENT << (
 CREATE_TABLE_AS_STATEMENT = pp.Group(
     CREATE +
     TABLE +
-    TABLE_IDENT("table_name") +
+    NAMESPACED_TABLE_IDENT("table_name") +
     AS +
     LPAR +
     pp.Group(SELECT_STATEMENT)("table_select") +
@@ -594,19 +624,20 @@ def extract_wheres(ast):
 
 
 def make_table_source(table_source):
-    table_name = table_source.table_name
-    table_alias = table_source.alias
-    table_id = TableIdentifier.new(table_name, table_alias)
+    table_id = TableIdentifier(
+        database=table_source.database,
+        schema=table_source.schema,
+        name=table_source.table_name,
+        alias=table_source.alias
+    )
 
-    fname = f"{table_source.table_name}.dumb"
-    reader = FileReader(fname)
+    reader = FileReader(table_id)
     column_data = file_format.read_header(reader)
     column_names = [c.column_name for c in column_data]
     columns = [table_id.field(name) for name in column_names]
 
     return SelectFileSource(
-        file_path=f"{table_id}.dumb",
-        table_identifier=table_id,
+        table=table_id,
         columns=columns,
     )
 
@@ -768,8 +799,15 @@ def ast_to_create_obj(ast):
     table_select_ast = ast.table_select
     table_select_obj = ast_to_select_obj(table_select_ast)
 
+    table_id = TableIdentifier(
+        database=table_source.database,
+        schema=table_source.schema,
+        name=table_source.table_name,
+        alias=table_source.alias
+    )
+
     ctas = CreateTableAs(
-        table_name=table_ident.table_name,
+        table=table_ident,
         select=table_select_obj
     )
 

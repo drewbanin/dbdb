@@ -17,7 +17,6 @@ class RowTuple:
         elif isinstance(data, (tuple, list)):
             self.data = data
         else:
-            import ipdb; ipdb.set_trace()
             raise RuntimeError(f"bad input to RowTuple: {data}")
 
     def field(self, name):

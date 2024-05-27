@@ -21,7 +21,7 @@ export const OperatorNode = ({ data }) => {
   const rows_processed = formatNumber(statData.rows_processed, 0);
   const rows_emitted = formatNumber(statData.rows_emitted, 0);
   const elapsed = formatNumber(statData.elapsed_time);
-  const table_name = (data.details || {}).table;
+  const table_name = (data.details || {}).qualified_table_name;
 
   const getCustomStat = (statData, statName, formatFunc) => {
       if (!statData || !statData.custom) {

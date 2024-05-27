@@ -10,9 +10,9 @@ import itertools
 class CreateTableAsConfig(OperatorConfig):
     def __init__(
         self,
-        table_name,
+        table,
     ):
-        self.table_name = table_name
+        self.table = table
 
 
 class CreateTableAsOperator(Operator):
@@ -80,11 +80,11 @@ class CreateTableAsOperator(Operator):
                 "table size is about a megabyte - sorry!"
             )
 
-        reader = FileReader(self.config.table_name)
+        reader = FileReader(self.config.table)
         with reader.open('wb') as fh:
             fh.write(table_data)
 
-        print(f"Done writing table {self.config.table_name}")
+        print(f"Done writing table {self.config.table}")
 
         self.rows_written = len(records)
 

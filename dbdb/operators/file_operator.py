@@ -16,13 +16,10 @@ class TableScanConfig(OperatorConfig):
 
         limit=None,
         order=None,
-        table=None,
     ):
         self.table_ref = table_ref
         self.limit = limit
         self.order = order
-
-        self.table = table
         self.columns = columns
 
 
@@ -35,6 +32,7 @@ class TableScanOperator(Operator):
     def details(self):
         return {
             "table": self.config.table_ref,
+            "qualified_table_name": str(self.config.table_ref),
             "columns": self.config.columns,
         }
 
@@ -71,7 +69,7 @@ class TableScanOperator(Operator):
         self.iterator = iterator
 
         return Rows(
-            self.config.table,
+            self.config.table_ref,
             self.config.columns,
             iterator,
         )

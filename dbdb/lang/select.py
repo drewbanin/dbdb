@@ -154,10 +154,10 @@ class Select:
 class CreateTableAs:
     def __init__(
         self,
-        table_name,
+        table,
         select,
     ):
-        self.table_name = table_name
+        self.table = table
         self.select = select
 
         self._plan = None
@@ -172,9 +172,7 @@ class CreateTableAs:
         plan = self.select._plan
         select_output_op = self.select._output_op
 
-        create_op = CreateTableAsClause(
-            table_name = self.table_name
-        ).as_operator()
+        create_op = CreateTableAsOperator(table=self.table)
 
         plan.add_node(create_op, label="Create")
         plan.add_edge(select_output_op, create_op, input_arg="rows")
@@ -185,16 +183,6 @@ class CreateTableAs:
 class SelectClause:
     def as_operator(self):
         raise NotImplementedError()
-
-
-class CreateTableAsClause(SelectClause):
-    def __init__(self, table_name):
-        self.table_name = table_name
-
-    def as_operator(self):
-        return CreateTableAsOperator(
-            table_name=self.table_name
-        )
 
 
 class SelectList(SelectClause):
@@ -260,18 +248,16 @@ class SelectFunctionSource(SelectClause):
 
 
 class SelectFileSource(SelectClause):
-    def __init__(self, file_path, table_identifier, columns):
-        self.file_path = file_path
-        self.table_identifier = table_identifier
+    def __init__(self, table, columns):
+        self.table = table
         self.columns = columns
 
     def name(self):
-        return self.table_identifier.name
+        return self.table.name
 
     def as_operator(self):
         return TableScanOperator(
-            table_ref=self.file_path,
-            table=self.table_identifier,
+            table_ref=self.table,
             columns=self.columns
         )
 

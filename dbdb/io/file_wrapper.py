@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import time
 import asyncio
 import os
+from pathlib import Path
 
 if os.path.exists("/dbdb-data"):
     DATA_DIR = "/dbdb-data"
@@ -75,22 +76,42 @@ class FileHandleProxy:
 
 
 class FileReader:
-    def __init__(self, table_ref):
-        self.table_ref = table_ref
-        self.table_path = self.make_path(table_ref)
+    def __init__(self, table):
+        self.table_ref = str(table)
+        self.table_path = self.make_path(table)
         self.handle = None
 
     @classmethod
-    def make_path(cls, table_name):
-        return f"{DATA_DIR}/{table_name}.dumb"
+    def make_path(cls, table):
+        parts = ['database', 'schema', 'name']
+        path = Path(DATA_DIR)
+
+        for part in parts:
+            value = getattr(table, part)
+            if part == 'name':
+                value = f"{value}.dumb"
+            elif value is None:
+                value = 'dbdb'
+
+            path = path / value
+
+        return path
 
     @contextmanager
     def open(self, mode='rb'):
-        with open(self.table_path, mode) as fh:
-            self.handle = FileHandleProxy(fh)
-            if mode == 'rb':
-                self.handle.read_size()
-            yield self.handle
+        if mode == 'rb' and not self.table_path.exists():
+            dir_path = self.table_path.parent
+            dir_path.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with open(self.table_path, mode) as fh:
+                self.handle = FileHandleProxy(fh)
+                if mode == 'rb':
+                    self.handle.read_size()
+                yield self.handle
+        except FileNotFoundError:
+            table_name = str(self.table_ref)
+            raise RuntimeError(f"Table `{table_name}` does not exist")
 
     def read(self, count=None):
         self.handle.read(count)
