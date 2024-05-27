@@ -4,9 +4,7 @@ dev:
 
 build-web:
 	echo "building web assets"
-	pushd .
 	cd ./web/dbdb && NODE_ENV=production npm run build
-	popd
 
 deploy-fly:
 	echo "deploying to fly.io"

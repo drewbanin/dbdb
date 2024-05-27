@@ -212,8 +212,8 @@ Button:disabled {
 .queryStatus {
     margin-top: 10px;
     padding: 10px;
-    border: 1px solid #0084dc44;
-    background-color: #0084dc66;
+    border: 1px solid #DEDEDE;
+    background-color: #EFEFEF;
     font-size: 12px;
 }
 

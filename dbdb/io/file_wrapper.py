@@ -5,6 +5,12 @@
 from contextlib import contextmanager
 import time
 import asyncio
+import os
+
+if os.path.exists("/dbdb-data"):
+    DATA_DIR = "/dbdb-data"
+else:
+    DATA_DIR = "./data"
 
 
 class FileHandleProxy:
@@ -76,7 +82,7 @@ class FileReader:
 
     @classmethod
     def make_path(cls, table_name):
-        return f"data/{table_name}.dumb"
+        return f"{DATA_DIR}/{table_name}.dumb"
 
     @contextmanager
     def open(self, mode='rb'):

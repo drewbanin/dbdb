@@ -1,5 +1,6 @@
 fly.toml
 web/dbdb/node_modules
+data/
 env/
 .git
 

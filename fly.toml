@@ -30,6 +30,6 @@ primary_region = 'ewr'
   url_prefix = "/"
 
 [mounts]
-  source = "dbdb-data"
+  source = "dbdata"
   destination = "/dbdb-data"
   initial_size = "1gb"
