@@ -1,9 +1,3 @@
-
-"""
-Describe file format here...
-"""
-
-
 import struct
 from dbdb.io.types import (
     DataType,
@@ -12,10 +6,16 @@ from dbdb.io.types import (
     DataSorting,
     DEFAULT_STRING_SIZE,
 )
+from dbdb.logger import logger
 
 from dbdb.io import constants
 from dbdb.io import encoder, compressor
 from typing import Optional
+
+
+"""
+Describe file format here...
+"""
 
 
 def sort_together(sort_index, to_sort):
@@ -180,10 +180,10 @@ class ColumnInfo(object):
         }
 
     def describe(self):
-        print(f"Column {self.column_name}")
-        print(f"  - Type={self.column_type} ({self.column_type.value})")
-        print(f"  - Encoding={self.encoding} ({self.encoding.value})")
-        print(f"  - Sorted?={self.sorting} ({self.sorting.value})")
+        logger.info(f"Column {self.column_name}")
+        logger.info(f"  - Type={self.column_type} ({self.column_type.value})")
+        logger.info(f"  - Encoding={self.encoding} ({self.encoding.value})")
+        logger.info(f"  - Sorted?={self.sorting} ({self.sorting.value})")
 
 
 class ColumnData(object):
@@ -214,8 +214,8 @@ class ColumnData(object):
             yield res
 
     def describe(self):
-        print(f"  - Size={self.size()}")
-        print(f"  - Data={list(self.data[0:10])}")
+        logger.info(f"  - Size={self.size()}")
+        logger.info(f"  - Data={list(self.data[0:10])}")
 
 
 class Column(object):

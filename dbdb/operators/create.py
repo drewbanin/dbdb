@@ -5,6 +5,8 @@ from dbdb.io.file_wrapper import FileReader
 from dbdb.operators.base import Operator, OperatorConfig, pipeline
 from dbdb.tuples.rows import Rows
 
+from dbdb.logger import logger
+
 import itertools
 
 class CreateTableAsConfig(OperatorConfig):
@@ -84,7 +86,7 @@ class CreateTableAsOperator(Operator):
         with reader.open('wb') as fh:
             fh.write(table_data)
 
-        print(f"Done writing table {self.config.table}")
+        logger.info(f"Done writing table {self.config.table}")
 
         self.rows_written = len(records)
 

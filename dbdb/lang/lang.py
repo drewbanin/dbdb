@@ -44,6 +44,8 @@ from dbdb.operators.union import UnionOperator
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
+from dbdb.logger import logger
+
 import math
 
 pp.ParserElement.enable_packrat()
@@ -71,10 +73,10 @@ class SelectQuery(object):
         self.limit = limit
 
     def describe(self):
-        print(f"Source table: {self.source}")
-        print(f" Projections: {self.projections}")
-        print(f"     Filters: {self.filters}")
-        print(f"       Limit: {self.limit}")
+        logger.info(f"Source table: {self.source}")
+        logger.info(f" Projections: {self.projections}")
+        logger.info(f"     Filters: {self.filters}")
+        logger.info(f"       Limit: {self.limit}")
 
 
 def handle_is(string, loc, toks):

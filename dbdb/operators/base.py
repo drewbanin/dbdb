@@ -1,7 +1,8 @@
+from dbdb.operators.operator_stats import OperatorStats
+from dbdb.logger import logger
 
 import tabulate
 import uuid
-from dbdb.operators.operator_stats import OperatorStats
 
 
 def pipeline(*iterables):
@@ -68,7 +69,7 @@ class Operator:
             tablefmt='presto',
             floatfmt="0.2f"
         )
-        print(tbl)
+        logger.info(tbl)
 
     def __hash__(self):
         return hash(str(self.operator_id))

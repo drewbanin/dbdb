@@ -1,4 +1,5 @@
 from dbdb.tuples.identifiers import TableIdentifier
+from dbdb.logger import logger
 
 import tabulate
 from typing import NamedTuple
@@ -157,13 +158,13 @@ class Rows:
         else:
             to_print = raw
 
-        print("Table:", self.table)
+        logger.info("Table:", self.table)
         tbl = tabulate.tabulate(
             to_print,
             headers=self.fields,
             tablefmt='presto'
         )
-        print(tbl)
+        logger.info(tbl)
 
         return self.new(iter(data))
 

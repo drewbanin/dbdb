@@ -1,5 +1,6 @@
-import dbdb.lang.lang
 from dbdb.operators.operator_stats import set_stats_callback
+from dbdb.logger import logger
+import dbdb.lang.lang
 
 import networkx as nx
 import time
@@ -121,13 +122,13 @@ async def check_machine_id(request: Request, call_next):
 
 @app.get('/stream')
 async def message_stream(request: Request, query_id: str):
-    print(f"Client connected (query={query_id})")
+    logger.info(f"Client connected (query={query_id})")
     async def event_generator():
         more_events = True
         while more_events:
             # If client closes connection, stop sending events
             if await request.is_disconnected():
-                print(f"Client disconnected (query={query_id})")
+                logger.info(f"Client disconnected (query={query_id})")
                 break
 
             for (event, is_done) in pop_events(query_id):
@@ -139,7 +140,7 @@ async def message_stream(request: Request, query_id: str):
             await asyncio.sleep(STREAM_DELAY)
 
         unset_query(query_id)
-        print(f"Client request completed (query={query_id})")
+        logger.info(f"Client request completed (query={query_id})")
 
     return EventSourceResponse(event_generator())
 
@@ -182,7 +183,7 @@ async def _do_run_query(query_id, plan, nodes):
             else:
                 args[key] = row_iter
 
-        print("Running operator", node, "with args", args)
+        # logger.info("Running operator", node, "with args", args)
         rows = await node.run(**args)
         row_iterators[node] = rows
 
@@ -264,14 +265,11 @@ async def _do_run_query(query_id, plan, nodes):
     })
 
 
-def do_run_query(loop, query_id, plan, nodes):
-    # I don't think i should need to create this task manually, but
-    # if i don't, then background tasks block new incoming requests.
-    # Weird! And annoying!
+async def do_run_query(query_id, plan, nodes):
     try:
-        loop.create_task(_do_run_query(query_id, plan, nodes))
+        await _do_run_query(query_id, plan, nodes)
     except (RuntimeError, TypeError, ValueError) as e:
-        print("GOT AN ERROR!", e)
+        logger.error(f"Error running query: {e}")
         add_event(query_id, {
             "event": "QueryError",
             "data": {
@@ -279,6 +277,12 @@ def do_run_query(loop, query_id, plan, nodes):
                 "error": str(e)
             }
         })
+
+def bg_run_query(loop, query_id, plan, nodes):
+    # I don't think i should need to create this task manually, but
+    # if i don't, then background tasks block new incoming requests.
+    # Weird! And annoying!
+    loop.create_task(do_run_query(query_id, plan, nodes))
 
 
 
@@ -296,14 +300,14 @@ async def run_query(query: Query, background_tasks: BackgroundTasks):
             parents[id(node)] = [id(n) for n in parent_nodes]
 
     except Exception as e:
-        print(e)
+        logger.error(f"Error running query: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
     query_id = str(id(plan))
 
     loop = asyncio.get_event_loop()
-    background_tasks.add_task(do_run_query, loop, query_id, plan, nodes)
+    background_tasks.add_task(bg_run_query, loop, query_id, plan, nodes)
 
     return {
         "query_id": query_id,
@@ -327,7 +331,7 @@ async def explain_query(query: Query):
             parents[id(node)] = [id(n) for n in parent_nodes]
 
     except Exception as e:
-        print(e)
+        logger.error(f"Error running query: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
     query_id = id(plan)
