@@ -17,6 +17,9 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 import asyncio
 
+# import warnings
+# warnings.simplefilter("always", ResourceWarning)
+
 
 class Query(BaseModel):
     sql: str
@@ -261,9 +264,12 @@ async def _do_run_query(query_id, plan, nodes):
     })
 
 
-async def do_run_query(query_id, plan, nodes):
+def do_run_query(loop, query_id, plan, nodes):
+    # I don't think i should need to create this task manually, but
+    # if i don't, then background tasks block new incoming requests.
+    # Weird! And annoying!
     try:
-        await _do_run_query(query_id, plan, nodes)
+        loop.create_task(_do_run_query(query_id, plan, nodes))
     except (RuntimeError, TypeError, ValueError) as e:
         print("GOT AN ERROR!", e)
         add_event(query_id, {
@@ -273,6 +279,7 @@ async def do_run_query(query_id, plan, nodes):
                 "error": str(e)
             }
         })
+
 
 
 @app.post("/query")
@@ -292,8 +299,11 @@ async def run_query(query: Query, background_tasks: BackgroundTasks):
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
 
+
     query_id = str(id(plan))
-    background_tasks.add_task(do_run_query, query_id, plan, nodes)
+
+    loop = asyncio.get_event_loop()
+    background_tasks.add_task(do_run_query, loop, query_id, plan, nodes)
 
     return {
         "query_id": query_id,
