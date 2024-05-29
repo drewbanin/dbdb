@@ -732,13 +732,11 @@ def make_select_from_ast(ast_select, scopes):
     projections = extract_projections(ast_select)
     wheres = extract_wheres(ast_select)
     joins = extract_joins(ast_select, scopes)
-    order_by = extract_order_by(ast_select)
     group_by = extract_group_by(ast_select, projections)
     limit = extract_limit(ast_select)
 
     source = None
     if '_from' in ast_select:
-        # TODO : Handle when FROM is missing!
         source = extract_source(ast_select._from, scopes)
 
     return Select(
@@ -747,7 +745,6 @@ def make_select_from_ast(ast_select, scopes):
         source=source,
         joins=joins,
         group_by=group_by,
-        order_by=order_by,
         limit=limit,
 
         scopes=scopes,
@@ -767,6 +764,8 @@ def make_select_from_scope(ast, scopes):
 
     unions = [make_select_from_ast(u, scopes) for u in unions]
     select.unions = unions
+    select.order_by = extract_order_by(ast)
+
     return select
 
 

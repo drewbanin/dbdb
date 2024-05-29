@@ -255,6 +255,8 @@ union
 select 'two' as id, i from generate_series(2)
 union
 select 'tre' as id, i from generate_series(2)
+
+order by 1, 2 desc
 """
 
 single_select = """
