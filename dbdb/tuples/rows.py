@@ -158,13 +158,12 @@ class Rows:
         else:
             to_print = raw
 
-        logger.info("Table:", self.table)
         tbl = tabulate.tabulate(
             to_print,
             headers=self.fields,
             tablefmt='presto'
         )
-        logger.info(tbl)
+        logger.info(f"TABLE\n{tbl}")
 
         return self.new(iter(data))
 

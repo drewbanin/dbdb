@@ -188,7 +188,8 @@ RESERVED = pp.Group(
     WHEN |
     THEN |
     ELSE |
-    END
+    END |
+    CREATE
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
@@ -546,9 +547,7 @@ PLAIN_SELECT = pp.Group(
 )("select")
 
 SET_OPERATION = pp.Group(
-    PLAIN_SELECT +
-    UNION +
-    PLAIN_SELECT
+    pp.delimitedList(PLAIN_SELECT, UNION, min=1)
 )("union").setName('union')
 
 # Subqueries and CTEs
@@ -724,15 +723,8 @@ def extract_unions(ast):
     if 'union' not in ast:
         return None
 
-    ast = ast.union.copy()
-    unions = []
-    while len(ast) > 0:
-        u1 = ast.pop(0)
-        ast.pop(0)
-        u2 = ast.pop(0)
-        unions += [u1, u2]
-
-    select = unions.pop()
+    unions = ast.union[:-1]
+    select = ast.union[-1]
     return unions, select
 
 

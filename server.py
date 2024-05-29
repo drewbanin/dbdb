@@ -264,6 +264,8 @@ async def _do_run_query(query_id, plan, nodes):
         }
     })
 
+    return data
+
 
 async def do_run_query(query_id, plan, nodes):
     try:

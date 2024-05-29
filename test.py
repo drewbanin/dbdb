@@ -7,6 +7,7 @@ import json
 import random
 from pydantic import BaseModel
 from typing import Dict, List
+import tabulate
 
 from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -249,9 +250,11 @@ select midi('avril_14.mid') at 60 bpm
 """
 
 debug = """
-select i from generate_series(2)
+select 'one' as id, i from generate_series(2)
 union
-select i from generate_series(2)
+select 'two' as id, i from generate_series(2)
+union
+select 'tre' as id, i from generate_series(2)
 """
 
 single_select = """
@@ -268,7 +271,7 @@ single_select = """
 select * from mydb.my_schema.debug
 """
 
-sql = ctas
+sql = debug
 
 select = dbdb.lang.lang.parse_query(sql)
 nodes = list(nx.topological_sort(select._plan))
@@ -276,4 +279,12 @@ nodes = list(nx.topological_sort(select._plan))
 from server import _do_run_query
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(_do_run_query("abc123", select._plan, nodes))
+res = loop.run_until_complete(_do_run_query("abc123", select._plan, nodes))
+
+tbl = tabulate.tabulate(
+    res,
+    headers="keys",
+    tablefmt='presto'
+)
+
+print(tbl)
