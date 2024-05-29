@@ -3,6 +3,7 @@ import { useSub } from '../Hooks.js';
 
 import { formatBytes, formatNumber } from '../Helpers.js';
 import { QueryContext } from '../Store.js';
+import VolumePicker from './volumePicker.tsx';
 
 import { pieArcLabelClasses, ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip, ScatterChart, ScatterPlot, PiePlot } from '@mui/x-charts';
 import { BarChart } from '@mui/x-charts/BarChart';
@@ -326,14 +327,14 @@ function TimeDomainViz({ playing, rows, offset }) {
 }
 
 export function Visualizer() {
-    const { result, schema } = useContext(QueryContext);
+    const { result, schema, volume } = useContext(QueryContext);
     const [ rows, setRows ] = result;
     const [ dataSchema, setSchema ] = schema;
+    const [ musicVolume, setMusicVolume ] = volume;
 
     const [ playTime, setPlayTime ] = useState(null);
 
     const [ audioState, setAudioState ] = useState('waiting');
-    const [ muted, setMuted ] = useState(false);
 
     const source = useRef(null);
     const audioCtx = useRef(null);
@@ -367,40 +368,34 @@ export function Visualizer() {
         if (audioState == 'waiting') {
             source.current.start();
             setAudioState('playing');
+            console.log("Audio: playing")
             audioCtx.current.resume();
         } else if (audioState == 'playing') {
             setAudioState('paused');
+            console.log("Audio: paused")
             audioCtx.current.suspend();
         } else if (audioState == 'paused') {
             setAudioState('playing');
+            console.log("Audio: playing")
             audioCtx.current.resume();
         }
     }
 
-    const muteUnmuteSound = () => {
-        if (muted) {
-            gain.current.gain.value = 1;
-        } else {
-            gain.current.gain.value = 0;
-        }
-
-        setMuted(!muted);
-    }
-
     useEffect(() => {
-        console.log("CHECKING USE EFFECT?", mappedRows.length);
         if (mappedRows.length === 0) {
             return
         }
 
-        console.log("Playing for query:", mappedRows.length, "rows");
         const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
 
         endTime.current = totalTime;
 
         audioCtx.current = ctx;
         source.current = newSource;
+
+        // initialized w/ saved volume level
         gain.current = newGain;
+        gain.current.gain.value = musicVolume;
 
         audioCtx.current.suspend();
         // newSource.start();
@@ -408,8 +403,6 @@ export function Visualizer() {
     }, [rows, source, audioCtx, gain])
 
     useEffect(() => {
-      console.log("Running effect?", audioState);
-
       if (audioState === 'done') {
           console.log("Audio state is done - exiting");
           return
@@ -429,7 +422,7 @@ export function Visualizer() {
         }
       }, 10);
 
-      return () => { console.log("Cancelling interval"); clearInterval(interval); }
+      return () => { clearInterval(interval); }
     }, [setPlayTime, setAudioState, audioState, audioCtx, endTime]);
 
     const [ vizType, setVizType ] = useState('freq');
@@ -454,7 +447,11 @@ export function Visualizer() {
         showMediaControls = false;
     }
 
-    console.log("Rendering at t=", playTime);
+    function updateVolume(level) {
+        console.log("Setting gain to", level);
+        gain.current.gain.value = level;
+    }
+
     return (
         <>
             <div className="panelHeader">
@@ -475,12 +472,7 @@ export function Visualizer() {
                                     className="light title">BEN</button>
 
                                 { showMediaControls && <div style={{ margin: 0, float: 'right' }}>
-                                    <button
-                                        style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
-                                        onClick={ e => muteUnmuteSound() }
-                                        className="light title">
-                                        { muted ? 'UNMUTE' : 'MUTE' }
-                                    </button>
+                                    <VolumePicker onVolumeChange={updateVolume} />
 
                                     <button
                                         style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}

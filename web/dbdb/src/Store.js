@@ -13,6 +13,7 @@ const QueryContextProvider = ({ children }) => {
     const [error, setError] = useState(null);
     const [schema, setSchema] = useState(null);
     const [nodeStats, setNodeStats] = useState({});
+    const [volume, setVolume] = useState(1);
 
     return (
         <QueryContext.Provider value={{
@@ -22,6 +23,7 @@ const QueryContextProvider = ({ children }) => {
             nodes: [nodes, setNodes],
             error: [error, setError],
             nodeStats: [nodeStats, setNodeStats],
+            volume: [volume, setVolume],
         }}>
             {children}
         </QueryContext.Provider>

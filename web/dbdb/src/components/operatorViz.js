@@ -177,7 +177,6 @@ function OperatorViz(props) {
     nodeIds.forEach((id) => {
         const edges = nodeData.edges[id];
         edges.forEach((edgeId) => {
-            console.log("CREATING EDGE??")
             RFEdges.push({
                 id: `${id}--${edgeId}`,
                 source: edgeId + '',
