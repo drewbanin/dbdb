@@ -1,18 +1,20 @@
-import React, { useContext, useMemo, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { useSub } from '../Hooks.js';
 
-import { formatBytes, formatNumber } from '../Helpers.js';
 import { QueryContext } from '../Store.js';
 import VolumePicker from './volumePicker.tsx';
 
-import { pieArcLabelClasses, ResponsiveChartContainer, BarPlot, LinePlot, ChartsXAxis, ChartsYAxis, ChartsTooltip, ScatterChart, ScatterPlot, PiePlot } from '@mui/x-charts';
-import { BarChart } from '@mui/x-charts/BarChart';
-
-import { useAnimationFrame } from '../animate.js';
-
-import Stack from '@mui/material/Stack';
-import Box from '@mui/material/Box';
-import { SparkLineChart } from '@mui/x-charts/SparkLineChart';
+import {
+    BarPlot,
+    ChartsTooltip,
+    ChartsXAxis,
+    ChartsYAxis,
+    LinePlot,
+    PiePlot,
+    ResponsiveChartContainer,
+    ScatterPlot,
+    pieArcLabelClasses,
+} from '@mui/x-charts';
 
 const sin = (t, f, a) => {
     return a * Math.sin(2 * Math.PI * t * f);
@@ -74,7 +76,7 @@ const createBuffer = (rows) => {
         for (let i=offsetStartIndex; i < offsetEndIndex; i++) {
             const time = i / SAMPLE_RATE;
 
-            const waveFunc = (funcName == 'sqr') ? sqr : sin;
+            const waveFunc = (funcName === 'sqr') ? sqr : sin;
             const value = waveFunc(time, freq, amplitude)
 
             freqBuf[i] += value;
@@ -159,7 +161,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
       yVals.push(yVal);
   }
 
-  if (xVals.length == 0 || yVals.length == 0) {
+  if (xVals.length === 0 || yVals.length === 0) {
       xVals.push(0);
       yVals.push(0);
   }
@@ -328,9 +330,9 @@ function TimeDomainViz({ playing, rows, offset }) {
 
 export function Visualizer() {
     const { result, schema, volume } = useContext(QueryContext);
-    const [ rows, setRows ] = result;
-    const [ dataSchema, setSchema ] = schema;
-    const [ musicVolume, setMusicVolume ] = volume;
+    const [ rows ] = result;
+    const [ dataSchema ] = schema;
+    const [ musicVolume ] = volume;
 
     const [ playTime, setPlayTime ] = useState(null);
 
@@ -340,20 +342,25 @@ export function Visualizer() {
     const audioCtx = useRef(null);
     const gain = useRef(null);
     const endTime = useRef(null);
-    const state = {}
 
     useSub('QUERY_COMPLETE', (queryId) => {
         console.log("Query is complete: ", queryId);
         setAudioState('waiting');
     });
 
-    const mappedRows = rows.map(row => {
-        const mapped = {};
-        dataSchema.forEach((col, i) => {
-            mapped[col] = row[i];
+    const mappedRows = useMemo(() => {
+        return rows.map(row => {
+            const mapped = {};
+            dataSchema.forEach((col, i) => {
+                mapped[col] = row[i];
+            })
+            return mapped;
         })
-        return mapped;
-    })
+
+    }, [rows, dataSchema]);
+
+
+    const volumeRef = useRef(musicVolume);
 
     const stopSound = () => {
         source.current.stop();
@@ -363,18 +370,16 @@ export function Visualizer() {
     }
 
     const playPauseSound = () => {
-        const currentTime = playTime;
-
-        if (audioState == 'waiting') {
+        if (audioState === 'waiting') {
             source.current.start();
             setAudioState('playing');
             console.log("Audio: playing")
             audioCtx.current.resume();
-        } else if (audioState == 'playing') {
+        } else if (audioState === 'playing') {
             setAudioState('paused');
             console.log("Audio: paused")
             audioCtx.current.suspend();
-        } else if (audioState == 'paused') {
+        } else if (audioState === 'paused') {
             setAudioState('playing');
             console.log("Audio: playing")
             audioCtx.current.resume();
@@ -395,12 +400,12 @@ export function Visualizer() {
 
         // initialized w/ saved volume level
         gain.current = newGain;
-        gain.current.gain.value = musicVolume;
+        gain.current.gain.value = volumeRef.current;
 
         audioCtx.current.suspend();
         // newSource.start();
         setAudioState('waiting');
-    }, [rows, source, audioCtx, gain])
+    }, [mappedRows, source, audioCtx, gain, setAudioState])
 
     useEffect(() => {
       if (audioState === 'done') {
@@ -431,18 +436,18 @@ export function Visualizer() {
     const showFreq = vizType === 'freq';
     const showPie = vizType === 'pie';
 
-    const isPlaying = audioState == 'playing' || audioState == 'paused';
+    const isPlaying = audioState === 'playing' || audioState === 'paused';
 
     let playPauseLabel;
     let showMediaControls;
     let isReady = mappedRows.length > 0;
-    if (audioState == 'waiting' || audioState == 'paused') {
+    if (audioState === 'waiting' || audioState === 'paused') {
         playPauseLabel = 'PLAY';
         showMediaControls = isReady;
-    } else if (audioState == 'playing') {
+    } else if (audioState === 'playing') {
         playPauseLabel = 'PAUSE';
         showMediaControls = isReady;
-    } else if (audioState == 'done') {
+    } else if (audioState === 'done') {
         playPauseLabel = audioState
         showMediaControls = false;
     }
@@ -500,8 +505,8 @@ export function Visualizer() {
 
 export function XYViz() {
     const { schema, result } = useContext(QueryContext);
-    const [ dataSchema, setSchema ] = schema;
-    const [ rows, setRows ] = result;
+    const [ dataSchema ] = schema;
+    const [ rows ] = result;
 
     // collects series into list of {name, x, y}
     

@@ -9,13 +9,13 @@ import OperatorViz from './components/operatorViz.js';
 import { Visualizer, XYViz, PlaceholderViz } from './components/visualizer.tsx';
 import ResultTable from './components/resultTable.js';
 
-import { QueryContext, QueryContextProvider } from './Store.js';
+import { QueryContext } from './Store.js';
 
 function Database() {
     const [activeTab, setActiveTab] = useState('plan');
 
     const { schema } = useContext(QueryContext);
-    const [ dataSchema, setSchema ] = schema;
+    const [ dataSchema ] = schema;
 
     const fields = dataSchema || [];
 

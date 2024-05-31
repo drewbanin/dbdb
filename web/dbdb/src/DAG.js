@@ -9,7 +9,7 @@ const cleanDag = (data) => {
     const scopeNodes = nodes.filter(n => n.name === 'Scope');
     scopeNodes.forEach(node => {
         const parentNodes = edges[node.id] || [];
-        const childNodes = Object.keys(edges).filter(n => {
+        Object.keys(edges).forEach(n => {
             const nodeList = edges[n] || [];
 
             const newEdges = nodeList.filter(n2 => {
@@ -17,7 +17,7 @@ const cleanDag = (data) => {
             })
 
             // we removed our scope node
-            if (newEdges.length != nodeList.length) {
+            if (newEdges.length !== nodeList.length) {
                 parentNodes.forEach(pn => {
                     newEdges.push(pn)
                 })

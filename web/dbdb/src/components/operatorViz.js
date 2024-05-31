@@ -1,4 +1,4 @@
-import React, {useContext, useCallback, useState, useMemo} from 'react';
+import React, {useContext, useCallback, useMemo} from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   Panel,
@@ -42,7 +42,7 @@ const getLayoutedElements = (nodes, edges, options) => {
 };
 
 const LayoutFlow = ({RFNodes, RFEdges}) => {
-  const { fitView, setCenter } = useReactFlow();
+  const { fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(RFNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(RFEdges);
 
@@ -61,7 +61,7 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
         });
       });
     },
-    [nodes, edges]
+    [nodes, edges, fitView, setEdges, setNodes]
   );
 
   const selectNode = (e, node) => {
@@ -147,9 +147,8 @@ const LayoutFlow = ({RFNodes, RFEdges}) => {
 
 
 function OperatorViz(props) {
-    const { query, result, nodes } = useContext(QueryContext);
-    const [ nodeData, setNodeData ] = nodes;
-    const [ labels, setLabels ] = useState({nodes: {}})
+    const { nodes } = useContext(QueryContext);
+    const [ nodeData ] = nodes;
 
     if (!nodeData || !nodeData.nodes) {
         return (<div style={{ marginTop: 10 }}>NO DATA</div>)
