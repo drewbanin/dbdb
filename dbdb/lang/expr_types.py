@@ -91,7 +91,10 @@ class FunctionCall(ASTToken):
         # If this is a scalar function, return the set of fields
         # that are aggregated within the function expression
         if self.agg_type == Aggregates.SCALAR:
-            return self.func_expr.get_aggregated_fields()
+            scalars = set()
+            for expr in self.func_expr:
+                scalars.update(expr.get_aggregated_fields())
+            return scalars
         else:
             # If it's an aggregate function, then confirm that the func_expr
             # is _not_ also an aggregate. Otherwise, return the non-agg fields
@@ -112,7 +115,10 @@ class FunctionCall(ASTToken):
 
     def get_non_aggregated_fields(self):
         if self.agg_type == Aggregates.SCALAR:
-            return self.func_expr.get_non_aggregated_fields()
+            scalars = set()
+            for expr in self.func_expr:
+                scalars.update(expr.get_non_aggregated_fields())
+            return scalars
         else:
             return set()
 
@@ -230,6 +236,22 @@ class CaseWhen(ASTToken):
         self.when_exprs = when_exprs
         self.else_expr = else_expr
 
+    def iter_exprs(self):
+        for expr in self.when_exprs + [self.else_expr]:
+            yield expr
+
+    def get_aggregated_fields(self):
+        fields = set()
+        for expr in self.iter_exprs():
+            fields.update(expr.get_aggregated_fields())
+        return fields
+
+    def get_non_aggregated_fields(self):
+        fields = set()
+        for expr in self.iter_exprs():
+            fields.update(expr.get_non_aggregated_fields())
+        return fields
+
     def eval(self, row):
         for (when_cond, when_value) in self.when_exprs:
             if when_cond.eval(row):
@@ -244,6 +266,12 @@ class CastExpr(ASTToken):
 
     def eval(self, row):
         return self.ttype
+
+    def get_aggregated_fields(self):
+        return set()
+
+    def get_non_aggregated_fields(self):
+        return set()
 
     @classmethod
     def make(cls, string, loc, toks):

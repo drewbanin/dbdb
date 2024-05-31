@@ -70,7 +70,7 @@ class AggregateOperator(Operator):
 
         return groups
 
-    async def make_iterator(self, scalar_fields, grouping, rows):
+    async def make_iterator(self, scalar_fields, rows):
         projections = self.config.projections.projections
 
         resolve_funcs = []
@@ -187,7 +187,7 @@ class AggregateOperator(Operator):
             if len(scalar) > 0:
                 scalar_fields.append(i)
 
-        iterator = self.make_iterator(scalar_fields, grouping, rows)
+        iterator = self.make_iterator(scalar_fields, rows)
         self.iterator = iterator
 
         # This gets a temporary name because we do not know the name

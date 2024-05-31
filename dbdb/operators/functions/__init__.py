@@ -1,19 +1,17 @@
 
-from . import (
-    audio,
-    system,
-)
+from dbdb.operators.functions import system
 
 modules = [
     system,
-    audio
 ]
+
 
 func_map = {}
 for mod in modules:
     for local in dir(mod):
         if local.startswith('DBDB_'):
             func_map[local] = getattr(mod, local)
+
 
 def find_func(func_name):
     search = f"DBDB_{func_name.upper()}"

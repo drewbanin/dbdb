@@ -273,6 +273,19 @@ single_select = """
 select * from mydb.my_schema.debug
 """
 
+agg = """
+select
+    id,
+    sum(id),
+    count(id)
+from debug
+group by 1
+"""
+
+debug = """
+select * from generate_series(10)
+"""
+
 sql = debug
 
 select = dbdb.lang.lang.parse_query(sql)

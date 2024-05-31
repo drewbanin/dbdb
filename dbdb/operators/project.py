@@ -2,8 +2,6 @@ from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows, RowTuple
 from dbdb.tuples.identifiers import FieldIdentifier
 
-from dbdb.operators.functions import find_func
-
 
 class ProjectConfig(OperatorConfig):
     def __init__(

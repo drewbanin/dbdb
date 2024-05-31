@@ -304,14 +304,14 @@ EXPRESSION = pp.Forward()
 def call_function(string, loc, toks):
     # <func_name> ( <expr> )
     func_name = toks[0].func_name[0].upper()
-    func_expr = toks[0].func_expression
+    func_expr = list(toks[0].func_expression)
     agg_type = getattr(Aggregates, func_name, Aggregates.SCALAR)
     return FunctionCall(func_name, func_expr, agg_type)
 
 
 def call_window_function(string, loc, toks):
     func_name = toks[0].func_name[0].upper()
-    func_expr = toks[0].func_expression
+    func_expr = list(toks[0].func_expression)
     agg_type = Aggregates.SCALAR
 
     raise RuntimeError("Window functions are not currently supported")
@@ -689,17 +689,76 @@ def extract_joins(ast, scopes):
     return joins
 
 
+def resolve_group_by_expr(group_expr, projections):
+    if isinstance(group_expr, Literal):
+        group_idx = group_expr.eval([])
+        projection = projections[group_idx - 1]
+        agg_fields = projection.get_aggregated_fields()
+        if len(agg_fields) > 0:
+            field_names = ", ".join(agg_fields)
+            raise RuntimeError(f"Cannot group by aggregated field: {field_names}")
+        else:
+            return projection.get_non_aggregated_fields()
+    else:
+        # TODO! Resolve column names
+        raise RuntimeError("TODO: Pls group by indexes for now!")
+
+
 def extract_group_by(ast, projections):
-    if 'group_by' not in ast:
+    """
+    Possibilities:
+    1. No fields are aggregated + no groups --> scalar projections
+    2. All fields are aggregated + no groups --> implicit grouping
+    3. All fields are scalar + grouped --> explicit distinct
+    4. All non-agg fields are grouped  --> explicit grouping
+    5. Otherwise --> There is an error (field neither grouped nor agg'd)
+    """
+
+    aggs = []
+    agg_field_names = set()
+
+    scalars = []
+    scalar_field_names = set()
+
+    groups = set()
+
+    # TODO : Remove [2:] hack, fix parser ids
+    grouping_exprs = (ast.group_by or [])[2:]
+
+    for group in grouping_exprs:
+        grouping_fields = resolve_group_by_expr(group, projections.projections)
+        groups.update(grouping_fields)
+
+    for projection in projections.projections:
+        agg_fields = projection.get_aggregated_fields()
+        aggs.append(agg_fields)
+        agg_field_names.update(agg_fields)
+
+        scalar_fields = projection.get_non_aggregated_fields()
+        scalars.append(scalar_fields)
+        scalar_field_names.update(scalar_fields)
+
+    has_aggs = any(len(agg) > 0 for agg in aggs)
+    has_scalar = any(len(scalar) > 0 for scalar in scalars)
+
+    if not has_aggs and 'group_by' not in ast:
+        # Case 1: All fields are scalar and there is no grouping
         return None
 
-    grouping_exprs = ast.group_by[2:]
+    elif not has_scalar and 'group_by' not in ast:
+        # Case 2: All fields are aggregated and there is no grouping
+        return SelectGroupBy([], projections)
 
-    # GROUP BY <expr>
-    return SelectGroupBy(
-        grouping_exprs,
-        projections,
-    )
+    # Check if a scalar field exists that is not aggregated
+    ungrouped = scalar_field_names - groups
+    if len(ungrouped) > 0:
+        field_names = ", ".join(ungrouped)
+        raise RuntimeError(f"Field is neither grouped nor aggregated: {field_names}")
+
+    # Case 3: All fields are scalar and explicitly grouped
+    # Case 4: All non-agg'd fields are grouped
+    # In both cases, we can supply the grouping expr as-is b/c it is correct!
+    return SelectGroupBy(grouping_exprs, projections)
 
 
 def extract_order_by(ast):
@@ -758,7 +817,7 @@ def make_select_from_scope(ast, scopes):
     elif ast.union:
         unions, select = extract_unions(ast)
     else:
-        raise RuntimeError("Saw a SELECT that is niether a single select or union?")
+        raise RuntimeError("Saw a SELECT that is neither a single select or union?")
 
     select = make_select_from_ast(select, scopes)
 
