@@ -58,6 +58,10 @@ jobs:
         with:
           name: web_assets
           path: ./web/dbdb/build
+      - name: Debug assets
+        run: ls -R ./web/dbdb
+      - name: Debug assets two
+        run: ls -R ./web/dbdb/build
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - run: flyctl deploy -a dbdb --remote-only
