@@ -46,24 +46,28 @@ jobs:
           path: ./web/dbdb/build
 
   deploy:
-    name: Deploy app
+    name: deploy
     runs-on: ubuntu-latest
 
     if: github.ref == 'refs/heads/main'
     needs: build-web
 
     steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
       - name: load assets
         uses: actions/download-artifact@v4
         with:
           name: web_assets
-          path: ./web/dbdb/build
-      - name: Debug assets
-        run: ls -R ./web/dbdb
-      - name: Debug assets two
-        run: ls -R ./web/dbdb/build
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+          path: build
+
+      - name: relocate assets
+        run: mv build/ $GITHUB_WORKSPACE/web/dbdb/build/
+
+      - name: list assets
+        run: ls -R $GITHUB_WORKSPACE/web/dbdb/build
+
       - run: flyctl deploy -a dbdb --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
