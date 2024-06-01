@@ -39,6 +39,12 @@ jobs:
         run: npm run build
         working-directory: ./web/dbdb
 
+      - name: save assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: web_assets
+          path: ./web/dbdb/build
+
   deploy:
     name: Deploy app
     runs-on: ubuntu-latest
@@ -47,6 +53,11 @@ jobs:
     needs: build-web
 
     steps:
+      - name: load assets
+        uses: actions/download-artifact@v4
+        with:
+          name: web_assets
+          path: ./web/dbdb/build
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - run: flyctl deploy -a dbdb --remote-only
