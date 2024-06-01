@@ -1,4 +1,4 @@
-import React, { useContext, useState, useCallback, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import Button from 'react-bootstrap/Button';
 
 import { postRequest } from '../Client.js';
@@ -7,7 +7,7 @@ import { usePub } from '../Hooks.js';
 import { cleanDag } from '../DAG.js';
 import { makeRoute } from '../routes.js';
 
-import Editor, { useMonaco, loader } from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
 import CodeTheme from './theme.json';
 
 import Spinner from '../spinner.gif';
@@ -24,9 +24,9 @@ function QueryComponent() {
 
     const [ queryText, setQueryText ] = query;
     const [ rows, setRows ] = result;
-    const [ rowSchema, setSchema ] = schema;
     const [ nodeData, setNodeData ] = nodes;
-    const [ nodeStatData, setNodeStatData ] = nodeStats;
+    const [ , setSchema ] = schema;
+    const [ , setNodeStatData ] = nodeStats;
 
     const [ errorData, setError ] = error;
 
@@ -79,12 +79,7 @@ function QueryComponent() {
         })
     };
 
-    const cancelQuery = () => {
-        if (!queryRunning) return;
-
-    };
-
-    const publish = usePub();
+    const publish = useRef(usePub());
 
     useEffect(() => {
       if (!nodeData || !nodeData.query_id) {
@@ -116,7 +111,7 @@ function QueryComponent() {
         } else if (event === "ResultSchema") {
             setSchema(payload.data.columns)
         } else if (event === "QueryComplete") {
-            publish("QUERY_COMPLETE", data.id);
+            publish.current("QUERY_COMPLETE", data.id);
             setQueryRunning(false);
         } else if (event === "QueryMutationStatus") {
              setQueryStatus(data.status);
@@ -132,7 +127,7 @@ function QueryComponent() {
                 return newData
             })
         } else {
-            publish(event, data, payload);
+            publish.current(event, data, payload);
         }
       }
       sse.onerror = (e, data) => {
@@ -144,7 +139,7 @@ function QueryComponent() {
         console.log("closing SSE")
         sse.close();
       };
-    }, [nodeData]);
+    }, [nodeData, publish, setError, setNodeStatData, setRows, setSchema]);
 
     const queryOptions = QUERIES;
 
@@ -161,7 +156,7 @@ function QueryComponent() {
                             <span className="light title">QUERY</span>
                             { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
                             {queryRunning && <span>
-                                <img className="queryLoading" src={Spinner} />
+                                <img alt="" className="queryLoading" src={Spinner} />
                             </span>}
 
                         </div>
