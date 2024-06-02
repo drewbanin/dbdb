@@ -74,6 +74,11 @@ class Literal(ASTToken):
         return f"{self.val}[{type(self.val)}]"
 
 
+class Null(Literal):
+    def __init__(self):
+        self.val = None
+
+
 class FunctionCall(ASTToken):
     def __init__(self, func_name, func_expr, agg_type):
         self.func_name = func_name

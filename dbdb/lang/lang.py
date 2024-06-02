@@ -7,6 +7,7 @@ from dbdb.lang.expr_types import (
     ColumnIdentifier,
     TableIdent,
     Literal,
+    Null,
     FunctionCall,
     BinaryOperator,
     NegationOperator,
@@ -140,16 +141,15 @@ THEN = pp.CaselessKeyword("THEN")
 ELSE = pp.CaselessKeyword("ELSE")
 END = pp.CaselessKeyword("END")
 
-# dbdb - fun!
-PLAY = pp.CaselessKeyword("PLAY")
-AT = pp.CaselessKeyword("AT")
-BPM = pp.CaselessKeyword("BPM")
 
 # TYPES
 STRING = pp.CaselessKeyword("STRING")
 TEXT = pp.CaselessKeyword("TEXT")
 INT = pp.CaselessKeyword("INT")
 FLOAT = pp.CaselessKeyword("FLOAT")
+
+# NULL
+NULL = pp.CaselessKeyword("NULL").setParseAction(lambda x: Null())
 
 # Literals
 PI = pp.CaselessKeyword("PI").setParseAction(lambda x: Literal(math.pi))
@@ -182,15 +182,14 @@ RESERVED = pp.Group(
     JOIN |
     ASC  |
     DESC |
-    PLAY |
-    AT   |
     PI   |
     CASE |
     WHEN |
     THEN |
     ELSE |
     END |
-    CREATE
+    CREATE |
+    NULL
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
@@ -271,13 +270,13 @@ NAMESPACED_TABLE_IDENT = pp.Group(
 )("qualified_table_ident").setParseAction(make_qualified_table_identifier)
 
 
-
 def as_literal(string, loc, toks):
     # Big hack - no idea why this happens!
     if isinstance(toks[0], Literal):
         return toks[0]
     else:
         return Literal(toks[0])
+
 
 def as_bool(string, loc, toks):
     if toks[0].upper() == 'TRUE':
@@ -295,7 +294,7 @@ LIT_BOOL = (
     pp.CaselessKeyword("TRUE") | pp.CaselessKeyword("FALSE")
 ).setParseAction(as_bool)
 
-LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL).setParseAction(as_literal)
+LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL | NULL).setParseAction(as_literal)
 STAR = "*"
 
 EXPRESSION = pp.Forward()
