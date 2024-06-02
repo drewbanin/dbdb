@@ -1,4 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
+from dbdb.lang.expr_types import Literal
 import itertools
 
 
@@ -36,7 +37,7 @@ class SortOperator(Operator):
         self.stats.update_row_processed(row)
         sort_keys = []
         for ascending, projection in self.config.order:
-            if projection.is_int():
+            if isinstance(projection, Literal):
                 key = row.data[projection.value() - 1]
             else:
                 key = projection.eval(row)

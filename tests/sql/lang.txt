@@ -64,67 +64,19 @@ with data as (
     select 2 as id
     union
     select 2 as id
+    union
+    select 3 as id
 
 )
 
 select distinct id
 from data
+order by 1
 
 
 ---
 
 [
-    {id: 2}
-]
-
-====================================
-Test select order
-====================================
-
-with data as (
-    select 3 as id
-    union
-    select 1 as id
-    union
-    select 2 as id
-
-)
-
-select id
-from data
-order by id
-
-
----
-
-[
-    {id: 1},
     {id: 2},
     {id: 3}
-]
-
-====================================
-Test select order desc
-====================================
-
-with data as (
-    select 3 as id
-    union
-    select 1 as id
-    union
-    select 2 as id
-
-)
-
-select id
-from data
-order by id desc
-
-
----
-
-[
-    {id: 3},
-    {id: 2},
-    {id: 1}
 ]

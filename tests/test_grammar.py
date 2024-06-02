@@ -24,17 +24,18 @@ def parse_test_file(test_path):
             lines.pop(0)
             continue
 
-        test_name = lines.pop(0)
-        test_body = lines.pop(0)
+        test_name = lines.pop(0).strip()
+        test_body = lines.pop(0).strip()
+
         parts = test_body.split("---")
         test_sql, test_expected_yml = parts
         test_expected = yaml.load(test_expected_yml, Loader=yaml.Loader)
 
         yield (
             test_path,
-            test_name.strip(),
-            test_sql.strip(),
-            test_expected
+            test_name,
+            test_sql,
+            test_expected,
         )
 
 def find_tests(dir_path):
@@ -51,7 +52,9 @@ def find_tests(dir_path):
 def make_test_name(test_index):
     filename, test_name, sql, expected = SQL_TESTS[test_index]
 
-    return test_name.replace(" ", "-").lower()
+    filename_s = filename.stem
+    test_name_s = test_name.replace(" ", "-").lower()
+    return f"{filename_s}.{test_name_s}"
 
 
 

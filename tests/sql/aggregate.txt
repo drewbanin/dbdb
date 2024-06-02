@@ -59,3 +59,24 @@ from data
 [
     {value: '1,1', value_pipe: '1|1'}
 ]
+
+====================================
+Test aggs containing expressions
+====================================
+
+with data as (
+
+    select i from generate_series(10)
+
+)
+
+select
+    sum(i * 2) + 10 as value
+
+from data
+
+---
+
+[
+    {value: 10}
+]
