@@ -68,7 +68,13 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r dev-requirements.txt
-          pytest tests/ -v
+          pytest -v --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
+
+      - name: coverage
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml
 
   deploy:
     name: deploy
