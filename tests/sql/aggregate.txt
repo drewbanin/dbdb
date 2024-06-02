@@ -80,3 +80,64 @@ from data
 [
     {value: 10}
 ]
+
+====================================
+Test grouping and agg
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select
+    id,
+    count(*) as value
+
+from data
+group by 1
+
+---
+
+[
+    {id: 1, value: 1},
+    {id: 2, value: 2},
+    {id: 3, value: 1},
+]
+
+====================================
+Test having clause
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select
+    id,
+    count(*) as value
+
+from data
+group by 1
+having count(*) = 2
+
+---
+
+[
+    {id: 2, value: 2},
+]
