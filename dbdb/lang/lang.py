@@ -193,7 +193,7 @@ RESERVED = pp.Group(
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
-    pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
+    pp.Word(pp.alphas + "_", pp.alphanums + '_')
 )("ident*")
 
 
