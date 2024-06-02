@@ -103,6 +103,7 @@ OR = pp.CaselessKeyword("OR")
 
 CREATE = pp.CaselessKeyword("CREATE")
 TABLE = pp.CaselessKeyword("TABLE")
+DISTINCT = pp.CaselessKeyword("DISTINCT")
 
 IS = pp.CaselessKeyword("IS").setParseAction(handle_is)
 IS_NOT = (IS + pp.CaselessKeyword("NOT")).setParseAction(handle_is_not)
@@ -192,6 +193,7 @@ RESERVED = pp.Group(
     ELSE |
     END |
     CREATE |
+    DISTINCT |
     NULL
 ).set_name("reserved_word")
 
@@ -307,24 +309,21 @@ def call_function(string, loc, toks):
     # <func_name> ( <expr> )
     func_name = toks[0].func_name[0].upper()
     func_expr = list(toks[0].func_expression)
+    is_distinct = toks[0].distinct != ''
+
     agg_type = getattr(Aggregates, func_name, Aggregates.SCALAR)
-    return FunctionCall(func_name, func_expr, agg_type)
+    return FunctionCall(func_name, func_expr, agg_type, is_distinct=is_distinct)
 
 
 def call_window_function(string, loc, toks):
-    func_name = toks[0].func_name[0].upper()
-    func_expr = list(toks[0].func_expression)
-    agg_type = Aggregates.SCALAR
-
     raise RuntimeError("Window functions are not currently supported")
-
-    return FunctionCall(func_name, func_expr, agg_type)
 
 
 FUNC_CALL = pp.Group(
     IDENT("func_name") +
     LPAR +
     pp.Opt(
+        pp.Opt(DISTINCT)("distinct") +
         pp.delimitedList(EXPRESSION)("func_expression")
     ) +
     RPAR
@@ -525,6 +524,8 @@ SELECT_STATEMENT = pp.Forward()
 
 PLAIN_SELECT = pp.Group(
     SELECT +
+
+    pp.Opt(DISTINCT)("distinct") +
 
     pp.delimitedList(
         COLUMN_EXPR

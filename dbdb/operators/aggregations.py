@@ -23,7 +23,7 @@ class AggregationMax(Aggregation):
     def __init__(self):
         self.max = None
 
-    def _process(self, values):
+    def process(self, values):
         value = values[0]
         if self.max is None:
             self.max = value
@@ -73,6 +73,7 @@ class AggregationCount(Aggregation):
         self.seen = 0
 
     def process(self, values):
+        # TODO : I think this should not count nulls...
         self.seen += 1
 
     def result(self):
@@ -93,7 +94,7 @@ class AggregationCountDistinct(Aggregation):
 
 class AggregationListAgg(Aggregation):
     def __init__(self):
-        self.seen = set()
+        self.seen = []
         self.delim = ','
 
     def process(self, values):
@@ -102,7 +103,7 @@ class AggregationListAgg(Aggregation):
         else:
             value, self.delim = values
 
-        self.seen.add(value)
+        self.seen.append(value)
 
     def result(self):
         self.result = self.delim.join([str(s) for s in self.seen])

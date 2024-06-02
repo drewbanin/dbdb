@@ -1,7 +1,7 @@
-
-
 import functools
+
 from dbdb.operators.aggregate import Aggregates
+from dbdb.operators.functions import find_func
 
 
 class ASTToken:
@@ -80,14 +80,22 @@ class Null(Literal):
 
 
 class FunctionCall(ASTToken):
-    def __init__(self, func_name, func_expr, agg_type):
+    def __init__(self, func_name, func_expr, agg_type, is_distinct):
         self.func_name = func_name
         self.func_expr = func_expr
         self.agg_type = agg_type
 
-    def eval(self, row):
-        from dbdb.operators.functions import find_func
+        if is_distinct and self.agg_type == Aggregates.SCALAR:
+            raise RuntimeError("Distinct is not allowed in scalar expressions")
 
+        self.is_distinct = is_distinct
+
+    def eval(self, row):
+        # TODO : It's pretty weird that this is only used for scalar functions,
+        # whereas agg functions are handled in the agg operator. Can i reconcile
+        # these two?
+
+        # Because this only handles scalar functions, ignore DISTINCT
         func = find_func(self.func_name)
         value = func.eval(self.func_expr, row)
         return value

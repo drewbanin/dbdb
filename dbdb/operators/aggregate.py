@@ -32,10 +32,12 @@ _agg_funcs = {
 }
 
 
-def lookup(agg):
+def lookup(agg, is_distinct):
     func = _agg_funcs.get(agg)
     if func is None:
         raise RuntimeError(f"Aggregate {agg} is not implemented")
+    elif agg == Aggregates.COUNT and is_distinct:
+        return _agg_funcs[Aggregates.COUNTD]
     return func
 
 
@@ -76,7 +78,7 @@ class AggregateOperator(Operator):
         resolve_funcs = []
         for i, projection in enumerate(projections):
             if i not in scalar_fields:
-                agg_class = lookup(projection.expr.agg_type)
+                agg_class = lookup(projection.expr.agg_type, projection.expr.is_distinct)
                 resolve_funcs.append(agg_class)
 
         grouped_sets = {}

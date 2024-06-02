@@ -1,0 +1,61 @@
+====================================
+Test agg functions
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select
+    min(id) as val_min,
+    max(id) as val_max,
+    sum(id) as val_sum,
+    avg(id) as val_avg,
+    count(id) as val_count,
+    count(distinct id) as val_countd
+
+from data
+
+---
+
+[{
+    val_min: 1,
+    val_max: 3,
+    val_sum: 8,
+    val_avg: 2.0,
+    val_count: 4,
+    val_countd: 3,
+}]
+
+
+====================================
+Test listagg functions
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 1 as id
+
+)
+
+select
+    listagg(id) as value,
+    listagg(id, '|') as value_pipe
+
+from data
+
+---
+
+[
+    {value: '1,1', value_pipe: '1|1'}
+]
