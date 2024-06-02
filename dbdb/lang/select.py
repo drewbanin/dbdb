@@ -13,6 +13,7 @@ from dbdb.operators.joins import (
 
 from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator, Aggregates
+from dbdb.operators.distinct import DistinctOperator
 from dbdb.operators.create import CreateTableAsOperator
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
@@ -36,6 +37,7 @@ class Select:
         unions=None,
         ctes=None,
 
+        is_distinct=False,
         scopes=None,
     ):
         self.projections = projections
@@ -47,6 +49,7 @@ class Select:
         self.limit = limit
         self.unions = []
 
+        self.is_distinct = is_distinct
         self.scopes = scopes or {}
 
         self._plan = None
@@ -126,6 +129,12 @@ class Select:
             plan.add_node(order_by_op, label="Order")
             plan.add_edge(output_op, order_by_op, input_arg="rows")
             output_op = order_by_op
+
+        if self.is_distinct:
+            distinct_op = DistinctOperator()
+            plan.add_node(distinct_op, label="Distinct")
+            plan.add_edge(output_op, distinct_op, input_arg="rows")
+            output_op = distinct_op
 
         if self.limit:
             limit_op = self.limit.as_operator()

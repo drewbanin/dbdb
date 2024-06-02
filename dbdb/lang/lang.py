@@ -43,6 +43,7 @@ from dbdb.tuples.identifiers import (
 from dbdb.operators.joins import JoinType
 from dbdb.operators.aggregate import Aggregates
 from dbdb.operators.union import UnionOperator
+from dbdb.operators.distinct import DistinctOperator
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
@@ -803,6 +804,7 @@ def make_select_from_ast(ast_select, scopes):
     joins = extract_joins(ast_select, scopes)
     group_by = extract_group_by(ast_select, projections)
     limit = extract_limit(ast_select)
+    is_distinct = ast_select.distinct != ''
 
     source = None
     if '_from' in ast_select:
@@ -816,6 +818,7 @@ def make_select_from_ast(ast_select, scopes):
         group_by=group_by,
         limit=limit,
 
+        is_distinct=is_distinct,
         scopes=scopes,
     )
 
