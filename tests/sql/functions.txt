@@ -1,0 +1,58 @@
+
+====================================
+Test generate_series
+====================================
+
+select i from generate_series(4)
+
+---
+
+[
+    {i: 0},
+    {i: 1},
+    {i: 2},
+    {i: 3},
+]
+
+
+====================================
+Test trig functions
+====================================
+
+select
+    sin(PI)::int as sin_pi,
+    cos(PI)::int as cos_pi,
+    sqr(PI / 2)::int as sqr_pi
+
+---
+
+[
+    {sin_pi: 0, cos_pi: -1, sqr_pi: 1},
+]
+
+====================================
+Test iff function
+====================================
+
+select
+    iff(true, 1, 0) as val_a,
+    iff(false, 1, 0) as val_b
+
+---
+
+[
+    {val_a: 1, val_b: 0}
+]
+
+====================================
+Test pow function
+====================================
+
+select
+    pow(2, 3) as value
+
+---
+
+[
+    {value: 8}
+]

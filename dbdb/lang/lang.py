@@ -7,8 +7,10 @@ from dbdb.lang.expr_types import (
     ColumnIdentifier,
     TableIdent,
     Literal,
+    Null,
     FunctionCall,
     BinaryOperator,
+    NegationOperator,
     CaseWhen,
     CastExpr,
     JoinClause,
@@ -139,10 +141,6 @@ THEN = pp.CaselessKeyword("THEN")
 ELSE = pp.CaselessKeyword("ELSE")
 END = pp.CaselessKeyword("END")
 
-# dbdb - fun!
-PLAY = pp.CaselessKeyword("PLAY")
-AT = pp.CaselessKeyword("AT")
-BPM = pp.CaselessKeyword("BPM")
 
 # TYPES
 STRING = pp.CaselessKeyword("STRING")
@@ -150,12 +148,18 @@ TEXT = pp.CaselessKeyword("TEXT")
 INT = pp.CaselessKeyword("INT")
 FLOAT = pp.CaselessKeyword("FLOAT")
 
+# NULL
+NULL = pp.CaselessKeyword("NULL").setParseAction(lambda x: Null())
+
 # Literals
 PI = pp.CaselessKeyword("PI").setParseAction(lambda x: Literal(math.pi))
 
 MATH = (
     PI
 )
+
+INLINE_COMMENT = "--" + pp.restOfLine
+BLOCK_COMMENT = pp.c_style_comment
 
 RESERVED = pp.Group(
     UNION    |
@@ -181,21 +185,19 @@ RESERVED = pp.Group(
     JOIN |
     ASC  |
     DESC |
-    PLAY |
-    AT   |
     PI   |
     CASE |
     WHEN |
     THEN |
     ELSE |
     END |
-    CREATE
+    CREATE |
+    NULL
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
-    pp.Word(pp.srange("[a-zA-Z_]"), pp.srange("[a-zA-Z0-9_"))
+    pp.Word(pp.alphas + "_", pp.alphanums + '_')
 )("ident*")
-
 
 
 def make_col_identifier(string, loc, toks):
@@ -270,13 +272,13 @@ NAMESPACED_TABLE_IDENT = pp.Group(
 )("qualified_table_ident").setParseAction(make_qualified_table_identifier)
 
 
-
 def as_literal(string, loc, toks):
     # Big hack - no idea why this happens!
     if isinstance(toks[0], Literal):
         return toks[0]
     else:
         return Literal(toks[0])
+
 
 def as_bool(string, loc, toks):
     if toks[0].upper() == 'TRUE':
@@ -294,7 +296,7 @@ LIT_BOOL = (
     pp.CaselessKeyword("TRUE") | pp.CaselessKeyword("FALSE")
 ).setParseAction(as_bool)
 
-LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL).setParseAction(as_literal)
+LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL | NULL).setParseAction(as_literal)
 STAR = "*"
 
 EXPRESSION = pp.Forward()
@@ -383,10 +385,11 @@ TYPE = (
 ).setParseAction(CastExpr.make)
 
 
-
 def op_negate(string, loc, toks):
-    # TODO:
-    pass
+    expr = toks[0]
+    # - value --> ['-', value]
+    _, value = expr
+    return NegationOperator(value)
 
 
 def binary_operator(string, loc, toks):
@@ -596,8 +599,14 @@ GRAMMAR = (
         CREATE_TABLE_AS_STATEMENT
         | SELECT_STATEMENT
     ) +
+    pp.Opt(";") +
     pp.stringEnd()
 )
+
+# Support comments
+GRAMMAR = GRAMMAR.ignore(INLINE_COMMENT)
+GRAMMAR = GRAMMAR.ignore(BLOCK_COMMENT)
+
 
 def extract_projections(ast):
     projections = []
@@ -867,10 +876,15 @@ def ast_to_create_obj(ast):
     return ctas
 
 
-def parse_query(query):
-    ast = GRAMMAR.parseString(query)
+def parse_query(sql):
+    try:
+        ast = GRAMMAR.parseString(sql)
+    except pp.exceptions.ParseException as e:
+        raise RuntimeError(f"Failed to parse query: {e}")
+
     if ast.create:
         query = ast_to_create_obj(ast)
     else:
         query = ast_to_select_obj(ast)
+
     return query

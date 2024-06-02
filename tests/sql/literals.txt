@@ -1,0 +1,60 @@
+
+====================================
+Select literal integer
+====================================
+
+select 1 as my_field
+
+---
+
+[{my_field: 1}]
+
+====================================
+Select literal string
+====================================
+
+select 'a' as my_field
+
+---
+
+[{my_field: 'a'}]
+
+====================================
+Select literal bool
+====================================
+
+select true as my_true, false as my_false
+
+---
+
+[{my_true: true, my_false: false}]
+
+====================================
+Select literal float
+====================================
+
+select 17.2 as value
+
+---
+
+[{value: 17.2}]
+
+====================================
+Select negative values
+====================================
+
+select -1 as val_a, -20.24 as val_b
+
+---
+
+[{val_a: -1, val_b: -20.24}]
+
+====================================
+Select null values
+====================================
+
+select NULL as id
+
+---
+
+[{id: null}]
