@@ -599,6 +599,7 @@ GRAMMAR = (
         CREATE_TABLE_AS_STATEMENT
         | SELECT_STATEMENT
     ) +
+    pp.Opt(";") +
     pp.stringEnd()
 )
 
