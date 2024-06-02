@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
 
     if: github.ref == 'refs/heads/main'
-    needs: build-web
+    needs: [build-web, python-tests]
 
     steps:
       - uses: actions/checkout@v4
