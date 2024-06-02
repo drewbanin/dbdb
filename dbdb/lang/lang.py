@@ -603,8 +603,10 @@ GRAMMAR = (
     pp.stringEnd()
 )
 
+# Support comments
 GRAMMAR = GRAMMAR.ignore(INLINE_COMMENT)
 GRAMMAR = GRAMMAR.ignore(BLOCK_COMMENT)
+
 
 def extract_projections(ast):
     projections = []
@@ -874,13 +876,15 @@ def ast_to_create_obj(ast):
     return ctas
 
 
-def parse_query(query):
+def parse_query(sql):
     try:
-        ast = GRAMMAR.parseString(query)
+        ast = GRAMMAR.parseString(sql)
     except pp.exceptions.ParseException as e:
         raise RuntimeError(f"Failed to parse query: {e}")
+
     if ast.create:
         query = ast_to_create_obj(ast)
     else:
         query = ast_to_select_obj(ast)
+
     return query

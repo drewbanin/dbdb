@@ -48,7 +48,17 @@ def find_tests(dir_path):
             yield from parse_test_file(p.resolve())
 
 
+def make_test_name(test_index):
+    filename, test_name, sql, expected = SQL_TESTS[test_index]
+
+    return test_name.replace(" ", "-").lower()
+
+
+
 SQL_TESTS = list(find_tests(SQL_DIR))
+SQL_TEST_INDEX = {
+    make_test_name(i): test for i, test in enumerate(SQL_TESTS)
+}
 
 def run_query(filename, test_name, sql):
     query_id, plan, nodes, edges = dbdb.engine.plan_query(sql)
@@ -60,7 +70,8 @@ def run_query(filename, test_name, sql):
         raise RuntimeError(f"Error in {relpath} - {test_name}: {e}")
 
 
-@pytest.mark.parametrize("filename, test_name, sql, expected", SQL_TESTS)
-def test_sql_statement(filename, test_name, sql, expected):
+@pytest.mark.parametrize("test_index", SQL_TEST_INDEX.keys())
+def test_sql_statement(test_index):
+    filename, test_name, sql, expected = SQL_TEST_INDEX[test_index]
     actual = run_query(filename, test_name, sql)
     assert actual == expected

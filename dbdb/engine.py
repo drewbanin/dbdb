@@ -210,8 +210,9 @@ def dispatch_query(loop, query_id, plan, nodes):
 
 
 def plan_query(sql):
-    select = dbdb.lang.lang.parse_query(sql)
-    plan = select._plan
+    statement = dbdb.lang.lang.parse_query(sql)
+
+    plan = statement._plan
     nodes = list(nx.topological_sort(plan))
     edges = {}
     for node in nodes:
