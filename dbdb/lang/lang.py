@@ -868,7 +868,10 @@ def ast_to_create_obj(ast):
 
 
 def parse_query(query):
-    ast = GRAMMAR.parseString(query)
+    try:
+        ast = GRAMMAR.parseString(query)
+    except pp.exceptions.ParseException as e:
+        raise RuntimeError(f"Failed to parse query: {e}")
     if ast.create:
         query = ast_to_create_obj(ast)
     else:

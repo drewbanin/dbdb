@@ -9,6 +9,13 @@ class DBDB_SIN:
         return math.sin(value)
 
 
+class DBDB_COS:
+    @classmethod
+    def eval(cls, args, row):
+        value = args[0].eval(row)
+        return math.cos(value)
+
+
 class DBDB_SQR:
     def __init__(self, number):
         pass

@@ -1,0 +1,56 @@
+====================================
+Test column identifiers
+====================================
+
+select
+    1 as value,
+    2 as column_2
+
+---
+
+[
+    {value: 1, column_2: 2},
+]
+
+
+====================================
+Test inline comments
+====================================
+
+-- here is a comment
+select 1 as id
+
+---
+
+[
+    {id: 1}
+]
+
+
+====================================
+Test multi-line comments
+====================================
+
+/*
+    this is a comment
+*/
+select 1 as id
+
+---
+
+[
+    {id: 1}
+]
+
+
+====================================
+Test semicolons ending statements
+====================================
+
+select 1 as id;
+
+---
+
+[
+    {id: 1}
+]
