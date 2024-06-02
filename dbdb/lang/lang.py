@@ -158,6 +158,9 @@ MATH = (
     PI
 )
 
+INLINE_COMMENT = "--" + pp.restOfLine
+BLOCK_COMMENT = pp.c_style_comment
+
 RESERVED = pp.Group(
     UNION    |
     FROM     |
@@ -195,7 +198,6 @@ RESERVED = pp.Group(
 IDENT = ~RESERVED + (
     pp.Word(pp.alphas + "_", pp.alphanums + '_')
 )("ident*")
-
 
 
 def make_col_identifier(string, loc, toks):
@@ -599,6 +601,9 @@ GRAMMAR = (
     ) +
     pp.stringEnd()
 )
+
+GRAMMAR = GRAMMAR.ignore(INLINE_COMMENT)
+GRAMMAR = GRAMMAR.ignore(BLOCK_COMMENT)
 
 def extract_projections(ast):
     projections = []
