@@ -43,11 +43,11 @@ select 17.2 as value
 Select negative values
 ====================================
 
-select -1 as val_1, -20.24 as val_2
+select -1 as val_a, -20.24 as val_b
 
 ---
 
-[{val_1: -1, val_2: -20.24}]
+[{val_a: -1, val_b: -20.24}]
 
 ====================================
 Select null values

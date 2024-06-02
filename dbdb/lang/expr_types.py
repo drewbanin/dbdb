@@ -189,6 +189,23 @@ OP_MAP = {
 }
 
 
+class NegationOperator:
+    def __init__(self, value):
+        self.value = value
+
+    def eval(self, row):
+        return -self.value.eval(row)
+
+    def get_aggregated_fields(self):
+        return self.value.get_aggregated_fields()
+
+    def get_non_aggregated_fields(self):
+        return self.value.get_non_aggregated_fields()
+
+    def __str__(self):
+        return f"-{self.value}"
+
+
 class BinaryOperator:
     def __init__(self, lhs, operator, rhs):
         self.lhs = lhs

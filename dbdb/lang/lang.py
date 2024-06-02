@@ -9,6 +9,7 @@ from dbdb.lang.expr_types import (
     Literal,
     FunctionCall,
     BinaryOperator,
+    NegationOperator,
     CaseWhen,
     CastExpr,
     JoinClause,
@@ -383,10 +384,11 @@ TYPE = (
 ).setParseAction(CastExpr.make)
 
 
-
 def op_negate(string, loc, toks):
-    # TODO:
-    pass
+    expr = toks[0]
+    # - value --> ['-', value]
+    _, value = expr
+    return NegationOperator(value)
 
 
 def binary_operator(string, loc, toks):
