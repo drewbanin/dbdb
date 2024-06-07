@@ -139,8 +139,10 @@ class ScalarFunctionCall(Expression):
         self.func_expr = func_expr
         self.func_class = func_class
 
+        self.processor = func_class()
+
     def eval(self, row):
-        return self.processor.eval(row.as_tuple())
+        return self.processor.eval(self.func_expr, row)
 
     def copy(self):
         return ScalarFunctionCall(
