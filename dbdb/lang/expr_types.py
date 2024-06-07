@@ -104,6 +104,23 @@ class Null(Literal):
         return Null()
 
 
+class Star(Expression):
+    def __init__(self):
+        self.val = None
+
+    def copy(self):
+        return Star()
+
+    def eval(self, row):
+        return self.val
+
+    def get_aggregated_fields(self):
+        return set()
+
+    def get_non_aggregated_fields(self):
+        return set()
+
+
 class ScalarFunctionCall(Expression):
     def __init__(self, func_name, func_expr, func_class):
         self.func_name = func_name

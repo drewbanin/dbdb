@@ -7,6 +7,7 @@ from dbdb.lang.expr_types import (
     TableIdent,
     Literal,
     Null,
+    Star,
     ScalarFunctionCall,
     AggregateFunctionCall,
     BinaryOperator,
@@ -297,6 +298,10 @@ def as_bool(string, loc, toks):
         raise RuntimeError("how?")
 
 
+def as_star(string, loc, toks):
+    return Star()
+
+
 LIT_STR = pp.QuotedString(quote_char="'")
 LIT_NUM = ppc.number
 
@@ -305,7 +310,7 @@ LIT_BOOL = (
 ).setParseAction(as_bool)
 
 LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL | NULL).setParseAction(as_literal)
-STAR = "*"
+STAR = pp.Literal("*").setParseAction(as_star)
 
 EXPRESSION = pp.Forward()
 

@@ -223,17 +223,9 @@ class SelectProjection(SelectClause):
         return self.expr.make_identifier_name()
 
     def get_aggregated_fields(self):
-        # TODO : Big hack!
-        if self.expr == "*":
-            return set()
-
         return self.expr.get_aggregated_fields()
 
     def get_non_aggregated_fields(self):
-        # TODO : Big hack!
-        if self.expr == "*":
-            return set()
-
         return self.expr.get_non_aggregated_fields()
 
 

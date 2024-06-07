@@ -1,5 +1,6 @@
 
 from dbdb.expressions.functions.base import AggregateFunction
+from dbdb.lang.expr_types import Literal
 
 class AggregationMin(AggregateFunction):
     NAMES = ['MIN']
@@ -85,20 +86,21 @@ class AggregationListAgg(AggregateFunction):
 
     def eval(self, expr, row):
         if len(expr) == 1:
-            value = expr[0].eval(row)
+            expr = expr[0]
         elif len(expr) == 2:
-            value, delim = values
-            self.delim = delim
+            expr, delim = expr
+            self.delim = delim.eval(row)
 
             delim_is_literal = isinstance(delim, Literal)
             delim_is_string = delim.is_string()
             if not (delim_is_literal and delim_is_string):
                 raise RuntimeError("LIST_AGG expects a string delimiter")
 
+        value = expr.eval(row)
         self.accum.append(value)
 
     def result(self):
-        if self.modifiers.distinct:
+        if self.modifiers.get('DISTINCT'):
             values = []
             seen = set()
             for item in self.accum:
