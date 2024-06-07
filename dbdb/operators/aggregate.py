@@ -1,35 +1,10 @@
 from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.operators import aggregations
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier
 
+from collections import defaultdict
 import enum
 import itertools
-
-
-class Aggregates(enum.Enum):
-    MIN = enum.auto()
-    MAX = enum.auto()
-    SUM = enum.auto()
-    AVG = enum.auto()
-    COUNT = enum.auto()
-    COUNTD = enum.auto()
-    LISTAGG = enum.auto()
-
-    SCALAR = enum.auto()
-
-
-_agg_funcs = {
-    Aggregates.MIN: aggregations.AggregationMin,
-    Aggregates.MAX: aggregations.AggregationMax,
-    Aggregates.SUM: aggregations.AggregationSum,
-    Aggregates.AVG: aggregations.AggregationAverage,
-
-    Aggregates.COUNT: aggregations.AggregationCount,
-    Aggregates.COUNTD: aggregations.AggregationCountDistinct,
-
-    Aggregates.LISTAGG: aggregations.AggregationListAgg,
-}
 
 
 def lookup(agg, is_distinct):
@@ -60,83 +35,68 @@ class AggregateOperator(Operator):
     def name(self):
         return "Aggregate"
 
-    def grouping_set(self, exprs, values):
-        groups = {}
-
-        for value in values:
-            key = tuple(expr.eval(value) for expr in exprs)
-            if key not in groups:
-                groups[key] = []
-
-            groups[key].append(value)
-
-        return groups
-
-    async def make_iterator(self, scalar_fields, rows):
+    async def make_iterator(self, rows):
         projections = self.config.projections.projections
 
-        resolve_funcs = []
-        for i, projection in enumerate(projections):
-            if i not in scalar_fields:
-                agg_class = lookup(projection.expr.agg_type, projection.expr.is_distinct)
-                resolve_funcs.append(agg_class)
+        group_projections = []
+        agg_projections = []
 
-        grouped_sets = {}
+        # Use this to "remember" the order of columns across agg'd
+        # and group'd fields. There is probably a way smarter way
+        # of doing this, but i am not smart enough to know what it is!
+        column_agg_list = []
+
+        for i, projection in enumerate(projections):
+            if len(projection.get_non_aggregated_fields()) > 0:
+                group_projections.append(projection)
+                column_agg_list.append(True)
+
+            else:
+                agg_projections.append(projection)
+                column_agg_list.append(False)
+
+        group_exprs = dict()
         async for row in rows:
             self.stats.update_row_processed(row)
-            grouping_values = []
-            agg_values = []
-            for i, projection in enumerate(projections):
-                if i in scalar_fields:
-                    value = projection.expr.eval(row)
-                    grouping_values.append(value)
+
+            grouping = tuple([proj.eval(row) for proj in group_projections])
+
+            # It's a new grouping set
+            if grouping not in group_exprs:
+                for projection in agg_projections:
+                    group_exprs[grouping] = [proj.copy() for proj in agg_projections]
+
+            # Process incremental step for aggregate functions
+            for proj in group_exprs[grouping]:
+                proj.eval(row)
+
+        for key, processors in group_exprs.items():
+            grouped = list(key)
+            aggregated = [p.result() for p in processors]
+
+            # Reconsitute an output row in the order described
+            # by the input list of projections. Both groups and
+            # aggs retain order, so we just need to splice them
+            # together in the same order that they were pulled apart
+            mapped = []
+            for is_group in column_agg_list:
+                if is_group:
+                    mapped.append(grouped.pop(0))
                 else:
-                    # Calc value inside the func - this is dumb
-                    # would be better to make the agg func do this
-                    values = [fe.eval(row) for fe in projection.expr.func_expr]
-                    agg_values.append(values)
+                    mapped.append(aggregated.pop(0))
 
-            grouping_set = tuple(grouping_values)
-            if grouping_set not in grouped_sets:
-                grouped_sets[grouping_set] = [agg() for agg in resolve_funcs]
-
-            resolver = grouped_sets[grouping_set]
-
-            for (agg, value) in zip(resolver, agg_values):
-                agg.process(value)
-
-        # OK - I now understand why we implemented this without
-        # a notion of iterator streaming before -- we cannot return
-        # any results until the aggregation has completed! how could
-        # we? Maybe if there is an ANY_VALUE() function we could return
-        # early or something... could also apply this for window functions
-        # in the future too... but this was kind of a big waste of time lmao
-
-        # TODO : this is dumb and assumed groups will come before aggs
-        for (grouped, agged) in grouped_sets.items():
-            grouped_values = list(grouped)
-            agged_values = [agg.result() for agg in agged]
-            merged = tuple(grouped_values + agged_values)
-            yield merged
-            self.stats.update_row_emitted(merged)
+            yield mapped
 
         self.stats.update_done_running()
 
     def field_names(self, table):
-        from dbdb.lang.lang import ColumnIdentifier, FunctionCall
-
         fields = []
-        unnamed_col_counter = 0
-        for field in self.config.projections.projections:
+        for i, field in enumerate(self.config.projections.projections):
             if field.alias:
                 field_name = field.alias
-            elif isinstance(field.expr, ColumnIdentifier):
-                field_name = field.expr.column
-            elif isinstance(field.expr, FunctionCall):
-                field_name = field.expr.func_name.lower()
             else:
-                field_name = f"col_{unnamed_col_counter}"
-                unnamed_col_counter += 1
+                # TODO : Make name from expression!
+                field_name = f"field_{i + 1}"
 
             fields.append(table.field(field_name))
         return fields
@@ -189,14 +149,15 @@ class AggregateOperator(Operator):
             if len(scalar) > 0:
                 scalar_fields.append(i)
 
-        iterator = self.make_iterator(scalar_fields, rows)
+        table_identifier = TableIdentifier.temporary()
+        fields = self.field_names(table_identifier)
+
+        iterator = self.make_iterator(rows)
         self.iterator = iterator
 
         # This gets a temporary name because we do not know the name
         # of this table... in fact... there is none!? I might need to
         # think about that more because fields are still scoped to their
         # parent locations.. which is kind of confusing.... hm....
-        table_identifier = TableIdentifier.temporary()
-        fields = self.field_names(table_identifier)
 
         return Rows(table_identifier, fields, iterator)

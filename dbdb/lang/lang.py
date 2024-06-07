@@ -2,13 +2,13 @@
 import pyparsing as pp
 from pyparsing import common as ppc
 
-
 from dbdb.lang.expr_types import (
     ColumnIdentifier,
     TableIdent,
     Literal,
     Null,
-    FunctionCall,
+    ScalarFunctionCall,
+    AggregateFunctionCall,
     BinaryOperator,
     NegationOperator,
     CaseWhen,
@@ -41,12 +41,17 @@ from dbdb.tuples.identifiers import (
 )
 
 from dbdb.operators.joins import JoinType
-from dbdb.operators.aggregate import Aggregates
 from dbdb.operators.union import UnionOperator
 from dbdb.operators.distinct import DistinctOperator
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
+from dbdb.expressions.functions.base import (
+    list_aggregate_functions,
+    list_scalar_functions,
+)
+
+
 from dbdb.logger import logger
 
 import math
@@ -305,22 +310,54 @@ STAR = "*"
 EXPRESSION = pp.Forward()
 
 
+scalar_func_map = list_scalar_functions()
+agg_func_map = list_aggregate_functions()
 
-def call_function(string, loc, toks):
+
+def call_scalar_function(string, loc, toks):
     # <func_name> ( <expr> )
-    func_name = toks[0].func_name[0].upper()
-    func_expr = list(toks[0].func_expression)
-    is_distinct = toks[0].distinct != ''
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = scalar_func_map[func_name]
 
-    agg_type = getattr(Aggregates, func_name, Aggregates.SCALAR)
-    return FunctionCall(func_name, func_expr, agg_type, is_distinct=is_distinct)
+    return ScalarFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class
+    )
+
+
+def call_aggregate_function(string, loc, toks):
+    # <func_name> ([DISTINCT] <expr> )
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = agg_func_map[func_name]
+
+    is_distinct = toks.distinct.lower() == 'distinct'
+
+    return AggregateFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class,
+        is_distinct=is_distinct,
+    )
 
 
 def call_window_function(string, loc, toks):
     raise RuntimeError("Window functions are not currently supported")
 
 
-FUNC_CALL = pp.Group(
+def call_function(string, loc, toks):
+    func_name = toks[0].upper()
+    if func_name in scalar_func_map:
+        return call_scalar_function(string, loc, toks)
+    elif func_name in agg_func_map:
+        return call_aggregate_function(string, loc, toks)
+    else:
+        raise RuntimeError(f"Function {func_name} not found")
+
+
+FUNC_CALL = (
     IDENT("func_name") +
     LPAR +
     pp.Opt(
@@ -329,6 +366,7 @@ FUNC_CALL = pp.Group(
     ) +
     RPAR
 ).setParseAction(call_function)
+
 
 FRAME_CLAUSE = pp.Group(
     ROWS +
@@ -410,8 +448,18 @@ def binary_operator(string, loc, toks):
 
     return binop
 
+EXPRESSION_OPERANDS = (
+    FUNC_CALL |
+    LITERAL |
+    MATH |
+    CASE_WHEN_EXPR |
+    TYPE |
+    QUALIFIED_IDENT |
+    STAR
+)
+
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | TYPE | QUALIFIED_IDENT | STAR,
+    EXPRESSION_OPERANDS,
     [
         ('::', 2, pp.OpAssoc.LEFT, binary_operator),
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
@@ -676,7 +724,8 @@ def make_reference_source(source):
 
 
 def extract_source(source, scopes):
-    if isinstance(source, FunctionCall):
+    # Should this be a different type?
+    if isinstance(source, ScalarFunctionCall):
         return make_source_function(source)
 
     scope_name = source.table_name

@@ -1,20 +1,37 @@
 import functools
 
-from dbdb.operators.aggregate import Aggregates
-from dbdb.operators.functions import find_func
+
+class Expression:
+    "Base interface for all expressions"
+    def copy(self):
+        raise NotImplementedError()
+
+    def get_aggregated_fields(self):
+        return NotImplementedError()
+
+    def get_non_aggregated_fields(self):
+        return NotImplementedError()
+
+    def eval(self, row):
+        return NotImplementedError()
+
+    def result(self):
+        # Only implemented for aggregate types
+        return NotImplementedError()
 
 
-class ASTToken:
-    def has_aggregate(self):
-        return False
-
-
-class ColumnIdentifier(ASTToken):
+class ColumnIdentifier(Expression):
     def __init__(self, table, column):
         self.table = table
         self.column = column
 
         self._qualified = self.qualify()
+
+    def copy(self):
+        return ColumnIdentifier(
+            table=self.table,
+            column=self.column
+        )
 
     def qualify(self):
         if self.table:
@@ -38,7 +55,8 @@ class ColumnIdentifier(ASTToken):
         return self.qualify()
 
 
-class TableIdent(ASTToken):
+# TODO : Should this derive from expression? probably not...
+class TableIdent(Expression):
     def __init__(self, table_name, schema=None, database=None, alias=None):
         self.table_name = table_name
         self.schema = schema
@@ -46,14 +64,12 @@ class TableIdent(ASTToken):
 
         self.alias = alias
 
-    def eval(self, row):
-        # If we call this, something bad happened...
-        raise NotImplementedError()
-
-
-class Literal(ASTToken):
+class Literal(Expression):
     def __init__(self, val):
         self.val = val
+
+    def copy(self):
+        return Literal(val=self.val)
 
     def eval(self, row):
         return self.val
@@ -67,8 +83,14 @@ class Literal(ASTToken):
     def get_non_aggregated_fields(self):
         return set()
 
+    def get_type(self):
+        return type(self.val).__name__
+
     def is_int(self):
         return isinstance(self.val, int)
+
+    def is_string(self):
+        return isinstance(self.val, str)
 
     def __str__(self):
         return f"{self.val}[{type(self.val)}]"
@@ -78,62 +100,81 @@ class Null(Literal):
     def __init__(self):
         self.val = None
 
+    def copy(self):
+        return Null()
 
-class FunctionCall(ASTToken):
-    def __init__(self, func_name, func_expr, agg_type, is_distinct):
+
+class ScalarFunctionCall(Expression):
+    def __init__(self, func_name, func_expr, func_class):
         self.func_name = func_name
         self.func_expr = func_expr
-        self.agg_type = agg_type
-
-        if is_distinct and self.agg_type == Aggregates.SCALAR:
-            raise RuntimeError("Distinct is not allowed in scalar expressions")
-
-        self.is_distinct = is_distinct
+        self.func_class = func_class
 
     def eval(self, row):
-        # TODO : It's pretty weird that this is only used for scalar functions,
-        # whereas agg functions are handled in the agg operator. Can i reconcile
-        # these two?
+        return self.processor.eval(row.as_tuple())
 
-        # Because this only handles scalar functions, ignore DISTINCT
-        func = find_func(self.func_name)
-        value = func.eval(self.func_expr, row)
-        return value
+    def copy(self):
+        return ScalarFunctionCall(
+            func_name = self.func_name,
+            func_expr = self.func_expr.copy(),
+            func_class = self.func_class
+        )
 
     def get_aggregated_fields(self):
-        # If this is a scalar function, return the set of fields
-        # that are aggregated within the function expression
-        if self.agg_type == Aggregates.SCALAR:
-            scalars = set()
-            for expr in self.func_expr:
-                scalars.update(expr.get_aggregated_fields())
-            return scalars
-        else:
-            # If it's an aggregate function, then confirm that the func_expr
-            # is _not_ also an aggregate. Otherwise, return the non-agg fields
-            # contained within the function expression
-            scalar_fields = set()
+        aggs = set()
+        for expr in self.func_expr:
+            aggs.update(expr.get_non_aggregated_fields())
+        return aggs
 
-            for expr in self.func_expr:
-                aggs = expr.get_aggregated_fields()
-                if len(aggs) > 0:
-                    raise RuntimeError("Tried to agg an agg")
-
-                scalars = expr.get_non_aggregated_fields()
-                scalar_fields.update(scalars)
-
-            # So these are the un-agg fields that become aggregated via being
-            # contained within this function
-            return scalar_fields
 
     def get_non_aggregated_fields(self):
-        if self.agg_type == Aggregates.SCALAR:
-            scalars = set()
-            for expr in self.func_expr:
-                scalars.update(expr.get_non_aggregated_fields())
-            return scalars
-        else:
-            return set()
+        scalars = set()
+        for expr in self.func_expr:
+            scalars.update(expr.get_non_aggregated_fields())
+        return scalars
+
+
+class AggregateFunctionCall(Expression):
+    def __init__(self, func_name, func_expr, func_class, is_distinct):
+        self.func_name = func_name
+        self.func_expr = func_expr
+        self.func_class = func_class
+        self.is_distinct = is_distinct
+
+        self.is_started = False
+        self.processor = func_class({
+            "DISTINCT": is_distinct
+        })
+
+    def copy(self):
+        return AggregateFunctionCall(
+            func_name = self.func_name,
+            func_expr = self.func_expr.copy(),
+            func_class = self.func_class,
+            is_distinct = self.is_distinct
+        )
+
+    def eval(self, row):
+        if not self.is_started:
+            self.is_started = True
+            self.processor.start()
+
+        self.processor.eval(self.func_expr, row)
+
+    def result(self):
+        return self.processor.result()
+
+    def get_aggregated_fields(self):
+        aggs = set()
+        for expr in self.func_expr:
+            aggs.update(expr.get_non_aggregated_fields())
+            if len(expr.get_aggregated_fields()) > 0:
+                raise RuntimeError(f"Cannot aggregate an aggregate: {self.func_name}")
+
+        return aggs
+
+    def get_non_aggregated_fields(self):
+        return set()
 
 
 # Operators!
@@ -206,6 +247,9 @@ class NegationOperator:
     def __init__(self, value):
         self.value = value
 
+    def copy(self):
+        return NegationOperator(value=self.value)
+
     def eval(self, row):
         return -self.value.eval(row)
 
@@ -224,6 +268,13 @@ class BinaryOperator:
         self.lhs = lhs
         self.operator = operator
         self.rhs = rhs
+
+    def copy(self):
+        return BinaryOperator(
+            lhs = self.lhs.copy(),
+            operator = self.operator,
+            rhs = self.rhs.copy()
+        )
 
     def short_circuit_and(self, row):
         lhs = bool(self.lhs.eval(row))
@@ -261,10 +312,16 @@ class BinaryOperator:
         return f"({self.lhs} {self.operator} {self.rhs})"
 
 
-class CaseWhen(ASTToken):
+class CaseWhen(Expression):
     def __init__(self, when_exprs, else_expr):
         self.when_exprs = when_exprs
         self.else_expr = else_expr
+
+    def copy(self):
+        return CaseWhen(
+            when_exprs = [e.copy() for e in self.when_exprs],
+            else_expr = self.else_expr.copy()
+        )
 
     def iter_exprs(self):
         for expr in self.when_exprs + [self.else_expr]:
@@ -290,9 +347,12 @@ class CaseWhen(ASTToken):
         return self.else_expr.eval(row)
 
 
-class CastExpr(ASTToken):
+class CastExpr(Expression):
     def __init__(self, ttype):
         self.ttype = ttype
+
+    def copy(self):
+        return CastExpr(ttype=self.ttype)
 
     def eval(self, row):
         return self.ttype
@@ -319,7 +379,7 @@ class CastExpr(ASTToken):
         return CastExpr(ttype)
 
 
-class JoinClause(ASTToken):
+class JoinClause(Expression):
     def __init__(self, to, join_type, on):
         self.to = to
         self.join_type = join_type
@@ -354,5 +414,3 @@ class JoinCondition:
         # TODO: What is the LHS and RHS???
         join_expr = None
         return JoinCondition('USING', join_expr)
-
-

@@ -4,13 +4,13 @@ Test agg functions
 
 with data as (
 
-    select 1 as id
+    select 1 as id, 'a' as letter
     union
-    select 2 as id
+    select 2 as id, 'b' as letter
     union
-    select 2 as id
+    select 2 as id, 'c' as letter
     union
-    select 3 as id
+    select 3 as id, 'd' as letter
 
 )
 

@@ -12,7 +12,7 @@ from dbdb.operators.joins import (
 )
 
 from dbdb.operators.rename import RenameScopeOperator
-from dbdb.operators.aggregate import AggregateOperator, Aggregates
+from dbdb.operators.aggregate import AggregateOperator
 from dbdb.operators.distinct import DistinctOperator
 from dbdb.operators.create import CreateTableAsOperator
 from dbdb.tuples.rows import Rows
@@ -208,6 +208,19 @@ class SelectProjection(SelectClause):
     def __init__(self, expr, alias):
         self.expr = expr
         self.alias = alias
+
+    def copy(self):
+        return self.expr.copy()
+
+    def eval(self, row):
+        return self.expr.eval(row)
+
+    def result(self):
+        # This is only implemented for aggregate functions
+        return self.expr.result()
+
+    def make_identifier_name(self):
+        return self.expr.make_identifier_name()
 
     def get_aggregated_fields(self):
         # TODO : Big hack!
