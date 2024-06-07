@@ -40,15 +40,16 @@ class ProjectOperator(Operator):
         fields = []
         projections = self.config.project
         for i, projection in enumerate(projections):
-            if projection.expr == "*":
+            if projection.is_star():
                 for field in rows.fields:
                     fields.append(field)
             else:
                 if projection.alias:
                     col_name = projection.alias
+                elif projection.can_derive_name():
+                    col_name = projection.make_name()
                 else:
-                    # TODO
-                    col_name = f"col_{i}"
+                    col_name = f"col_{i + 1}"
 
                 field = FieldIdentifier(col_name, rows.table)
                 fields.append(field)

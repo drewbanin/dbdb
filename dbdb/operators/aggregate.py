@@ -94,9 +94,10 @@ class AggregateOperator(Operator):
         for i, field in enumerate(self.config.projections.projections):
             if field.alias:
                 field_name = field.alias
+            elif field.can_derive_name():
+                field_name = field.make_name()
             else:
-                # TODO : Make name from expression!
-                field_name = f"field_{i + 1}"
+                field_name = f"col_{i + 1}"
 
             fields.append(table.field(field_name))
         return fields

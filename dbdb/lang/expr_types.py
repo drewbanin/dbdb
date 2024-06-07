@@ -7,17 +7,23 @@ class Expression:
         raise NotImplementedError()
 
     def get_aggregated_fields(self):
-        return NotImplementedError()
+        raise NotImplementedError()
+
+    def make_name(self):
+        raise NotImplementedError()
+
+    def can_derive_name(self):
+        return False
 
     def get_non_aggregated_fields(self):
-        return NotImplementedError()
+        raise NotImplementedError()
 
     def eval(self, row):
-        return NotImplementedError()
+        raise NotImplementedError()
 
     def result(self):
         # Only implemented for aggregate types
-        return NotImplementedError()
+        raise NotImplementedError()
 
 
 class ColumnIdentifier(Expression):
@@ -26,6 +32,12 @@ class ColumnIdentifier(Expression):
         self.column = column
 
         self._qualified = self.qualify()
+
+    def make_name(self):
+        return self.column
+
+    def can_derive_name(self):
+        return True
 
     def copy(self):
         return ColumnIdentifier(
@@ -142,7 +154,6 @@ class ScalarFunctionCall(Expression):
         for expr in self.func_expr:
             aggs.update(expr.get_non_aggregated_fields())
         return aggs
-
 
     def get_non_aggregated_fields(self):
         scalars = set()
@@ -261,23 +272,23 @@ OP_MAP = {
 
 
 class NegationOperator:
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, expr):
+        self.expr = expr
 
     def copy(self):
-        return NegationOperator(value=self.value)
+        return NegationOperator(expr=self.expr)
 
     def eval(self, row):
-        return -self.value.eval(row)
+        return -self.expr.eval(row)
 
     def get_aggregated_fields(self):
-        return self.value.get_aggregated_fields()
+        return self.expr.get_aggregated_fields()
 
     def get_non_aggregated_fields(self):
-        return self.value.get_non_aggregated_fields()
+        return self.expr.get_non_aggregated_fields()
 
     def __str__(self):
-        return f"-{self.value}"
+        return f"-{self.expr}"
 
 
 class BinaryOperator:

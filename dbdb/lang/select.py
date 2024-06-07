@@ -19,6 +19,7 @@ from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
 from dbdb.expressions import Expression, Equality, EqualityTypes
 from dbdb.lang import table_functions
+from dbdb.lang.expr_types import Star
 
 import networkx as nx
 
@@ -219,8 +220,14 @@ class SelectProjection(SelectClause):
         # This is only implemented for aggregate functions
         return self.expr.result()
 
-    def make_identifier_name(self):
-        return self.expr.make_identifier_name()
+    def make_name(self):
+        return self.expr.make_name()
+
+    def is_star(self):
+        return isinstance(self.expr, Star)
+
+    def can_derive_name(self):
+        return self.expr.can_derive_name()
 
     def get_aggregated_fields(self):
         return self.expr.get_aggregated_fields()
