@@ -955,6 +955,9 @@ def ast_to_create_obj(ast):
 
 
 def parse_query(sql):
+    if len(sql.strip()) == 0:
+        raise RuntimeError("Query is empty")
+
     try:
         ast = GRAMMAR.parseString(sql)
     except pp.exceptions.ParseException as e:
