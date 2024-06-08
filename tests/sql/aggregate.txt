@@ -1,0 +1,145 @@
+====================================
+Test agg functions
+====================================
+
+with data as (
+
+    select 1 as id, 'a' as letter
+    union
+    select 2 as id, 'b' as letter
+    union
+    select 2 as id, 'c' as letter
+    union
+    select 3 as id, 'd' as letter
+
+)
+
+select
+    min(id) as val_min,
+    max(id) as val_max,
+    sum(id) as val_sum,
+    avg(id) as val_avg,
+    count(id) as val_count,
+    count(distinct id) as val_countd
+
+from data
+
+---
+
+[{
+    val_min: 1,
+    val_max: 3,
+    val_sum: 8,
+    val_avg: 2.0,
+    val_count: 4,
+    val_countd: 3,
+}]
+
+
+====================================
+Test listagg functions
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 1 as id
+
+)
+
+select
+    listagg(id) as value,
+    listagg(id, '|') as value_pipe
+
+from data
+
+---
+
+[
+    {value: '1,1', value_pipe: '1|1'}
+]
+
+====================================
+Test aggs containing expressions
+====================================
+
+with data as (
+
+    select i from generate_series(10)
+
+)
+
+select
+    sum(i) + 10 as value
+
+from data
+
+---
+
+[
+    {value: 55}
+]
+
+====================================
+Test grouping and agg
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select
+    id,
+    count(*) as value
+
+from data
+group by 1
+order by 1
+
+---
+
+[
+    {id: 1, value: 1},
+    {id: 2, value: 2},
+    {id: 3, value: 1},
+]
+
+====================================
+Test having clause
+skip
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select
+    id,
+    count(*) as value
+
+from data
+group by 1
+having count(*) = 2
+
+---
+
+[
+    {id: 2, value: 2},
+]

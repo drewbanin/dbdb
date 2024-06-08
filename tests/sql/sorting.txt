@@ -1,0 +1,129 @@
+====================================
+Test select order
+====================================
+
+with data as (
+    select 3 as id
+    union
+    select 1 as id
+    union
+    select 2 as id
+
+)
+
+select id
+from data
+order by 1
+
+
+---
+
+[
+    {id: 1},
+    {id: 2},
+    {id: 3}
+]
+
+====================================
+Test select order desc
+====================================
+
+with data as (
+    select 3 as id
+    union
+    select 1 as id
+    union
+    select 2 as id
+
+)
+
+select id
+from data
+order by id desc
+
+
+---
+
+[
+    {id: 3},
+    {id: 2},
+    {id: 1}
+]
+
+====================================
+Test select order by index
+====================================
+
+with data as (
+    select 3 as id
+    union
+    select 1 as id
+    union
+    select 2 as id
+
+)
+
+select id
+from data
+order by 1
+
+
+---
+
+[
+    {id: 1},
+    {id: 2},
+    {id: 3}
+]
+
+====================================
+Test select order by index desc
+====================================
+
+with data as (
+    select 3 as id
+    union
+    select 1 as id
+    union
+    select 2 as id
+
+)
+
+select id
+from data
+order by 1 desc
+
+
+---
+
+[
+    {id: 3},
+    {id: 2},
+    {id: 1}
+]
+
+====================================
+Test multiple select order
+====================================
+
+with data as (
+    select 1 as id, 'alice' as name
+    union
+    select 1 as id, 'bob' as name
+    union
+    select 2 as id, 'cathy' as name
+
+)
+
+select id, name
+from data
+order by 1 desc, name
+
+
+---
+
+[
+    {id: 2, name: 'cathy'},
+    {id: 1, name: 'alice'},
+    {id: 1, name: 'bob'}
+]

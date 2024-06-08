@@ -2,13 +2,15 @@
 import pyparsing as pp
 from pyparsing import common as ppc
 
-
 from dbdb.lang.expr_types import (
     ColumnIdentifier,
     TableIdent,
     Literal,
     Null,
-    FunctionCall,
+    Star,
+    ScalarFunctionCall,
+    AggregateFunctionCall,
+    TableFunctionCall,
     BinaryOperator,
     NegationOperator,
     CaseWhen,
@@ -41,11 +43,18 @@ from dbdb.tuples.identifiers import (
 )
 
 from dbdb.operators.joins import JoinType
-from dbdb.operators.aggregate import Aggregates
 from dbdb.operators.union import UnionOperator
+from dbdb.operators.distinct import DistinctOperator
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
+from dbdb.expressions.functions.base import (
+    list_aggregate_functions,
+    list_scalar_functions,
+    list_table_functions,
+)
+
+
 from dbdb.logger import logger
 
 import math
@@ -103,6 +112,7 @@ OR = pp.CaselessKeyword("OR")
 
 CREATE = pp.CaselessKeyword("CREATE")
 TABLE = pp.CaselessKeyword("TABLE")
+DISTINCT = pp.CaselessKeyword("DISTINCT")
 
 IS = pp.CaselessKeyword("IS").setParseAction(handle_is)
 IS_NOT = (IS + pp.CaselessKeyword("NOT")).setParseAction(handle_is_not)
@@ -192,6 +202,7 @@ RESERVED = pp.Group(
     ELSE |
     END |
     CREATE |
+    DISTINCT |
     NULL
 ).set_name("reserved_word")
 
@@ -289,6 +300,10 @@ def as_bool(string, loc, toks):
         raise RuntimeError("how?")
 
 
+def as_star(string, loc, toks):
+    return Star()
+
+
 LIT_STR = pp.QuotedString(quote_char="'")
 LIT_NUM = ppc.number
 
@@ -297,38 +312,84 @@ LIT_BOOL = (
 ).setParseAction(as_bool)
 
 LITERAL = (LIT_STR | LIT_NUM | LIT_BOOL | NULL).setParseAction(as_literal)
-STAR = "*"
+STAR = pp.Literal("*").setParseAction(as_star)
 
 EXPRESSION = pp.Forward()
 
 
+scalar_func_map = list_scalar_functions()
+agg_func_map = list_aggregate_functions()
+table_func_map = list_table_functions()
 
-def call_function(string, loc, toks):
-    # <func_name> ( <expr> )
-    func_name = toks[0].func_name[0].upper()
-    func_expr = list(toks[0].func_expression)
-    agg_type = getattr(Aggregates, func_name, Aggregates.SCALAR)
-    return FunctionCall(func_name, func_expr, agg_type)
+
+def call_scalar_function(string, loc, toks):
+    # <func_name> ( <expr>, ... )
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = scalar_func_map[func_name]
+
+    return ScalarFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class
+    )
+
+
+def call_aggregate_function(string, loc, toks):
+    # <func_name> ([DISTINCT] <expr>, ... )
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = agg_func_map[func_name]
+
+    is_distinct = toks.distinct.lower() == 'distinct'
+
+    return AggregateFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class,
+        is_distinct=is_distinct,
+    )
+
+
+def call_table_func(string, loc, toks):
+    # <func_name> (<expr>, ... )
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = table_func_map[func_name]
+
+    return TableFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class,
+    )
 
 
 def call_window_function(string, loc, toks):
-    func_name = toks[0].func_name[0].upper()
-    func_expr = list(toks[0].func_expression)
-    agg_type = Aggregates.SCALAR
-
     raise RuntimeError("Window functions are not currently supported")
 
-    return FunctionCall(func_name, func_expr, agg_type)
+
+def call_function(string, loc, toks):
+    func_name = toks[0].upper()
+    if func_name in scalar_func_map:
+        return call_scalar_function(string, loc, toks)
+    elif func_name in agg_func_map:
+        return call_aggregate_function(string, loc, toks)
+    elif func_name in table_func_map:
+        return call_table_func(string, loc, toks)
+    else:
+        raise RuntimeError(f"Function {func_name} not found")
 
 
-FUNC_CALL = pp.Group(
+FUNC_CALL = (
     IDENT("func_name") +
     LPAR +
     pp.Opt(
+        pp.Opt(DISTINCT)("distinct") +
         pp.delimitedList(EXPRESSION)("func_expression")
     ) +
     RPAR
 ).setParseAction(call_function)
+
 
 FRAME_CLAUSE = pp.Group(
     ROWS +
@@ -410,8 +471,18 @@ def binary_operator(string, loc, toks):
 
     return binop
 
+EXPRESSION_OPERANDS = (
+    FUNC_CALL |
+    LITERAL |
+    MATH |
+    CASE_WHEN_EXPR |
+    TYPE |
+    QUALIFIED_IDENT |
+    STAR
+)
+
 EXPRESSION << pp.infix_notation(
-    FUNC_CALL | LITERAL | MATH | CASE_WHEN_EXPR | TYPE | QUALIFIED_IDENT | STAR,
+    EXPRESSION_OPERANDS,
     [
         ('::', 2, pp.OpAssoc.LEFT, binary_operator),
         ('-', 1, pp.OpAssoc.RIGHT, op_negate),
@@ -525,6 +596,8 @@ SELECT_STATEMENT = pp.Forward()
 
 PLAIN_SELECT = pp.Group(
     SELECT +
+
+    pp.Opt(DISTINCT)("distinct") +
 
     pp.delimitedList(
         COLUMN_EXPR
@@ -656,12 +729,14 @@ def make_source_function(func_source):
     func_name = func_source.func_name
     func_expr = func_source.func_expr
     func_alias = func_source.alias
+    func_class = func_source.func_class
 
     table_id = TableIdentifier.new(func_alias, func_alias)
 
     return SelectFunctionSource(
         function_name=func_name,
         function_args=[f.eval(None) for f in func_expr],
+        function_class=func_class,
         table_identifier=table_id,
     )
 
@@ -674,7 +749,8 @@ def make_reference_source(source):
 
 
 def extract_source(source, scopes):
-    if isinstance(source, FunctionCall):
+    # Should this be a different type?
+    if isinstance(source, TableFunctionCall):
         return make_source_function(source)
 
     scope_name = source.table_name
@@ -802,6 +878,7 @@ def make_select_from_ast(ast_select, scopes):
     joins = extract_joins(ast_select, scopes)
     group_by = extract_group_by(ast_select, projections)
     limit = extract_limit(ast_select)
+    is_distinct = ast_select.distinct != ''
 
     source = None
     if '_from' in ast_select:
@@ -815,6 +892,7 @@ def make_select_from_ast(ast_select, scopes):
         group_by=group_by,
         limit=limit,
 
+        is_distinct=is_distinct,
         scopes=scopes,
     )
 

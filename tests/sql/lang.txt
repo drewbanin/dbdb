@@ -54,3 +54,29 @@ select 1 as id;
 [
     {id: 1}
 ]
+
+
+====================================
+Test distinct select
+====================================
+
+with data as (
+    select 2 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+
+)
+
+select distinct id
+from data
+order by 1
+
+
+---
+
+[
+    {id: 2},
+    {id: 3}
+]

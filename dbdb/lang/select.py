@@ -12,12 +12,14 @@ from dbdb.operators.joins import (
 )
 
 from dbdb.operators.rename import RenameScopeOperator
-from dbdb.operators.aggregate import AggregateOperator, Aggregates
+from dbdb.operators.aggregate import AggregateOperator
+from dbdb.operators.distinct import DistinctOperator
 from dbdb.operators.create import CreateTableAsOperator
+from dbdb.operators.table_function import TableFunctionOperator
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
 from dbdb.expressions import Expression, Equality, EqualityTypes
-from dbdb.lang import table_functions
+from dbdb.lang.expr_types import Star
 
 import networkx as nx
 
@@ -36,6 +38,7 @@ class Select:
         unions=None,
         ctes=None,
 
+        is_distinct=False,
         scopes=None,
     ):
         self.projections = projections
@@ -47,6 +50,7 @@ class Select:
         self.limit = limit
         self.unions = []
 
+        self.is_distinct = is_distinct
         self.scopes = scopes or {}
 
         self._plan = None
@@ -127,6 +131,12 @@ class Select:
             plan.add_edge(output_op, order_by_op, input_arg="rows")
             output_op = order_by_op
 
+        if self.is_distinct:
+            distinct_op = DistinctOperator()
+            plan.add_node(distinct_op, label="Distinct")
+            plan.add_edge(output_op, distinct_op, input_arg="rows")
+            output_op = distinct_op
+
         if self.limit:
             limit_op = self.limit.as_operator()
             plan.add_node(limit_op, label="Limit")
@@ -200,18 +210,25 @@ class SelectProjection(SelectClause):
         self.expr = expr
         self.alias = alias
 
-    def get_aggregated_fields(self):
-        # TODO : Big hack!
-        if self.expr == "*":
-            return set()
+    def copy(self):
+        return self.expr.copy()
 
+    def eval(self, row):
+        return self.expr.eval(row)
+
+    def make_name(self):
+        return self.expr.make_name()
+
+    def is_star(self):
+        return isinstance(self.expr, Star)
+
+    def can_derive_name(self):
+        return self.expr.can_derive_name()
+
+    def get_aggregated_fields(self):
         return self.expr.get_aggregated_fields()
 
     def get_non_aggregated_fields(self):
-        # TODO : Big hack!
-        if self.expr == "*":
-            return set()
-
         return self.expr.get_non_aggregated_fields()
 
 
@@ -239,19 +256,21 @@ class SelectReferenceSource(SelectClause):
 
 
 class SelectFunctionSource(SelectClause):
-    def __init__(self, function_name, function_args, table_identifier):
+    def __init__(self, function_name, function_args, function_class, table_identifier):
         self.function_name = function_name
         self.function_args = function_args
+        self.function_class = function_class
         self.table = table_identifier
 
     def name(self):
         return self.table.name
 
     def as_operator(self):
-        return table_functions.as_operator(
-            self.table,
-            self.function_name,
-            self.function_args
+        return TableFunctionOperator(
+            table = self.table,
+            function_name = self.function_name,
+            function_args = self.function_args,
+            function_class = self.function_class,
         )
 
 

@@ -64,11 +64,14 @@ jobs:
       - name: show python version
         run: python -c "import sys; print(sys.version)"
 
-      - name: show python version
+      - name: pytest
+        env:
+          DBDB_GSHEETS_API_KEY: ${{ secrets.DBDB_GSHEETS_API_KEY }}
+          DBDB_OPENAI_API_KEY: ${{ secrets.DBDB_OPENAI_API_KEY }}
         run: |
           pip install -r requirements.txt
           pip install -r dev-requirements.txt
-          pytest tests/ -v
+          pytest -v tests/
 
   deploy:
     name: deploy

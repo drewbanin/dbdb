@@ -15,3 +15,6 @@ db.sqlite3
 **/*.md
 
 .env.sh
+.coverage
+pytest-coverage.txt
+pytest.xml

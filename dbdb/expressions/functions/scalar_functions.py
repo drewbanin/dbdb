@@ -1,26 +1,27 @@
 
 import math
-import asyncio
+from dbdb.expressions.functions.base import ScalarFunction
 
-class DBDB_SIN:
-    @classmethod
+
+class FunctionSin(ScalarFunction):
+    NAMES = ['sin']
+
     def eval(cls, args, row):
         value = args[0].eval(row)
         return math.sin(value)
 
 
-class DBDB_COS:
-    @classmethod
+class FunctionCos(ScalarFunction):
+    NAMES = ['cos']
+
     def eval(cls, args, row):
         value = args[0].eval(row)
         return math.cos(value)
 
 
-class DBDB_SQR:
-    def __init__(self, number):
-        pass
+class FunctionSquare(ScalarFunction):
+    NAMES = ['sqr']
 
-    @classmethod
     def eval(cls, args, row):
         value = args[0].eval(row)
         value = math.sin(value)
@@ -30,8 +31,9 @@ class DBDB_SQR:
             return -1
 
 
-class DBDB_IFF:
-    @classmethod
+class FunctionIff(ScalarFunction):
+    NAMES = ['iff']
+
     def eval(cls, args, row):
         if len(args) != 3:
             raise RuntimeError("IFF requires 3 args")
@@ -43,8 +45,9 @@ class DBDB_IFF:
             return args[2].eval(row)
 
 
-class DBDB_POW:
-    @classmethod
+class FunctionPow(ScalarFunction):
+    NAMES = ['pow']
+
     def eval(cls, args, row):
         if len(args) != 2:
             raise RuntimeError("POW requires 2 args")

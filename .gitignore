@@ -1,10 +1,13 @@
+# build + env files
 build/
 dbdb.egg-info
 dist/
 env/
+
+# compiled / data files
 *.dumb
 *.pyc
-__pycache__
+__pycache__/
 *.png
 
 # gsheets integration
@@ -14,3 +17,8 @@ token.json
 *.midi
 .env.sh
 data/*.dumb
+
+# pytest coverage
+.coverage
+pytest-coverage.txt
+pytest.xml

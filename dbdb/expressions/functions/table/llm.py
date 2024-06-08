@@ -1,6 +1,4 @@
-
-from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.tuples.rows import Rows
+from dbdb.expressions.functions.base import TableFunction
 
 import asyncio
 import os
@@ -29,38 +27,27 @@ a header row in your response.
 """
 
 
-def check_api_key():
-    if not API_KEY:
-        raise RuntimeError("dbdb was not initialized with an OpenAI API key & can't query do llm magic :/")
+class AskGPTTableFunction(TableFunction):
+    NAMES = ['ASK_GPT']
 
-
-class AskGPTConfig(OperatorConfig):
-    def __init__(
-        self,
-        table,
-        function_args,
-    ):
-        self.table = table
-
-        if len(function_args) != 1:
+    def __init__(self, args):
+        if len(args) != 1:
             raise RuntimeError("ASK_GPT function expects 1 arg")
 
-        self.prompt = function_args[0]
+        self.check_api_key()
+
+        self.prompt = args[0]
         self.client = AsyncOpenAI(api_key=API_KEY)
 
+        self.iterator = self.make_iterator()
+        self._fields = None
 
-class AskGPTOperator(Operator):
-    Config = AskGPTConfig
-
-    def name(self):
-        return "GPT-4"
-
-    @classmethod
-    def function_name(cls):
-        return "ASK_GPT"
+    def check_api_key(self):
+        if not API_KEY:
+            raise RuntimeError("dbdb was not initialized with an OpenAI API key & can't do llm magic :/")
 
     async def make_iterator(self):
-        stream = await self.config.client.chat.completions.create(
+        stream = await self.client.chat.completions.create(
             model="gpt-4o",
             stream=True,
             messages=[
@@ -70,7 +57,7 @@ class AskGPTOperator(Operator):
                 },
                 {
                     "role": "user",
-                    "content": self.config.prompt,
+                    "content": self.prompt,
                 }
             ],
         )
@@ -86,12 +73,7 @@ class AskGPTOperator(Operator):
                 # Omit last element - it might be incomplete...
                 for line in lines[:-1]:
                     row = [v.strip() for v in line.split(",")]
-
-                    self.stats.update_row_processed(row)
-
                     yield row
-
-                    self.stats.update_row_emitted(row)
 
                 # Reset the accumulator to the last (incomplete?) line
                 accum = lines[-1]
@@ -102,18 +84,15 @@ class AskGPTOperator(Operator):
                 row = [v.strip() for v in line.split(",")]
                 yield row
 
-        self.stats.update_done_running()
+    async def fields(self):
+        # We need to crank the iterator to get the first row
+        # back from gpt4, BUT we also need to make sure to
+        # only do that once or we'll accidentally consume data
+        if self._fields is None:
+            self._fields = await self.iterator.__anext__()
 
-    async def run(self):
-        self.stats.update_start_running()
-        iterator = self.make_iterator()
-        self.iterator = iterator
+        return self._fields
 
-        header_row = await self.iterator.__anext__()
-        fields = [self.config.table.field(col_name) for col_name in header_row]
-
-        return Rows(
-            self.config.table,
-            fields,
-            iterator,
-        )
+    async def generate(self):
+        async for row in self.iterator:
+            yield row

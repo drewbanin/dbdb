@@ -24,17 +24,26 @@ def parse_test_file(test_path):
             lines.pop(0)
             continue
 
-        test_name = lines.pop(0)
-        test_body = lines.pop(0)
+        skip = False
+        test_name = lines.pop(0).strip()
+
+        if '\n' in test_name:
+            test_name, opts = test_name.split("\n")
+            if 'skip' in opts:
+                skip = True
+
+        test_body = lines.pop(0).strip()
+
         parts = test_body.split("---")
         test_sql, test_expected_yml = parts
         test_expected = yaml.load(test_expected_yml, Loader=yaml.Loader)
 
         yield (
             test_path,
-            test_name.strip(),
-            test_sql.strip(),
-            test_expected
+            test_name,
+            test_sql,
+            test_expected,
+            skip,
         )
 
 def find_tests(dir_path):
@@ -49,9 +58,14 @@ def find_tests(dir_path):
 
 
 def make_test_name(test_index):
-    filename, test_name, sql, expected = SQL_TESTS[test_index]
+    filename, test_name, sql, expected, skip = SQL_TESTS[test_index]
 
-    return test_name.replace(" ", "-").lower()
+    filename_s = filename.stem
+    test_name_s = test_name.replace(" ", "-").lower()
+    if skip:
+        return f"{filename_s}.{test_name_s} (skipped)"
+    else:
+        return f"{filename_s}.{test_name_s}"
 
 
 
@@ -72,6 +86,10 @@ def run_query(filename, test_name, sql):
 
 @pytest.mark.parametrize("test_index", SQL_TEST_INDEX.keys())
 def test_sql_statement(test_index):
-    filename, test_name, sql, expected = SQL_TEST_INDEX[test_index]
+    filename, test_name, sql, expected, skip = SQL_TEST_INDEX[test_index]
+    if skip:
+        pytest.skip("Test is skipped")
+        return
+
     actual = run_query(filename, test_name, sql)
     assert actual == expected

@@ -24,7 +24,7 @@ class ProjectOperator(Operator):
             # self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
-                if projection.expr == "*":
+                if projection.is_star():
                     for value in row.data:
                         projected.append(value)
                 else:
@@ -37,25 +37,19 @@ class ProjectOperator(Operator):
         self.stats.update_done_running()
 
     def list_fields(self, rows):
-        from dbdb.lang.lang import ColumnIdentifier, FunctionCall
-
         fields = []
         projections = self.config.project
-        unnamed_col_counter = 0
-        for projection in projections:
-            if projection.expr == "*":
+        for i, projection in enumerate(projections):
+            if projection.is_star():
                 for field in rows.fields:
                     fields.append(field)
             else:
                 if projection.alias:
                     col_name = projection.alias
-                elif isinstance(projection.expr, ColumnIdentifier):
-                    col_name = projection.expr.column
-                elif isinstance(projection.expr, FunctionCall):
-                    col_name = projection.expr.func_name.lower()
+                elif projection.can_derive_name():
+                    col_name = projection.make_name()
                 else:
-                    col_name = f"col_{unnamed_col_counter}"
-                    unnamed_col_counter += 1
+                    col_name = f"col_{i + 1}"
 
                 field = FieldIdentifier(col_name, rows.table)
                 fields.append(field)

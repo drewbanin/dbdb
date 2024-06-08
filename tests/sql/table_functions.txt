@@ -1,0 +1,46 @@
+
+====================================
+Test generate_series
+====================================
+
+select i from generate_series(4)
+
+---
+
+[
+    {i: 0},
+    {i: 1},
+    {i: 2},
+    {i: 3},
+]
+
+
+====================================
+Test google_sheets
+====================================
+
+select *
+from google_sheet('1FdRv_eVVo5GxtXthiScIyA3L7Z7h21eXWMMDcaFfGMI', 'Example')
+
+---
+
+[
+    {name: drew, favorite_color: green},
+    {name: tiffany, favorite_color: blue},
+    {name: laika, favorite_color: gray},
+    {name: flanders, favorite_color: gray},
+]
+
+
+====================================
+Test ask_gpt
+====================================
+
+select *
+from ask_gpt('generate the numbers 1 and 2 in columns named a and b')
+
+---
+
+[
+    {a: '1', b: '2'},
+]
