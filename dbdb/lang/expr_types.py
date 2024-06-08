@@ -154,7 +154,7 @@ class ScalarFunctionCall(Expression):
     def get_aggregated_fields(self):
         aggs = set()
         for expr in self.func_expr:
-            aggs.update(expr.get_non_aggregated_fields())
+            aggs.update(expr.get_aggregated_fields())
         return aggs
 
     def get_non_aggregated_fields(self):
