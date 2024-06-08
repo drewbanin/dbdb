@@ -293,3 +293,8 @@ iframe#webpack-dev-server-client-overlay{display:none!important}
   background: black;
   cursor: pointer;
 }
+
+::-webkit-scrollbar {
+    width: 0;  /* Remove scrollbar space */
+    background: transparent;  /* Optional: just make scrollbar invisible */
+}

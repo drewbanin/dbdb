@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo, useCallback } from 'react';
 import DataTable from 'react-data-table-component';
 
 import { QueryContext } from '../Store.js';
@@ -26,18 +26,6 @@ function ResultTable() {
     const [ resultData ] = result;
     const [ resultSchema ] = schema;
 
-
-    if (!resultData || !resultSchema) {
-        return (<div style={{ marginTop: 10 }}>NO DATA</div>)
-    }
-
-    /*
-     * instead of scrolling into view as a row is returned, instead, scroll
-     * into view as a note is played by the music player. Active rows should be
-     * highlighted in a default color, or the color can be set by returning
-     * a value called _color (or w/e) from the SQL query
-     */
-
     const formatRow = (row) => {
         Object.keys(row).forEach((key) => {
             const value = row[key];
@@ -54,18 +42,23 @@ function ResultTable() {
         return row;
     }
 
-    const columns = resultSchema.map( (col, i) => {
-        return {
-            name: col.toUpperCase(),
-            selector: row => row[i],
-        }
-    })
+    const columns = useMemo(() => {
+        return (resultSchema || []).map((col, i) => {
+            return {
+                name: col.toUpperCase(),
+                selector: row => row[i],
+            }
+        });
+
+    }, [resultSchema]);
 
     // const displayRows = resultData.slice(0, 1000);
-    const rows = resultData.map((row) => {
-        // this mutates
-        return formatRow(row);
-    })
+    const rows = useMemo(() => {
+        return (resultData || []).map((row) => {
+            // this mutates
+            return formatRow(row);
+        })
+    }, [resultData]);
 
     return (
         <DataTable
@@ -74,7 +67,7 @@ function ResultTable() {
             customStyles={customStyles}
             fixedHeader
             fixedHeaderScrollHeight={'500px'}
-
+            pagination
         />
     )
 }
