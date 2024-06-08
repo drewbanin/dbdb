@@ -64,7 +64,7 @@ jobs:
       - name: show python version
         run: python -c "import sys; print(sys.version)"
 
-      - name: show python version
+      - name: pytest
         env:
           DBDB_GSHEETS_API_KEY: ${{ secrets.DBDB_GSHEETS_API_KEY }}
           DBDB_OPENAI_API_KEY: ${{ secrets.DBDB_OPENAI_API_KEY }}
