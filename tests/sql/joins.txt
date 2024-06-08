@@ -1,12 +1,32 @@
 ====================================
-Not implemented
-skip
+Test inner join
 ====================================
 
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name
+from users
+inner join events on users.id = events.id
 
 ---
 
 [
-    {id: 1},
+    {name: 'drew', event: 'drove'},
+    {name: 'alice', event: 'walked'},
+    {name: 'drew', event: 'flew'},
 ]
 
