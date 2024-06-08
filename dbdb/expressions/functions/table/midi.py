@@ -1,7 +1,6 @@
-from dbdb.operators.base import Operator, OperatorConfig, pipeline
-from dbdb.tuples.rows import Rows
-from dbdb.const import ROOT_DIR
+from dbdb.expressions.functions.base import TableFunction
 
+import asyncio
 import mido
 from mido import MidiFile
 import itertools
@@ -41,28 +40,14 @@ def number_to_note(number: int) -> tuple:
     return note, octave
 
 
-class MIDIConfig(OperatorConfig):
-    def __init__(
-        self,
-        table,
-        function_args,
-    ):
-        self.table = table
-        if len(function_args) != 1:
+class MIDITableFunction(TableFunction):
+    NAMES = ['MIDI']
+
+    def __init__(self, args):
+        if len(args) != 1:
             raise RuntimeError("MIDI function expects 1 arg")
 
-        self.fname = function_args[0]
-
-
-class MIDIOperator(Operator):
-    Config = MIDIConfig
-
-    def name(self):
-        return "MIDI Reader"
-
-    @classmethod
-    def function_name(cls):
-        return "MIDI"
+        self.fname = args[0]
 
     def details(self):
         return {
@@ -70,15 +55,17 @@ class MIDIOperator(Operator):
             "columns": []
         }
 
-    async def make_iterator(self):
-        midi_file = MidiFile(self.config.fname)
+    async def fields(self):
+        return ['time', 'note', 'octave', 'freq', 'length', 'amplitude']
+
+    async def generate(self):
+        midi_file = MidiFile(self.fname)
 
         tempo = 0
         for i, track in enumerate(midi_file.tracks):
             now_playing = {}
             t = 0
             for msg in track:
-                self.stats.update_row_processed(msg)
                 t += msg.time
                 if msg.type == 'set_tempo':
                     bpm = mido.tempo2bpm(msg.tempo)
@@ -97,7 +84,7 @@ class MIDIOperator(Operator):
                     note, octave = number_to_note(msg.note)
                     frequency = note_to_frequency(note, octave)
 
-                    row = (
+                    yield (
                         start_time,
                         note,
                         int(octave),
@@ -105,21 +92,3 @@ class MIDIOperator(Operator):
                         duration,
                         1,
                     )
-                    yield row
-                    self.stats.update_row_emitted(row)
-
-        self.stats.update_done_running()
-
-    async def run(self):
-        self.stats.update_start_running()
-
-        col_names = ['time', 'note', 'octave', 'freq', 'length', 'amplitude']
-        fields = [self.config.table.field(col) for col in col_names]
-
-        iterator = self.make_iterator()
-
-        return Rows(
-            self.config.table,
-            fields,
-            iterator,
-        )

@@ -15,10 +15,10 @@ from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator
 from dbdb.operators.distinct import DistinctOperator
 from dbdb.operators.create import CreateTableAsOperator
+from dbdb.operators.table_function import TableFunctionOperator
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
 from dbdb.expressions import Expression, Equality, EqualityTypes
-from dbdb.lang import table_functions
 from dbdb.lang.expr_types import Star
 
 import networkx as nx
@@ -260,19 +260,21 @@ class SelectReferenceSource(SelectClause):
 
 
 class SelectFunctionSource(SelectClause):
-    def __init__(self, function_name, function_args, table_identifier):
+    def __init__(self, function_name, function_args, function_class, table_identifier):
         self.function_name = function_name
         self.function_args = function_args
+        self.function_class = function_class
         self.table = table_identifier
 
     def name(self):
         return self.table.name
 
     def as_operator(self):
-        return table_functions.as_operator(
-            self.table,
-            self.function_name,
-            self.function_args
+        return TableFunctionOperator(
+            table = self.table,
+            function_name = self.function_name,
+            function_args = self.function_args,
+            function_class = self.function_class,
         )
 
 

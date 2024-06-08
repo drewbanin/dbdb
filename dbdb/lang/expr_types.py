@@ -207,6 +207,13 @@ class AggregateFunctionCall(Expression):
         return set()
 
 
+class TableFunctionCall:
+    def __init__(self, func_name, func_expr, func_class):
+        self.func_name = func_name
+        self.func_expr = func_expr
+        self.func_class = func_class
+
+
 # Operators!
 def op_add(l, r):
     return l + r

@@ -24,7 +24,7 @@ class ProjectOperator(Operator):
             # self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
-                if projection.expr == "*":
+                if projection.is_star():
                     for value in row.data:
                         projected.append(value)
                 else:

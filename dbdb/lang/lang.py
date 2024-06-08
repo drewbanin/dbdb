@@ -10,6 +10,7 @@ from dbdb.lang.expr_types import (
     Star,
     ScalarFunctionCall,
     AggregateFunctionCall,
+    TableFunctionCall,
     BinaryOperator,
     NegationOperator,
     CaseWhen,
@@ -50,6 +51,7 @@ from dbdb.io.file_wrapper import FileReader
 from dbdb.expressions.functions.base import (
     list_aggregate_functions,
     list_scalar_functions,
+    list_table_functions,
 )
 
 
@@ -317,10 +319,11 @@ EXPRESSION = pp.Forward()
 
 scalar_func_map = list_scalar_functions()
 agg_func_map = list_aggregate_functions()
+table_func_map = list_table_functions()
 
 
 def call_scalar_function(string, loc, toks):
-    # <func_name> ( <expr> )
+    # <func_name> ( <expr>, ... )
     func_name = toks.func_name[0].upper()
     func_expr = list(toks.func_expression)
     func_class = scalar_func_map[func_name]
@@ -333,7 +336,7 @@ def call_scalar_function(string, loc, toks):
 
 
 def call_aggregate_function(string, loc, toks):
-    # <func_name> ([DISTINCT] <expr> )
+    # <func_name> ([DISTINCT] <expr>, ... )
     func_name = toks.func_name[0].upper()
     func_expr = list(toks.func_expression)
     func_class = agg_func_map[func_name]
@@ -348,6 +351,19 @@ def call_aggregate_function(string, loc, toks):
     )
 
 
+def call_table_func(string, loc, toks):
+    # <func_name> (<expr>, ... )
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = table_func_map[func_name]
+
+    return TableFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class,
+    )
+
+
 def call_window_function(string, loc, toks):
     raise RuntimeError("Window functions are not currently supported")
 
@@ -358,6 +374,8 @@ def call_function(string, loc, toks):
         return call_scalar_function(string, loc, toks)
     elif func_name in agg_func_map:
         return call_aggregate_function(string, loc, toks)
+    elif func_name in table_func_map:
+        return call_table_func(string, loc, toks)
     else:
         raise RuntimeError(f"Function {func_name} not found")
 
@@ -711,12 +729,14 @@ def make_source_function(func_source):
     func_name = func_source.func_name
     func_expr = func_source.func_expr
     func_alias = func_source.alias
+    func_class = func_source.func_class
 
     table_id = TableIdentifier.new(func_alias, func_alias)
 
     return SelectFunctionSource(
         function_name=func_name,
         function_args=[f.eval(None) for f in func_expr],
+        function_class=func_class,
         table_identifier=table_id,
     )
 
@@ -730,7 +750,7 @@ def make_reference_source(source):
 
 def extract_source(source, scopes):
     # Should this be a different type?
-    if isinstance(source, ScalarFunctionCall):
+    if isinstance(source, TableFunctionCall):
         return make_source_function(source)
 
     scope_name = source.table_name
