@@ -74,28 +74,28 @@ class NestedLoopJoinOperator(JoinOperator):
     def name(self):
         return "Nested Loop Join"
 
-    async def _join(self, left_values, right_values):
-        # Unfortunate thing: we need to materialize the
-        # left and right iterators in order to loop over
-        # them multiple times. I guess that's fine...?
-        lvals = await left_values.materialize()
-        rvals = await right_values.materialize()
+    async def cross_join(self, left_row, right_row):
+        await left_row.materialize()
+        await right_row.materialize()
 
-        # Handle cross join
-        if self.config.join_type == JoinType.CROSS:
-            async for row in self.cross_join(lvals, rvals):
-                yield row
-            return
-        elif self.config.join_type == JoinType.FULL_OUTER:
-            raise NotImplementedError()
+        lvals = left_row.data
+        rvals = right_row.data
 
-        is_outer = False
-        if self.config.join_type == JoinType.LEFT_OUTER:
-            is_outer = True
-        if self.config.join_type == JoinType.RIGHT_OUTER:
-            raise RuntimeError("right joins are not supported, sorry")
-            lvals, rvals = rvals, lvals
-            is_outer = True
+        for lval in lvals:
+            self.stats.update_row_processed(lval)
+            for rval in rvals:
+                self.stats.update_row_processed(rval)
+
+                merged = lval.merge(rval)
+                yield merged
+                self.stats.update_row_emitted(merged)
+
+    async def regular_join(self, left_row, right_row, is_outer):
+        await left_row.materialize()
+        await right_row.materialize()
+
+        lvals = left_row.data
+        rvals = right_row.data
 
         for i, lval in enumerate(lvals):
             self.stats.update_row_processed(lval)
@@ -111,10 +111,24 @@ class NestedLoopJoinOperator(JoinOperator):
             # If there was not match & it's an outer join,
             # emit a row w/ right side null
             if not matched and is_outer:
-                # TODO : Flip for right outer join...
-                merged = lval.as_tuple() + right_values.nulls()
+                merged = lval.as_tuple() + right_row.nulls()
                 # self.stats.update_row_emitted(merged)
                 yield merged
+
+    async def _join(self, left_rows, right_rows):
+        iterator = None
+        if self.config.join_type == JoinType.CROSS:
+            iterator = self.cross_join(left_rows, right_rows)
+        elif self.config.join_type == JoinType.FULL_OUTER:
+            raise NotImplementedError()
+        elif self.config.join_type == JoinType.RIGHT_OUTER:
+            raise NotImplementedError()
+        else:
+            is_outer = self.config.join_type in [JoinType.LEFT_OUTER, JoinType.RIGHT_OUTER]
+            iterator = self.regular_join(left_rows, right_rows, is_outer)
+
+        async for row in iterator:
+            yield row
 
         self.stats.update_done_running()
 

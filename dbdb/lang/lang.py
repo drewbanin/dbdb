@@ -16,7 +16,8 @@ from dbdb.lang.expr_types import (
     CaseWhen,
     CastExpr,
     JoinClause,
-    JoinCondition,
+    JoinConditionOn,
+    JoinConditionUsing,
 )
 
 from dbdb.lang.select import (
@@ -104,6 +105,7 @@ WITH = pp.CaselessKeyword("WITH")
 SELECT = pp.CaselessKeyword("SELECT")
 FROM = pp.CaselessKeyword("FROM")
 UNION = pp.CaselessKeyword("UNION")
+ALL = pp.CaselessKeyword("ALL")
 AS = pp.CaselessKeyword("AS")
 ON = pp.CaselessKeyword("ON")
 AND = pp.CaselessKeyword("AND")
@@ -173,6 +175,7 @@ BLOCK_COMMENT = pp.c_style_comment
 
 RESERVED = pp.Group(
     UNION    |
+    ALL      |
     FROM     |
     WITH     |
     SELECT   |
@@ -510,18 +513,14 @@ COLUMN_EXPR = pp.Group(
     )
 )
 
-def make_explicit_join(string, loc, toks):
-    return JoinCondition.make_from_on_expr(toks)
-
-def make_implicit_join(string, loc, toks):
-    return JoinCondition.make_from_using_expr(toks)
-
 
 def make_join(string, loc, toks):
     if toks[0] == 'JOIN':
         return JoinType.INNER
     elif toks[0] == 'INNER':
         return JoinType.INNER
+    elif toks[0] == 'LEFT':
+        return JoinType.LEFT_OUTER
     elif toks[0] == 'LEFT' and toks[1] == 'OUTER':
         return JoinType.LEFT_OUTER
     elif toks[0] == 'RIGHT' and toks[1] == 'OUTER':
@@ -555,8 +554,13 @@ UNQUALIFIED_JOIN_TYPES = (
 # TODO : For this to actually work, we need to know about the LHS and RHS
 # otherwise we cannot build the binary operator....
 JOIN_CONDITION = (
-    (ON + EXPRESSION).setParseAction(make_explicit_join) |
-    (USING + LPAR + pp.delimitedList(IDENT) + RPAR).setParseAction(make_implicit_join)
+    (ON + EXPRESSION).setParseAction(JoinConditionOn.from_tokens) |
+    (
+        USING +
+        LPAR +
+        pp.delimitedList(IDENT)("fields") +
+        RPAR
+    ).setParseAction(JoinConditionUsing.from_tokens)
 )
 
 
@@ -623,7 +627,8 @@ PLAIN_SELECT = pp.Group(
 )("select")
 
 SET_OPERATION = pp.Group(
-    pp.delimitedList(PLAIN_SELECT, UNION, min=1)
+    # UNION is the same as UNION ALL in dbdb :)
+    pp.delimitedList(PLAIN_SELECT, UNION + pp.Opt(ALL), min=1)
 )("union").setName('union')
 
 # Subqueries and CTEs
@@ -955,6 +960,9 @@ def ast_to_create_obj(ast):
 
 
 def parse_query(sql):
+    if len(sql.strip()) == 0:
+        raise RuntimeError("Query is empty")
+
     try:
         ast = GRAMMAR.parseString(sql)
     except pp.exceptions.ParseException as e:

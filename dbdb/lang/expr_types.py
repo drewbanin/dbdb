@@ -454,22 +454,38 @@ class JoinClause(Expression):
 
 
 class JoinCondition:
-    def __init__(self, join_type, join_expr):
-        self.join_type = join_type
+    ...
+
+class JoinConditionOn(JoinCondition):
+    def __init__(self, join_expr):
         self.join_expr = join_expr
 
     def eval(self, row):
         return self.join_expr.eval(row)
 
     @classmethod
-    def make_from_on_expr(cls, tokens):
-        # ON <expr>
-        return JoinCondition('ON', tokens[1])
+    def from_tokens(cls, toks):
+        on, expr = toks
+        return JoinConditionOn(expr)
+
+
+class JoinConditionUsing(JoinConditionOn):
+    def __init__(self, fields):
+        self.fields = fields
+
+    def eval(self, row):
+        field_values = {}
+
+        for field in self.fields:
+            values = list(row.iter_values_for_field(field))
+            if len(values) != 2:
+                raise RuntimeError(f"Unexpected results while processing join: {values}, {self.fields}")
+
+            if values[0] != values[1]:
+                return False
+
+        return True
 
     @classmethod
-    def make_from_using_expr(cls, tokens):
-        # USING ( <field list> )
-        # Build our own expression...
-        # TODO: What is the LHS and RHS???
-        join_expr = None
-        return JoinCondition('USING', join_expr)
+    def from_tokens(cls, toks):
+        return JoinConditionUsing(toks.fields)
