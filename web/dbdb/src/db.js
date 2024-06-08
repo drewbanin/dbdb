@@ -14,13 +14,25 @@ import { QueryContext } from './Store.js';
 function Database() {
     const [activeTab, setActiveTab] = useState('plan');
 
-    const { schema } = useContext(QueryContext);
+    const { schema, result, running } = useContext(QueryContext);
     const [ dataSchema ] = schema;
+    const [ resultData ] = result;
+    const [ queryRunning ] = running;
 
     const fields = dataSchema || [];
 
     const isMusic = fields.indexOf('time') >= 0 && fields.indexOf('freq') >= 0;
     const isXY = fields.filter(f => f.endsWith('_x')).length > 0;
+
+    function formatRowCount(count) {
+        if (!count) {
+            return ""
+        }
+
+        return count.toLocaleString() + " ROWS"
+    }
+
+    const rowCountString = formatRowCount(resultData.length);
 
     return (
         <div className="flexColumn">
@@ -46,11 +58,20 @@ function Database() {
                 <div className="flexRow">
                     <div className="flexRowBox boxWrapper" style={{ flexGrow: 1 }}>
                         <div className="tabPicker light">
-                            <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
-                            <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                <div>
+                                    <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
+                                    <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
+                                </div>
+                                {(queryRunning || resultData.length > 0) && <div style={{ textAlign: 'right', position: 'relative', bottom: -14 }}>
+                                    {rowCountString}
+                                </div>}
+                            </div>
                         </div>
-                        { activeTab === "plan" && <OperatorViz />}
-                        { activeTab === "table" && <ResultTable />}
+                        <div style={{ borderTop: '1px solid black' }}>
+                            { activeTab === "plan" && <OperatorViz />}
+                            { activeTab === "table" && <ResultTable />}
+                        </div>
                     </div>
                 </div>
             </div>

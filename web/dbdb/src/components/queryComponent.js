@@ -10,8 +10,6 @@ import { makeRoute } from '../routes.js';
 import Editor, { loader } from '@monaco-editor/react';
 import CodeTheme from './theme.json';
 
-import Spinner from '../spinner.gif';
-
 import Dropdown from 'react-dropdown';
 import 'react-dropdown/style.css';
 
@@ -20,18 +18,18 @@ import QUERIES from '../queries.js';
 
 function QueryComponent() {
 
-    const { query, result, nodes, error, schema, nodeStats } = useContext(QueryContext);
+    const { query, result, nodes, error, schema, nodeStats, running } = useContext(QueryContext);
 
     const [ queryText, setQueryText ] = query;
-    const [ rows, setRows ] = result;
+    const [ , setRows ] = result;
     const [ nodeData, setNodeData ] = nodes;
     const [ , setSchema ] = schema;
     const [ , setNodeStatData ] = nodeStats;
+    const [ queryRunning, setQueryRunning ] = running;
 
     const [ errorData, setError ] = error;
 
     const [ queryStatus, setQueryStatus ] = useState(null);
-    const [ queryRunning, setQueryRunning ] = useState(false);
 
     loader.init().then((monaco) => {
         monaco.editor.defineTheme('dbdb', CodeTheme);
@@ -139,7 +137,7 @@ function QueryComponent() {
         console.log("closing SSE")
         sse.close();
       };
-    }, [nodeData, publish, setError, setNodeStatData, setRows, setSchema]);
+    }, [nodeData, publish, setError, setNodeStatData, setRows, setSchema, setQueryRunning]);
 
     const queryOptions = QUERIES;
 
@@ -154,11 +152,6 @@ function QueryComponent() {
                     <div className="helpText">
                         <div style={{ display: 'inline-block', marginTop: 5 }}>
                             <span className="light title">QUERY</span>
-                            { !!rows.length && <span style={{marginLeft: 10, fontSize: 12}}>{rows.length} rows</span>}
-                            {queryRunning && <span>
-                                <img alt="" className="queryLoading" src={Spinner} />
-                            </span>}
-
                         </div>
 
                         <div style={{ display: 'inline-block', float: 'right'  }}>

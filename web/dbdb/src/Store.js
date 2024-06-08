@@ -14,6 +14,7 @@ const QueryContextProvider = ({ children }) => {
     const [schema, setSchema] = useState(null);
     const [nodeStats, setNodeStats] = useState({});
     const [volume, setVolume] = useState(1);
+    const [queryRunning, setQueryRunning] = useState(false);
 
     return (
         <QueryContext.Provider value={{
@@ -24,6 +25,7 @@ const QueryContextProvider = ({ children }) => {
             error: [error, setError],
             nodeStats: [nodeStats, setNodeStats],
             volume: [volume, setVolume],
+            running: [queryRunning, setQueryRunning],
         }}>
             {children}
         </QueryContext.Provider>

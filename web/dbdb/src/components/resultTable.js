@@ -16,6 +16,7 @@ const customStyles = {
             minHeight: '32px',
             fontWeight: 700,
             fontSize: '14px',
+            borderBottom: '1px solid black',
         },
     },
 }
@@ -25,9 +26,17 @@ function ResultTable() {
     const [ resultData ] = result;
     const [ resultSchema ] = schema;
 
+
     if (!resultData || !resultSchema) {
         return (<div style={{ marginTop: 10 }}>NO DATA</div>)
     }
+
+    /*
+     * instead of scrolling into view as a row is returned, instead, scroll
+     * into view as a note is played by the music player. Active rows should be
+     * highlighted in a default color, or the color can be set by returning
+     * a value called _color (or w/e) from the SQL query
+     */
 
     const formatRow = (row) => {
         Object.keys(row).forEach((key) => {
@@ -47,7 +56,7 @@ function ResultTable() {
 
     const columns = resultSchema.map( (col, i) => {
         return {
-            name: col,
+            name: col.toUpperCase(),
             selector: row => row[i],
         }
     })
@@ -63,7 +72,9 @@ function ResultTable() {
             columns={columns}
             data={rows}
             customStyles={customStyles}
-            pagination
+            fixedHeader
+            fixedHeaderScrollHeight={'500px'}
+
         />
     )
 }

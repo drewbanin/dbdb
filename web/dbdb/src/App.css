@@ -154,11 +154,6 @@ Button:disabled {
     margin-top: 0;
 }
 
-.tabPicker {
-    display: block;
-    border-bottom: 1px solid black;
-}
-
 .tabPicker Button {
     border-bottom: 0px;
     padding: 5px;
