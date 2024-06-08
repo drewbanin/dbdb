@@ -71,14 +71,14 @@ with data as (
 )
 
 select
-    sum(i * 2) + 10 as value
+    sum(i) + 10 as value
 
 from data
 
 ---
 
 [
-    {value: 10}
+    {value: 55}
 ]
 
 ====================================

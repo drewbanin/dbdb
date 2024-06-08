@@ -13,6 +13,8 @@ class AggregationMin(AggregateFunction):
         elif value < self.accum:
             self.accum = value
 
+        return self.accum
+
 
 class AggregationMax(AggregateFunction):
     NAMES = ['MAX']
@@ -24,6 +26,8 @@ class AggregationMax(AggregateFunction):
 
         elif value > self.accum:
             self.accum = value
+
+        return self.accum
 
 
 class AggregationSum(AggregateFunction):
@@ -37,6 +41,8 @@ class AggregationSum(AggregateFunction):
         else:
             self.accum += value
 
+        return self.accum
+
 
 class AggregationAverage(AggregateFunction):
     NAMES = ['AVG']
@@ -49,10 +55,6 @@ class AggregationAverage(AggregateFunction):
         value = expr[0].eval(row)
         self.accum += value
         self.seen += 1
-
-    def result(self):
-        if self.seen == 0:
-            return None
 
         return self.accum / self.seen
 
@@ -70,7 +72,6 @@ class AggregationCount(AggregateFunction):
         value = expr[0].eval(row)
         self.accum.append(value)
 
-    def result(self):
         if self.modifiers.get('DISTINCT'):
             return len(set(self.accum))
         else:
@@ -99,7 +100,6 @@ class AggregationListAgg(AggregateFunction):
         value = expr.eval(row)
         self.accum.append(value)
 
-    def result(self):
         if self.modifiers.get('DISTINCT'):
             values = []
             seen = set()

@@ -56,6 +56,7 @@ class AggregateOperator(Operator):
                 column_agg_list.append(False)
 
         group_exprs = dict()
+        proj_results = dict()
         async for row in rows:
             self.stats.update_row_processed(row)
 
@@ -67,12 +68,20 @@ class AggregateOperator(Operator):
                     group_exprs[grouping] = [proj.copy() for proj in agg_projections]
 
             # Process incremental step for aggregate functions
+            # This is kind of dumb because we are processing and _saving the results_
+            # of the expression, even if it's an incomplete aggregation! I think that's
+            # a singal that this isn't The Right Way To Do This. But, it does work because
+            # the partial agg results are overwritten for each row, and the final output
+            # for the last row is indeed the correct response to pass onto the next operator.
+            #
+            # My guess is that i should partition the execution graph up-front and then calculate
+            # all of the aggs independently before computing scalar transformations over the results.
             for proj in group_exprs[grouping]:
-                proj.eval(row)
+                proj_results[proj] = proj.eval(row)
 
-        for key, processors in group_exprs.items():
+        for key, agg_projections in group_exprs.items():
             grouped = list(key)
-            aggregated = [p.result() for p in processors]
+            aggregated = [proj_results[p] for p in agg_projections]
 
             # Reconsitute an output row in the order described
             # by the input list of projections. Both groups and

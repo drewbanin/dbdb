@@ -189,7 +189,7 @@ class AggregateFunctionCall(Expression):
             self.is_started = True
             self.processor.start()
 
-        self.processor.eval(self.func_expr, row)
+        return self.processor.eval(self.func_expr, row)
 
     def result(self):
         return self.processor.result()
@@ -214,30 +214,66 @@ class TableFunctionCall:
         self.func_class = func_class
 
 
+def nullcheck(inner):
+    def check_nulls(*args):
+        if None in args:
+            return None
+        else:
+            return inner(*args)
+    return check_nulls
+
 # Operators!
+@nullcheck
 def op_add(l, r):
     return l + r
 
+@nullcheck
 def op_sub(l, r):
     return l - r
 
+@nullcheck
 def op_mul(l, r):
     return l * r
 
+@nullcheck
 def op_div(l, r):
     return l / r
 
+@nullcheck
 def op_and(l, r):
     return l and r
 
+@nullcheck
 def op_or(l, r):
     return l or r
 
+@nullcheck
 def op_eq(l, r):
     return l == r
 
+@nullcheck
 def op_neq(l, r):
     return l != r
+
+@nullcheck
+def op_lt(l, r):
+    return l < r
+
+@nullcheck
+def op_gt(l, r):
+    return l > r
+
+@nullcheck
+def op_lte(l, r):
+    return l <= r
+
+@nullcheck
+def op_gte(l, r):
+    return l >= r
+
+@nullcheck
+def op_cast(l, r):
+    return r(l)
 
 def op_is(l, r):
     return l is r
@@ -245,20 +281,6 @@ def op_is(l, r):
 def op_is_not(l, r):
     return l is not r
 
-def op_lt(l, r):
-    return l < r
-
-def op_gt(l, r):
-    return l > r
-
-def op_lte(l, r):
-    return l <= r
-
-def op_gte(l, r):
-    return l >= r
-
-def op_cast(l, r):
-    return r(l)
 
 
 OP_MAP = {

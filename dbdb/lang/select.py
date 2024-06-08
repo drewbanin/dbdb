@@ -216,10 +216,6 @@ class SelectProjection(SelectClause):
     def eval(self, row):
         return self.expr.eval(row)
 
-    def result(self):
-        # This is only implemented for aggregate functions
-        return self.expr.result()
-
     def make_name(self):
         return self.expr.make_name()
 

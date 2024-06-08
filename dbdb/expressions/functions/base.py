@@ -45,9 +45,6 @@ class AggregateFunction:
     def eval(self, row):
         raise NotImplementedError()
 
-    def result(self):
-        return self.accum
-
 
 class TableFunction:
     NAMES = []
