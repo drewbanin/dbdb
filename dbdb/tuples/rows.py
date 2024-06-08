@@ -34,6 +34,11 @@ class RowTuple:
 
         return self.data[found]
 
+    def iter_values_for_field(self, name):
+        for i, field in enumerate(self.fields):
+            if field.is_match(name):
+                yield self.data[i]
+
     def has_field(self, name):
         for f in self.fields:
             if field.is_match(f):

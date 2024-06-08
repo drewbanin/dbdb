@@ -6,6 +6,8 @@ with users as (
     select 1 as id, 'drew' as name
     union all
     select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
 ),
 
 events as (
@@ -18,15 +20,331 @@ events as (
 
 )
 
-select users.name
+select users.name, events.event
 from users
 inner join events on users.id = events.id
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+
+====================================
+Test inner join is implicit
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+join events on users.id = events.id
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+
+====================================
+Test left outer join
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+left outer join events on users.id = events.id
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'bob', event: null},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+
+====================================
+Test left join
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+left join events on users.id = events.id
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'bob', event: null},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+
+====================================
+Test right outer join
+skip
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+right outer join events on users.id = events.id
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'bob', event: null},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+
+====================================
+Test cross join (explicit)
+====================================
+
+with users as (
+    select 1 as id, 'alice' as name
+    union all
+    select 2 as id, 'bob' as name
+),
+
+labels as (
+
+    select 'cool' as label
+    union all
+    select 'cool' as label
+
+)
+
+select users.name, labels.label
+from users
+cross join labels
+order by name, label
+
+---
+
+[
+    {name: 'alice', label: 'cool'},
+    {name: 'alice', label: 'nice'},
+    {name: 'bob', event: 'cool'},
+    {name: 'bob', event: 'nice'},
+]
+
+
+====================================
+Test cross join (implicit)
+====================================
+
+with users as (
+    select 1 as id, 'alice' as name
+    union all
+    select 2 as id, 'bob' as name
+),
+
+labels as (
+
+    select 'cool' as label
+    union all
+    select 'cool' as label
+
+)
+
+select users.name, labels.label
+from users, labels
+order by name, label
+
+---
+
+[
+    {name: 'alice', label: 'cool'},
+    {name: 'alice', label: 'nice'},
+    {name: 'bob', event: 'cool'},
+    {name: 'bob', event: 'nice'},
+]
+
+
+====================================
+Test join with expression
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+inner join events on users.id = events.id and (event = 'walked' or event = 'drove')
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'drew', event: 'drove'},
+]
+
+====================================
+Test join with using
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name
+    union all
+    select 2 as id, 'alice' as name
+    union all
+    select 3 as id, 'bob' as name
+),
+
+events as (
+
+    select 1 as id, 'drove' as event
+    union all
+    select 2 as id, 'walked' as event
+    union all
+    select 1 as id, 'flew' as event
+
+)
+
+select users.name, events.event
+from users
+join events using (id)
+order by name, event
+
+---
+
+[
+    {name: 'alice', event: 'walked'},
+    {name: 'drew', event: 'drove'},
+    {name: 'drew', event: 'flew'},
+]
+
+====================================
+Test join with using (multiple fields)
+====================================
+
+with users as (
+    select 1 as id, 'drew' as name, 'abc' as other
+    union all
+    select 2 as id, 'alice' as name, 'def' as other
+    union all
+    select 3 as id, 'bob' as name, 'ghi' as other
+),
+
+events as (
+
+    select 1 as id, 'drove' as event, 'abc' as other
+    union all
+    select 2 as id, 'walked' as event, 'abc' as other
+    union all
+    select 1 as id, 'flew' as event, 'jkl' as other
+
+)
+
+select users.name, events.event
+from users
+join events using (id, other)
+order by name, event
 
 ---
 
 [
     {name: 'drew', event: 'drove'},
-    {name: 'alice', event: 'walked'},
-    {name: 'drew', event: 'flew'},
 ]
-

@@ -62,10 +62,7 @@ def make_test_name(test_index):
 
     filename_s = filename.stem
     test_name_s = test_name.replace(" ", "-").lower()
-    if skip:
-        return f"{filename_s}.{test_name_s} (skipped)"
-    else:
-        return f"{filename_s}.{test_name_s}"
+    return f"{filename_s}.{test_name_s}"
 
 
 
