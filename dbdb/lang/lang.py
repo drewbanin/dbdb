@@ -104,6 +104,7 @@ WITH = pp.CaselessKeyword("WITH")
 SELECT = pp.CaselessKeyword("SELECT")
 FROM = pp.CaselessKeyword("FROM")
 UNION = pp.CaselessKeyword("UNION")
+ALL = pp.CaselessKeyword("ALL")
 AS = pp.CaselessKeyword("AS")
 ON = pp.CaselessKeyword("ON")
 AND = pp.CaselessKeyword("AND")
@@ -173,6 +174,7 @@ BLOCK_COMMENT = pp.c_style_comment
 
 RESERVED = pp.Group(
     UNION    |
+    ALL      |
     FROM     |
     WITH     |
     SELECT   |
@@ -623,7 +625,8 @@ PLAIN_SELECT = pp.Group(
 )("select")
 
 SET_OPERATION = pp.Group(
-    pp.delimitedList(PLAIN_SELECT, UNION, min=1)
+    # UNION is the same as UNION ALL in dbdb :)
+    pp.delimitedList(PLAIN_SELECT, UNION + pp.Opt(ALL), min=1)
 )("union").setName('union')
 
 # Subqueries and CTEs
