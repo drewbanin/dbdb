@@ -196,7 +196,7 @@ labels as (
 
     select 'cool' as label
     union all
-    select 'cool' as label
+    select 'nice' as label
 
 )
 
@@ -210,8 +210,8 @@ order by name, label
 [
     {name: 'alice', label: 'cool'},
     {name: 'alice', label: 'nice'},
-    {name: 'bob', event: 'cool'},
-    {name: 'bob', event: 'nice'},
+    {name: 'bob', label: 'cool'},
+    {name: 'bob', label: 'nice'},
 ]
 
 
@@ -229,7 +229,7 @@ labels as (
 
     select 'cool' as label
     union all
-    select 'cool' as label
+    select 'nice' as label
 
 )
 
@@ -242,8 +242,8 @@ order by name, label
 [
     {name: 'alice', label: 'cool'},
     {name: 'alice', label: 'nice'},
-    {name: 'bob', event: 'cool'},
-    {name: 'bob', event: 'nice'},
+    {name: 'bob', label: 'cool'},
+    {name: 'bob', label: 'nice'},
 ]
 
 
