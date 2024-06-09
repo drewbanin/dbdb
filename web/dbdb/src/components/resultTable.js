@@ -61,8 +61,6 @@ function ResultTable() {
     }, [resultData]);
 
 
-    // paginationRowsPerPageOptions={[15, 50, 100]}
-    // paginationPerPage={50}
     return (
         <DataTable
             columns={columns}
@@ -70,6 +68,8 @@ function ResultTable() {
             customStyles={customStyles}
             fixedHeader
             fixedHeaderScrollHeight={'500px'}
+            paginationRowsPerPageOptions={[15, 50, 100]}
+            paginationPerPage={50}
             pagination
         />
     )
