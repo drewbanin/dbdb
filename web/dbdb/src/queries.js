@@ -43,6 +43,7 @@ with scale as (
 select note, time, length, func, frequency as freq from scale
 union
 select note, time, length, func, frequency * 2 as freq from scale
+order by time
 `.trim();
 
 
@@ -109,6 +110,7 @@ melody_freq as (
 select 'sqr' as func, * from bass_freq
 union
 select 'sin' as func, * from melody_freq
+order by time
 `.trim();
 
 
@@ -148,6 +150,7 @@ melody_freq as (
 )
 
 select * from melody_freq
+order by time
 `.trim();
 
 const APHEX = `
@@ -165,7 +168,7 @@ select
     freq::float as freq,
     func
 from music
-
+order by time
 `.trim();
 
 const QUERIES = {
