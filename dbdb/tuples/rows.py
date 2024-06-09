@@ -103,7 +103,7 @@ class Rows:
                     try:
                         newval = await self.__anext__()
                     except StopAsyncIteration:
-                        return
+                        break
 
                     for consumer in self.consumers:
                         consumer.append(newval)
@@ -112,6 +112,37 @@ class Rows:
 
         return Rows(self.table, self.fields, gen(new_deque))
 
+    async def iter_rows_batches(self, take=10):
+        """
+        This is non-blocking and relies on another thread/task to
+        be consuming the output using consume(). Pretty jank, should fix.
+        """
+
+        # Run output consumer in the bg
+        rows = []
+        status = {"complete": False}
+
+        async def bg_consume():
+            consumer = self.consume()
+            async for row in consumer:
+                rows.append(row)
+                await asyncio.sleep(0)
+
+            status["complete"] = True
+
+        task = asyncio.create_task(bg_consume())
+
+        index =  0
+        while not status["complete"]:
+            batch = rows[index:index + take]
+            yield batch
+            index += len(batch)
+            await asyncio.sleep(0)
+
+        # Clean up remaining rows if complete occurs
+        # before output is fully consumed
+        if index < len(rows):
+            yield rows[index:]
 
     @classmethod
     def merge(self, row_objs, iterator):

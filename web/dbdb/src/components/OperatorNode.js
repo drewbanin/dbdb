@@ -2,7 +2,6 @@ import { useContext } from 'react';
 import { Handle, Position } from 'reactflow';
 
 import { QueryContext } from '../Store.js';
-import Spinner from '../spinner.gif';
 
 import { formatNumber } from '../Helpers.js';
 
@@ -45,9 +44,6 @@ export const OperatorNode = ({ data }) => {
       <Handle type="target" position={Position.Left} />
       <div>
         <div className="title operator-title">
-        {(state === "running") && <span>
-            <img alt="" className="queryLoading" src={Spinner} />
-        </span>}
             {data.label}
         </div>
         <div className="operator-stats">

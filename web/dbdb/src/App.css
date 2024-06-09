@@ -154,11 +154,6 @@ Button:disabled {
     margin-top: 0;
 }
 
-.tabPicker {
-    display: block;
-    border-bottom: 1px solid black;
-}
-
 .tabPicker Button {
     border-bottom: 0px;
     padding: 5px;
@@ -297,4 +292,9 @@ iframe#webpack-dev-server-client-overlay{display:none!important}
   border-radius: 50%;
   background: black;
   cursor: pointer;
+}
+
+::-webkit-scrollbar {
+    width: 0;  /* Remove scrollbar space */
+    background: transparent;  /* Optional: just make scrollbar invisible */
 }

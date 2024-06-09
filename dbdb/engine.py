@@ -2,6 +2,8 @@ from dbdb.operators.operator_stats import set_stats_callback
 from dbdb.logger import logger
 import dbdb.lang.lang
 
+import asyncio
+import threading
 import networkx as nx
 import time
 import json
@@ -32,17 +34,11 @@ def add_event(query_id, payload):
         EVENTS[query_id].append(payload)
 
 
-def pop_events(query_id):
+async def pop_events(query_id):
     event_list = EVENTS.get(query_id, [])
 
-    # This looks dumb but is actually smart. We need to pop
-    # from the left of the queue at the same time that another
-    # task could be adding to the right of the queue. Instead
-    # of looping over the list, snapshot the elements to pop
-    # up-front and then loop that last. We'll get the other
-    # elements on the next task.
-    num_events = len(event_list)
-    for i in range(num_events):
+    is_done = False
+    while not is_done and len(event_list) > 0:
         event = event_list.pop(0)
 
         event_type = event['event']
@@ -53,6 +49,8 @@ def pop_events(query_id):
             "event": "message",
             "data": json.dumps(event),
         }, is_done
+
+        await asyncio.sleep(0)
 
 
 def unset_query(query_id):
@@ -118,27 +116,16 @@ async def run_query(query_id, plan, nodes):
             }
         })
 
-    batch = []
-    async for row in output_consumer:
-        batch.append(row.as_tuple())
-        if len(batch) == 1000 and not leaf_node.is_mutation():
-            add_event(query_id, {
-                "event": "ResultRows",
-                "data": {
-                    "id": query_id,
-                    "rows": batch
-                }
-            })
-            batch = []
-    # flush the remaining items in the batch
-    if len(batch) > 0 and not leaf_node.is_mutation():
+    async for batch in output_consumer.iter_rows_batches(take=100):
+        batched_rows = [r.as_tuple() for r in batch]
         add_event(query_id, {
             "event": "ResultRows",
             "data": {
                 "id": query_id,
-                "rows": batch
+                "rows": batched_rows
             }
         })
+        await asyncio.sleep(0.1)
 
     # await output.display()
 
@@ -186,7 +173,7 @@ async def run_query(query_id, plan, nodes):
 async def safe_dispatch_query(query_id, plan, nodes):
     try:
         await run_query(query_id, plan, nodes)
-        logger.error(f"Query {query_id} completed successfully")
+        logger.info(f"Query {query_id} completed successfully")
 
     except Exception as e:
         logger.error(f"Error running query: {e}")

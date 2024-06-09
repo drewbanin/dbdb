@@ -80,18 +80,23 @@ async def message_stream(request: Request, query_id: str):
                 logger.info(f"Client disconnected (query={query_id})")
                 break
 
-            for (event, is_done) in dbdb.engine.pop_events(query_id):
+            async for (event, is_done) in dbdb.engine.pop_events(query_id):
                 yield event
+                await asyncio.sleep(0)
                 if is_done:
                     more_events = False
                     break
 
             await asyncio.sleep(STREAM_DELAY_IN_SECONDS)
 
-        dbdb.engine.unset_query(query_id)
         logger.info(f"Client request completed (query={query_id})")
+        dbdb.engine.unset_query(query_id)
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        ping=1
+    )
 
 
 @app.post("/query")

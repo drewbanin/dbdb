@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import DataTable from 'react-data-table-component';
 
 import { QueryContext } from '../Store.js';
@@ -16,6 +16,7 @@ const customStyles = {
             minHeight: '32px',
             fontWeight: 700,
             fontSize: '14px',
+            borderBottom: '1px solid black',
         },
     },
 }
@@ -24,10 +25,6 @@ function ResultTable() {
     const { result, schema } = useContext(QueryContext);
     const [ resultData ] = result;
     const [ resultSchema ] = schema;
-
-    if (!resultData || !resultSchema) {
-        return (<div style={{ marginTop: 10 }}>NO DATA</div>)
-    }
 
     const formatRow = (row) => {
         Object.keys(row).forEach((key) => {
@@ -45,24 +42,34 @@ function ResultTable() {
         return row;
     }
 
-    const columns = resultSchema.map( (col, i) => {
-        return {
-            name: col,
-            selector: row => row[i],
-        }
-    })
+    const columns = useMemo(() => {
+        return (resultSchema || []).map((col, i) => {
+            return {
+                name: col.toUpperCase(),
+                selector: row => row[i],
+            }
+        });
+
+    }, [resultSchema]);
 
     // const displayRows = resultData.slice(0, 1000);
-    const rows = resultData.map((row) => {
-        // this mutates
-        return formatRow(row);
-    })
+    const rows = useMemo(() => {
+        return (resultData || []).map((row) => {
+            // this mutates
+            return formatRow(row);
+        })
+    }, [resultData]);
 
+
+    // paginationRowsPerPageOptions={[15, 50, 100]}
+    // paginationPerPage={50}
     return (
         <DataTable
             columns={columns}
             data={rows}
             customStyles={customStyles}
+            fixedHeader
+            fixedHeaderScrollHeight={'500px'}
             pagination
         />
     )
