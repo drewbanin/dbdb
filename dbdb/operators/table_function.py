@@ -41,6 +41,7 @@ class TableFunctionOperator(Operator):
 
         processor = self.config.function_class(self.config.function_args)
         iterator = self.make_iterator(processor)
+        iterator = self.add_exit_check(iterator)
 
         fields = [
             self.config.table.field(field_name)

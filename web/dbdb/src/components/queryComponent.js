@@ -26,10 +26,10 @@ function QueryComponent() {
     const [ , setSchema ] = schema;
     const [ , setNodeStatData ] = nodeStats;
     const [ queryRunning, setQueryRunning ] = running;
-
     const [ errorData, setError ] = error;
 
     const [ queryStatus, setQueryStatus ] = useState(null);
+    const [ queryCancelling, setQueryCancelling ] = useState(false);
 
     loader.init().then((monaco) => {
         monaco.editor.defineTheme('dbdb', CodeTheme);
@@ -51,6 +51,7 @@ function QueryComponent() {
                 setNodeData(null)
             } else {
                 const cleaned = cleanDag(res);
+                console.log("CLEANED", cleaned);
                 setNodeData(cleaned);
             }
         })
@@ -73,6 +74,26 @@ function QueryComponent() {
                 const cleaned = cleanDag(res);
                 setNodeData(cleaned);
                 setQueryRunning(false);
+            }
+        })
+    };
+
+    const cancelQuery = () => {
+        const queryId = nodeData?.query_id;
+
+        if (!queryRunning || !queryId) return;
+
+        setQueryCancelling(true);
+        postRequest("terminate", {queryId: queryId}, (res) => {
+            if (res.detail) {
+                setQueryRunning(false)
+                setError({error: res.detail});
+                setNodeData(null)
+                setQueryCancelling(false);
+            } else {
+                setQueryRunning(false)
+                setError({error: res});
+                setQueryCancelling(false);
             }
         })
     };
@@ -197,8 +218,18 @@ function QueryComponent() {
                         scrollBeyondLastLine: false,
                     }}
                 />
-                <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
-                <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <div>
+                        <Button disabled={queryRunning} onClick={ runQuery } className="primaryButton">EXECUTE</Button>
+                        <Button disabled={queryRunning} onClick={ explainQuery }>EXPLAIN</Button>
+                    </div>
+                    <div style={{ marginRight: -10 }}>
+                        {queryRunning && <Button
+                            style={{ backgroundColor: '#f48498' }}
+                            disabled={queryCancelling}
+                            onClick={ cancelQuery }>CANCEL</Button>}
+                    </div>
+                </div>
                 {errorData && <div className="queryError">
                     <strong>Query Error:</strong> {errorData.error}
                 </div>}

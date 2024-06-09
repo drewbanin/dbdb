@@ -42,14 +42,13 @@ class RenameScopeOperator(Operator):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
 
-        self.iterator = iterator
-
         derived_table = TableIdentifier(name=self.config.scope_name)
         mapped_fields = [
             FieldIdentifier(name=field.name, parent=derived_table)
             for field in rows.fields
         ]
 
+        iterator = self.add_exit_check(iterator)
         return Rows(
             table=derived_table,
             fields=mapped_fields,

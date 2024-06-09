@@ -163,11 +163,12 @@ class AggregateOperator(Operator):
         fields = self.field_names(table_identifier)
 
         iterator = self.make_iterator(rows)
-        self.iterator = iterator
 
         # This gets a temporary name because we do not know the name
         # of this table... in fact... there is none!? I might need to
         # think about that more because fields are still scoped to their
         # parent locations.. which is kind of confusing.... hm....
+
+        iterator = self.add_exit_check(iterator)
 
         return Rows(table_identifier, fields, iterator)

@@ -67,9 +67,9 @@ function ResultTable() {
             data={rows}
             customStyles={customStyles}
             fixedHeader
-            fixedHeaderScrollHeight={'500px'}
+            fixedHeaderScrollHeight={'515px'}
             paginationRowsPerPageOptions={[15, 50, 100]}
-            paginationPerPage={50}
+            paginationPerPage={15}
             pagination
         />
     )

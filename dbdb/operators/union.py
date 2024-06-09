@@ -36,7 +36,7 @@ class UnionOperator(Operator):
     async def run(self, rows):
         self.stats.update_start_running()
         iterator = self.make_iterator(rows)
-        self.iterator = iterator
+        iterator = self.add_exit_check(iterator)
 
         # Just use fields from first input. Probably
         # would be a good idea to validate shape of inputs.

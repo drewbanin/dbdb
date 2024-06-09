@@ -97,6 +97,6 @@ class CreateTableAsOperator(Operator):
     async def run(self, rows):
         self.rows_written = 0
         self.stats.update_start_running()
-        self.iterator = self.make_iterator(rows)
-
-        return rows.new(self.iterator)
+        iterator = self.make_iterator(rows)
+        iterator = self.add_exit_check(iterator)
+        return rows.new(iterator)

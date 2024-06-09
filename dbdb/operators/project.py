@@ -62,5 +62,5 @@ class ProjectOperator(Operator):
         fields = self.list_fields(rows)
 
         iterator = self.make_iterator(rows)
-        self.iterator = iterator
+        iterator = self.add_exit_check(iterator)
         return Rows(rows.table, fields, iterator)

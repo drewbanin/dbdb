@@ -60,8 +60,8 @@ function Database() {
                         <div className="tabPicker light">
                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                 <div>
-                                    <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
                                     <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
+                                    <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
                                 </div>
                                 {(queryRunning || resultData.length > 0) && <div style={{ textAlign: 'right', position: 'relative', bottom: -14 }}>
                                     {rowCountString}
