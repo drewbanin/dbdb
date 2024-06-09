@@ -68,8 +68,8 @@ function Database() {
                                     <Button className={activeTab === "table" ? "selected" : ""} onClick={ e => setActiveTab("table") }>RESULTS</Button>
                                     <Button className={activeTab === "plan" ? "selected" : ""}onClick={ e => setActiveTab("plan") }>QUERY PLAN</Button>
                                 </div>
-                                {(queryRunning || resultData.length > 0) && <div style={{ textAlign: 'right', position: 'relative', bottom: -14 }}>
-                                    {rowCountString}
+                                {(queryRunning || resultData.length > 0) && <div style={{ textAlign: 'right', position: 'relative', bottom: -20, fontSize: 12 }}>
+                                    <span>{rowCountString}</span>
                                 </div>}
                             </div>
                         </div>

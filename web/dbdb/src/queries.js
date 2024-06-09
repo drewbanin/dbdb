@@ -1,11 +1,11 @@
 
 const MATH = `
 select
-    i / 100 as sin_x,
-    sin(i / 100) + sin (1.1 * i / 100) as sin_y,
+    i / 20 as sin_x,
+    sin(i / 20) + sin (1.1 * i / 20) as sin_y,
     '#000000' as sin_color
 
-from generate_series(1300, 0.002)
+from generate_series(2000, 0.001)
 `.trim();
 
 const DELAY = `
