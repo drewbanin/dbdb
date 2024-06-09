@@ -408,6 +408,7 @@ export function Visualizer() {
 
         // initialized w/ saved volume level
         gain.current = newGain;
+        console.log("initialized volume to", volumeRef.current);
         gain.current.gain.value = volumeRef.current;
 
         audioCtx.current.suspend();
@@ -463,6 +464,7 @@ export function Visualizer() {
     function updateVolume(level) {
         console.log("Setting gain to", level);
         gain.current.gain.value = level;
+        volumeRef.current = level;
     }
 
     return (
