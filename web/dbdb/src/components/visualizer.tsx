@@ -141,12 +141,17 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   }, 0)
 
   const xDomain = maxFreq + 1;
-  let stepSize = Math.floor(xDomain / 50);
+  const steps = 50;
+  let stepSize = Math.max(Math.floor(xDomain / steps), 1);
+
+  if (stepSize < 1) {
+      stepSize = 1;
+  }
 
   const xVals = [];
   const yVals = [];
 
-  for (let i=0; i < (xDomain / stepSize); i += 1) {
+  for (let i=0; i < steps ; i += 1) {
       const xStart = Math.floor(i * stepSize);
       const xEnd = Math.ceil(xStart + stepSize);
 
@@ -363,8 +368,9 @@ export function Visualizer() {
     const volumeRef = useRef(musicVolume);
 
     const stopSound = () => {
-        source.current.stop();
-
+        if (source.current) {
+            source.current.stop();
+        }
         setPlayTime(0);
         setAudioState('done');
     }
@@ -388,6 +394,7 @@ export function Visualizer() {
 
     useEffect(() => {
         if (mappedRows.length === 0) {
+            stopSound();
             return
         }
 
