@@ -15,6 +15,7 @@ const QueryContextProvider = ({ children }) => {
     const [nodeStats, setNodeStats] = useState({});
     const [volume, setVolume] = useState(1);
     const [queryRunning, setQueryRunning] = useState(false);
+    const [isFullscreen, setFullscreen] = useState(false);
 
     return (
         <QueryContext.Provider value={{
@@ -26,6 +27,7 @@ const QueryContextProvider = ({ children }) => {
             nodeStats: [nodeStats, setNodeStats],
             volume: [volume, setVolume],
             running: [queryRunning, setQueryRunning],
+            fullscreen: [isFullscreen, setFullscreen],
         }}>
             {children}
         </QueryContext.Provider>

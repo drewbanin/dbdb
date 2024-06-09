@@ -9,7 +9,7 @@
 }
 
 .App {
-    margin: 20px 40px;
+    margin: 40px 40px;
     font-family: MonaspaceNeon;
 }
 
@@ -111,9 +111,9 @@ Button:disabled {
 
 .panelHeader {
     border: 1px solid black;
-    margin-top: 20px;
     text-align: left;
     border-bottom: 0;
+    /* margin-top: 20px; */
 }
 
 .light {
@@ -139,6 +139,10 @@ Button:disabled {
 
 .fixedHeight {
     height: 200px;
+}
+
+.minFixedHeight {
+    min-height: 100%;
 }
 
 .bottomRow {
@@ -298,4 +302,25 @@ iframe#webpack-dev-server-client-overlay{display:none!important}
 ::-webkit-scrollbar {
     width: 0;  /* Remove scrollbar space */
     background: transparent;  /* Optional: just make scrollbar invisible */
+}
+
+.fullScreenViz {
+    position: fixed;
+    left: 20%;
+    top: 20%;
+    width: calc(100vw - 40%);
+    height: 400px;
+    min-height: 400px;
+    z-index: 999;
+    background-color: white;
+
+    box-shadow: 0px 0px 400px 100px #ffffff;
+
+    /* Account for panel header height */
+    padding-bottom: 36px;
+}
+
+.regularViz {
+    min-height: 200px;
+    height: 200px;
 }

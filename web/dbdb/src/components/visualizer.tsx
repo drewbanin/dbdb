@@ -335,13 +335,13 @@ function TimeDomainViz({ playing, rows, offset }) {
 }
 
 export function Visualizer() {
-    const { result, schema, volume } = useContext(QueryContext);
+    const { result, schema, volume, fullscreen } = useContext(QueryContext);
     const [ rows ] = result;
     const [ dataSchema ] = schema;
     const [ musicVolume ] = volume;
+    const [ isFullscreen, setFullscreen ] = fullscreen;
 
     const [ playTime, setPlayTime ] = useState(null);
-
     const [ audioState, setAudioState ] = useState('waiting');
 
     const source = useRef(null);
@@ -487,32 +487,36 @@ export function Visualizer() {
                                     onClick={ e => setVizType('pie') }
                                     className="light title">BEN</button>
 
-                                { showMediaControls && <div style={{ margin: 0, float: 'right' }}>
-                                    <VolumePicker onVolumeChange={updateVolume} />
+                                <div style={{ margin: 0, float: 'right' }}>
+                                    { showMediaControls && 
+                                        <>
+                                            <VolumePicker onVolumeChange={updateVolume} />
+
+                                            <button
+                                                style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
+                                                onClick={ e => playPauseSound() }
+                                                className="light title"> {playPauseLabel}
+                                            </button>
+
+                                            <button
+                                                style={{ margin: 0, verticalAlign: 'top', marginRight: 5 }}
+                                                onClick={ e => stopSound() }
+                                                className="light title">STOP</button>
+                                        </>
+                                    }
 
                                     <button
-                                        style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
-                                        onClick={ e => playPauseSound() }
-                                        className="light title"> {playPauseLabel}
-                                    </button>
-
-                                    <button
-                                        style={{ margin: 0, verticalAlign: 'top', marginRight: 5 }}
-                                        onClick={ e => stopSound() }
-                                        className="light title">STOP</button>
-
-                                    <button
+                                        onClick={e => setFullscreen(!isFullscreen)}
                                         style={{ margin: 0, verticalAlign: 'top' }}
                                         className="light title">
-                                        <FullScreenIcon />
-
+                                        <FullScreenIcon isFullscreen={isFullscreen} />
                                     </button>
-                                </div>}
+                                </div>
                             </>
                     </div>
                 </div>
             </div>
-            <div className="configBox fixedHeight">
+            <div className="configBox minFixedHeight">
                 {showFreq && <FrequencyDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
                 {showTime && <TimeDomainViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
                 {showPie && <PieViz playing={isPlaying} rows={mappedRows} offset={playTime} />}
@@ -588,7 +592,7 @@ export function XYViz() {
                     </div>
                 </div>
             </div>
-            <div className="configBox fixedHeight">
+            <div className="configBox minFixedHeight">
                 <ResponsiveChartContainer
                   series={viz}
                   margin={{
@@ -607,7 +611,8 @@ export function XYViz() {
 
 }
 
-export function PlaceholderViz() {
+export function PlaceholderViz({ text }) {
+    const showText = text || 'RUN A QUERY';
     return (<>
             <div className="panelHeader">
                 <div style={{ padding: 5 }}>
@@ -615,8 +620,8 @@ export function PlaceholderViz() {
                     </div>
                 </div>
             </div>
-            <div className="configBox fixedHeight">
-                <div>RUN A QUERY</div>
+            <div className="configBox minFixedHeight">
+                <div>{showText}</div>
             </div>
         </>);
 

@@ -1,5 +1,5 @@
 
-function FullScreenIcon() {
+function FullScreenIcon({ isFullscreen }) {
     return (
         <div style={{ width: 12, height: 12, paddingBottom: 4}}>
             <svg height="100%" version="1.1" viewBox="10 10 16 16" width="100%">
