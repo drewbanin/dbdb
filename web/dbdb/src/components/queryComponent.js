@@ -51,7 +51,6 @@ function QueryComponent() {
                 setNodeData(null)
             } else {
                 const cleaned = cleanDag(res);
-                console.log("CLEANED", cleaned);
                 setNodeData(cleaned);
             }
         })
