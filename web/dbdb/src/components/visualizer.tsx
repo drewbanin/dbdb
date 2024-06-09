@@ -3,6 +3,7 @@ import { useSub } from '../Hooks.js';
 
 import { QueryContext } from '../Store.js';
 import VolumePicker from './volumePicker.tsx';
+import FullScreenIcon from './fullScreen.js';
 
 import {
     BarPlot,
@@ -496,9 +497,16 @@ export function Visualizer() {
                                     </button>
 
                                     <button
-                                        style={{ margin: 0, verticalAlign: 'top' }}
+                                        style={{ margin: 0, verticalAlign: 'top', marginRight: 5 }}
                                         onClick={ e => stopSound() }
                                         className="light title">STOP</button>
+
+                                    <button
+                                        style={{ margin: 0, verticalAlign: 'top' }}
+                                        className="light title">
+                                        <FullScreenIcon />
+
+                                    </button>
                                 </div>}
                             </>
                     </div>

@@ -96,6 +96,7 @@ Button:hover {
     color: white;
     background-color: black;
     font-weight: 500;
+    fill: white;
 }
 
 Button:disabled:hover {
