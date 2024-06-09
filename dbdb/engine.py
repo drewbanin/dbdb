@@ -14,6 +14,7 @@ import os
 # Store events and query results globally
 EVENTS = {}
 QUERY_CACHE = {}
+RUNNING_QUERIES = {}
 
 
 def push_cache(query_id, data):
@@ -71,12 +72,6 @@ async def run_query(query_id, plan, nodes):
     })
 
     def on_stat(name, stat, event_name='OperatorStats'):
-        if name == "processing":
-            # sample it
-            # TODO : this is probably dumb
-            if random.random() > 0.05:
-                return
-
         add_event(query_id, {
             "event": event_name,
             "name": name,
@@ -193,7 +188,8 @@ def dispatch_query(loop, query_id, plan, nodes):
     # Note that the loop is passed in from the request handler, so
     # this background task will run in the main server loop. Better
     # hope i didn't make any mistakes with asyncio in the db :)
-    loop.create_task(safe_dispatch_query(query_id, plan, nodes))
+    task = loop.create_task(safe_dispatch_query(query_id, plan, nodes))
+    RUNNING_QUERIES[query_id] = plan, task
 
 
 def plan_query(sql):
@@ -208,3 +204,13 @@ def plan_query(sql):
 
     query_id = str(id(plan))
     return query_id, plan, nodes, edges
+
+
+def terminate_query(query_id):
+    plan, task = RUNNING_QUERIES[query_id]
+    for node in list(plan):
+        node.exit()
+
+    task.cancel()
+
+    logger.info(f"Cancelled query #{query_id}")

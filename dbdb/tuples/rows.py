@@ -123,12 +123,15 @@ class Rows:
         status = {"complete": False}
 
         async def bg_consume():
-            consumer = self.consume()
-            async for row in consumer:
-                rows.append(row)
-                await asyncio.sleep(0)
+            try:
+                consumer = self.consume()
+                async for row in consumer:
+                    rows.append(row)
+                    await asyncio.sleep(0)
 
-            status["complete"] = True
+                status["complete"] = True
+            except GeneratorExit:
+                return
 
         task = asyncio.create_task(bg_consume())
 

@@ -111,7 +111,7 @@ async def run_query(query: Query, background_tasks: BackgroundTasks):
 
     # Add background task to run query
     loop = asyncio.get_event_loop()
-    background_tasks.add_task(
+    task = background_tasks.add_task(
         dbdb.engine.dispatch_query,
         # Args
         loop,
@@ -149,3 +149,10 @@ async def explain_query(query: Query):
         "nodes": [node.to_dict() for node in nodes],
         "edges": edges,
     }
+
+
+@app.post("/terminate")
+async def terminate(body: QueryId):
+    query_id = body.queryId
+    dbdb.engine.terminate_query(query_id)
+    return f"query #{query_id} terminated"

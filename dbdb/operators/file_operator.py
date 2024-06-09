@@ -103,6 +103,7 @@ class TableGenOperator(Operator):
 
         columns = []
         iterator = self.make_iterator()
+        iterator = self.add_exit_check(iterator)
 
         return Rows(
             self.config.table,

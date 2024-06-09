@@ -160,8 +160,8 @@ Button:disabled {
 }
 
 .tabPicker Button.selected {
-    color: black;
-    background-color: #CBC3E3;
+    border-bottom: 1px solid white;
+    margin-bottom: -1px;
 }
 
 .react-flow__handle {

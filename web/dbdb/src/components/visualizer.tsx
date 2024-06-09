@@ -368,10 +368,11 @@ export function Visualizer() {
     const volumeRef = useRef(musicVolume);
 
     const stopSound = () => {
-        if (source.current) {
+        if (source.current && source.current.context.state === 'running') {
             source.current.stop();
         }
         setPlayTime(0);
+        source.current = null;
         setAudioState('done');
     }
 
