@@ -72,12 +72,6 @@ async def run_query(query_id, plan, nodes):
     })
 
     def on_stat(name, stat, event_name='OperatorStats'):
-        if name == "processing":
-            # sample it
-            # TODO : this is probably dumb
-            if random.random() > 0.05:
-                return
-
         add_event(query_id, {
             "event": event_name,
             "name": name,
