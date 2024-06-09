@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useCallback } from 'react';
+import React, { useContext, useMemo } from 'react';
 import DataTable from 'react-data-table-component';
 
 import { QueryContext } from '../Store.js';
@@ -60,6 +60,9 @@ function ResultTable() {
         })
     }, [resultData]);
 
+
+    // paginationRowsPerPageOptions={[15, 50, 100]}
+    // paginationPerPage={50}
     return (
         <DataTable
             columns={columns}
