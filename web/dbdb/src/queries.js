@@ -3,9 +3,9 @@ const MATH = `
 select
     i / 100 as sin_x,
     sin(i / 100) + sin (1.1 * i / 100) as sin_y,
-    '#CBC3E3' as sin_color
+    '#000000' as sin_color
 
-from generate_series(10000)
+from generate_series(1300, 0.002)
 `.trim();
 
 const DELAY = `

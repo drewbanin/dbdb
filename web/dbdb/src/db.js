@@ -14,10 +14,12 @@ import { QueryContext } from './Store.js';
 function Database() {
     const [activeTab, setActiveTab] = useState('plan');
 
-    const { schema, result, running } = useContext(QueryContext);
+    const { schema, result, running, fullscreen } = useContext(QueryContext);
     const [ dataSchema ] = schema;
     const [ resultData ] = result;
     const [ queryRunning ] = running;
+
+    const [ isFullscreen ] = fullscreen;
 
     const fields = dataSchema || [];
 
@@ -45,7 +47,10 @@ function Database() {
                     </div>
                     <div className="statsPanel" style={{ marginLeft: 40, flexGrow: 0, minWidth: 500, maxWith: 500, width: 500}}>
                         <div className="boxWrapper">
-                            <div className="flexColumn">
+                            {isFullscreen && <div className="flexColumn regularViz">
+                                <PlaceholderViz text="RUNNING IN FULL SCREEN" />
+                            </div>}
+                            <div className={"flexColumn " + (isFullscreen ? 'fullScreenViz' : "regularViz")}>
                                 {isMusic && <Visualizer />}
                                 {isXY && <XYViz />}
                                 {(!isXY && !isMusic) &&  <PlaceholderViz />}
