@@ -1,4 +1,3 @@
-
 from dbdb.io.types import DataEncoding, DataType
 from dbdb.io import compressor
 from itertools import chain
@@ -20,7 +19,7 @@ def rle_encode(iterable, max_repeats=255):
         repeated = 1
         this_element = iterable[index]
 
-        for j, next_element in enumerate(iterable[index + 1:]):
+        for j, next_element in enumerate(iterable[index + 1 :]):
             if next_element == this_element and repeated < max_repeats:
                 repeated += 1
             else:
@@ -44,13 +43,13 @@ def encode_null_bitmap(data):
 
     byte_size = 8
     for byte_index in range(0, len(data), byte_size):
-        block = data[byte_index:byte_index+byte_size]
+        block = data[byte_index : byte_index + byte_size]
 
         byte = 0
         for bit_index, element in enumerate(block):
-            present = (element is not None)
+            present = element is not None
             if present:
-                place = 2 ** bit_index
+                place = 2**bit_index
                 byte = byte | place
                 without_nulls.append(element)
 
@@ -68,14 +67,14 @@ def decode_null_bitmap(bitfield_buffer, data, num_records):
     elements_created = 0
     for (byte,) in bitfield_bytes:
         for bit_index in range(byte_size):
-            place = 2 ** bit_index
-            present = (byte & place)
+            place = 2**bit_index
+            present = byte & place
 
             elements_created += 1
             if present:
                 value = data[element_index]
                 if isinstance(value, bytes):
-                    value = value.decode().strip('\x00')
+                    value = value.decode().strip("\x00")
                 yield value
                 element_index += 1
             else:
@@ -97,15 +96,14 @@ class DataEncoder:
 
     def chunk_to_pages(self, data):
         column_size = DataType.size(
-            self.column_info.column_type,
-            self.column_info.column_width
+            self.column_info.column_type, self.column_info.column_width
         )
 
         values_per_page = int(PAGE_SIZE / column_size)
 
         pages = []
         for i in range(0, len(data), values_per_page):
-            page = data[i:i+values_per_page]
+            page = data[i : i + values_per_page]
             pages.append(page)
 
         return pages
@@ -114,7 +112,7 @@ class DataEncoder:
         i = 0
         while i < len(buffer):
             # Read number of bytes in page
-            (page_size, ) = struct.unpack_from('>i', buffer, offset=i)
+            (page_size,) = struct.unpack_from(">i", buffer, offset=i)
 
             # Advance past page_size
             page_start = i + 4
@@ -155,7 +153,7 @@ class DataEncoder:
             compressed = self.compress_page(page)
 
             page_size = len(compressed)
-            page_size_p = struct.pack('>i', page_size)
+            page_size_p = struct.pack(">i", page_size)
             buffer.extend(page_size_p)
             buffer.extend(compressed)
 
@@ -187,8 +185,8 @@ class DataEncoder:
         # then data
 
         (bitfield_size,) = struct.unpack_from(">i", buffer, 0)
-        bitfield_buffer = buffer[4:4+bitfield_size]
-        data_buffer = buffer[4+bitfield_size:]
+        bitfield_buffer = buffer[4 : 4 + bitfield_size]
+        data_buffer = buffer[4 + bitfield_size :]
 
         return bitfield_buffer, data_buffer
 
@@ -215,11 +213,7 @@ class DataEncoder:
             decoded = self._decode(data_buffer)
             # TODO : I don't think i did this right... it should be #
             # of records in a page, not number of records in one column.
-            with_nulls = decode_null_bitmap(
-                bitfield_buffer,
-                decoded,
-                num_records
-            )
+            with_nulls = decode_null_bitmap(bitfield_buffer, decoded, num_records)
             flat.extend(with_nulls)
 
         return flat
@@ -230,7 +224,7 @@ class DataEncoder:
             fh.seek(pos)
             # Read number of bytes in page
             buffer = fh.read(4)
-            (page_size, ) = struct.unpack('>i', buffer)
+            (page_size,) = struct.unpack(">i", buffer)
 
             # Advance past page_size
             buffer = fh.read(page_size)
@@ -251,11 +245,7 @@ class DataEncoder:
         for page in self.iter_pages(fh, start, end):
             bitfield_buffer, data_buffer = self.decode_bitfield(page)
             decoded = self._decode(data_buffer)
-            with_nulls = decode_null_bitmap(
-                bitfield_buffer,
-                decoded,
-                num_records
-            )
+            with_nulls = decode_null_bitmap(bitfield_buffer, decoded, num_records)
             yield from with_nulls
 
     def valid_type(self):
@@ -267,8 +257,7 @@ class DataEncoder:
 
         encoder = type(self).__name__
         raise RuntimeError(
-            f"Cannot encode data of type {self.col_type} with encoder "
-            f"{encoder}"
+            f"Cannot encode data of type {self.col_type} with encoder " f"{encoder}"
         )
 
 
@@ -277,11 +266,8 @@ class RawEncoder(DataEncoder):
         buffer = bytearray()
 
         column_type = self.column_info.column_type
-        pack_string = DataType.pack_string(
-            column_type,
-            self.column_info.column_width
-        )
-        pack_f = f'>{pack_string}'
+        pack_string = DataType.pack_string(column_type, self.column_info.column_width)
+        pack_f = f">{pack_string}"
 
         for value in data:
             encodable = DataType.as_bytes(column_type, value)
@@ -292,11 +278,8 @@ class RawEncoder(DataEncoder):
 
     def _decode(self, page):
         column_type = self.column_info.column_type
-        pack_string = DataType.pack_string(
-            column_type,
-            self.column_info.column_width
-        )
-        pack_f = f'>{pack_string}'
+        pack_string = DataType.pack_string(column_type, self.column_info.column_width)
+        pack_f = f">{pack_string}"
 
         unpacked = struct.iter_unpack(pack_f, page)
         return [el[0] for el in unpacked]
@@ -317,11 +300,10 @@ class RunLengthEncoder(DataEncoder):
         # is 8kb. If that changes (or is configurable) we might
         # need to update this
         pack_string = DataType.pack_string(
-            self.column_info.column_type,
-            self.column_info.column_width
+            self.column_info.column_type, self.column_info.column_width
         )
 
-        pack_f = f'>B{pack_string}'
+        pack_f = f">B{pack_string}"
 
         # Loop over page and encode values
         i = 0
@@ -352,11 +334,8 @@ class RunLengthEncoder(DataEncoder):
 
     def _decode(self, page):
         column_type = self.column_info.column_type
-        pack_string = DataType.pack_string(
-            column_type,
-            self.column_info.column_width
-        )
-        pack_f = f'>B{pack_string}'
+        pack_string = DataType.pack_string(column_type, self.column_info.column_width)
+        pack_f = f">B{pack_string}"
 
         unpacked = struct.iter_unpack(pack_f, page)
 
@@ -385,10 +364,9 @@ class DeltaEncoder(DataEncoder):
         # is 8kb. If that changes (or is configurable) we might
         # need to update this
         pack_string = DataType.pack_string(
-            self.column_info.column_type,
-            self.column_info.column_width
+            self.column_info.column_type, self.column_info.column_width
         )
-        pack_f = f'>{pack_string}'
+        pack_f = f">{pack_string}"
 
         # Loop over page and encode values
         i = 0
@@ -409,11 +387,8 @@ class DeltaEncoder(DataEncoder):
 
     def _decode(self, page):
         column_type = self.column_info.column_type
-        pack_string = DataType.pack_string(
-            column_type,
-            self.column_info.column_width
-        )
-        pack_f = f'>{pack_string}'
+        pack_string = DataType.pack_string(column_type, self.column_info.column_width)
+        pack_f = f">{pack_string}"
 
         unpacked = struct.iter_unpack(pack_f, page)
 
@@ -429,9 +404,7 @@ class DeltaEncoder(DataEncoder):
 
 class DictionaryEncoder(DataEncoder):
     def valid_type(self):
-        return self.col_type in (
-            DataType.STR,
-        )
+        return self.col_type in (DataType.STR,)
 
     def _pack_header(self, dictionary):
         dict_buffer = bytearray()
@@ -439,13 +412,13 @@ class DictionaryEncoder(DataEncoder):
         # Construct dictionary first so we know the size
         for val in dictionary:
             # Pack in a null bit for string terminal
-            pack_f = f'>{len(val)}sc'
+            pack_f = f">{len(val)}sc"
             encodable = DataType.as_bytes(self.column_info.column_type, val)
-            packed = struct.pack(pack_f, encodable, b'\x00')
+            packed = struct.pack(pack_f, encodable, b"\x00")
             dict_buffer.extend(packed)
 
         buffer = bytearray()
-        size_p = struct.pack('>B', len(dict_buffer))
+        size_p = struct.pack(">B", len(dict_buffer))
 
         buffer.extend(size_p)
         buffer.extend(dict_buffer)
@@ -453,12 +426,12 @@ class DictionaryEncoder(DataEncoder):
         return buffer
 
     def _unpack_header(self, page):
-        (dict_length,) = struct.unpack_from('>B', page, 0)
+        (dict_length,) = struct.unpack_from(">B", page, 0)
 
         # read dict_length bytes and split on null bytes
-        buffer = page[1:1+dict_length]
+        buffer = page[1 : 1 + dict_length]
 
-        pack_f = f'>{dict_length}s'
+        pack_f = f">{dict_length}s"
         (dict_entries_s,) = struct.unpack(pack_f, buffer)
 
         null = b"\x00"
@@ -469,7 +442,7 @@ class DictionaryEncoder(DataEncoder):
             entry_s = entry.decode("ascii")
             dictionary[i] = entry_s
 
-        rest = page[1+dict_length:]
+        rest = page[1 + dict_length :]
         return dictionary, rest
 
     def get_dictionary(self, data):
@@ -501,7 +474,7 @@ class DictionaryEncoder(DataEncoder):
         lookup = {val: i for i, val in enumerate(dictionary)}
         for value in data:
             index = lookup[value]
-            packed = struct.pack('>B', index)
+            packed = struct.pack(">B", index)
             buffer.extend(packed)
 
         return buffer
@@ -509,7 +482,7 @@ class DictionaryEncoder(DataEncoder):
     def _decode(self, page):
         dictionary, page = self._unpack_header(page)
 
-        unpacked = struct.iter_unpack('>B', page)
+        unpacked = struct.iter_unpack(">B", page)
         return [dictionary[val] for (val,) in unpacked]
 
 

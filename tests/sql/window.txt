@@ -1,0 +1,30 @@
+====================================
+Test window functions
+====================================
+
+with data as (
+
+    select i from generate_series(10)
+
+)
+
+select
+    count(1) over () as val_count
+
+from data
+
+---
+
+[{
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+    val_count: 10,
+}]
+

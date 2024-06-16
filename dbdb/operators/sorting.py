@@ -1,6 +1,6 @@
 from dbdb.operators.base import Operator, OperatorConfig
-from dbdb.lang.expr_types import Literal
-import itertools
+from dbdb.expressions.expressions import Literal
+from dbdb.tuples.context import ExecutionContext
 
 
 class ReverseSort:
@@ -36,11 +36,12 @@ class SortOperator(Operator):
 
         self.stats.update_row_processed(row)
         sort_keys = []
+        context = ExecutionContext(row=row)
         for ascending, projection in self.config.order:
             if isinstance(projection, Literal):
                 key = row.data[projection.value() - 1]
             else:
-                key = projection.eval(row)
+                key = projection.eval(context)
 
             if not ascending:
                 key = ReverseSort(key)

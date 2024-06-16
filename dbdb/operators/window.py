@@ -3,23 +3,34 @@ from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import FieldIdentifier
 from dbdb.tuples.context import ExecutionContext
 
+from collections import defaultdict
+import enum
+import itertools
 
-class ProjectConfig(OperatorConfig):
-    def __init__(self, project=None):
-        self.project = project
+
+class WindowConfig(OperatorConfig):
+    def __init__(
+        self,
+        projections,
+    ):
+        self.projections = projections
 
 
-class ProjectOperator(Operator):
-    Config = ProjectConfig
+class WindowOperator(Operator):
+    Config = WindowConfig
 
     def name(self):
-        return "Projection"
+        return "Window"
 
-    async def make_iterator(self, tuples):
-        projections = self.config.project
+    async def make_iterator(self, rows):
+        projections = self.config.projections.projections
 
-        async for row in tuples:
-            context = ExecutionContext(row=row)
+        rows = rows.materialize()
+
+        index = 0
+        async for row in rows:
+            context = ExecutionContext(row=row, row_index=index, rows=rows)
+
             self.stats.update_row_processed(row)
             # self.stats.update_row_processed(row)
             projected = []
@@ -33,10 +44,12 @@ class ProjectOperator(Operator):
 
             yield projected
             self.stats.update_row_emitted(projected)
-            # self.stats.update_row_emitted(row)
+            index += 1
+
         self.stats.update_done_running()
 
     def list_fields(self, rows):
+        # TODO : This is a dupe of the impl in project.py...!
         fields = []
         projections = self.config.project
         for i, projection in enumerate(projections):
@@ -58,9 +71,8 @@ class ProjectOperator(Operator):
 
     async def run(self, rows):
         self.stats.update_start_running()
-
-        fields = self.list_fields(rows)
-
         iterator = self.make_iterator(rows)
         iterator = self.add_exit_check(iterator)
+
+        fields = self.list_fields(rows)
         return Rows(rows.table, fields, iterator)

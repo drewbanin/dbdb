@@ -1,4 +1,3 @@
-
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
 
@@ -13,7 +12,6 @@ class TableScanConfig(OperatorConfig):
         self,
         table_ref,
         columns,
-
         limit=None,
         order=None,
     ):
@@ -55,15 +53,14 @@ class TableScanOperator(Operator):
         scanned_columns = [c.to_dict() for c in column_data]
         column_names = [c.column_name for c in column_data]
 
-        self.stats.update_custom_stats({
-            "scanned_columns": scanned_columns,
-            "file_ref": self.reader.table_ref,
-        })
-
-        tuples = file_format.read_pages(
-            reader=self.reader,
-            columns=column_names
+        self.stats.update_custom_stats(
+            {
+                "scanned_columns": scanned_columns,
+                "file_ref": self.reader.table_ref,
+            }
         )
+
+        tuples = file_format.read_pages(reader=self.reader, columns=column_names)
 
         iterator = self.make_iterator(tuples)
         self.iterator = iterator

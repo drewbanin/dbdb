@@ -42,8 +42,8 @@ async def pop_events(query_id):
     while not is_done and len(event_list) > 0:
         event = event_list.pop(0)
 
-        event_type = event['event']
-        is_done = (event_type == 'QueryComplete')
+        event_type = event["event"]
+        is_done = event_type == "QueryComplete"
 
         yield {
             "id": int(time.time()),
@@ -64,26 +64,25 @@ async def run_query(query_id, plan, nodes):
     row_iterators: Dict[str, List] = {}
 
     # Sample stats
-    add_event(query_id, {
-        "event": "QueryStart",
-        "data": {
-            "id": query_id,
-        }
-    })
+    add_event(
+        query_id,
+        {
+            "event": "QueryStart",
+            "data": {
+                "id": query_id,
+            },
+        },
+    )
 
-    def on_stat(name, stat, event_name='OperatorStats'):
-        add_event(query_id, {
-            "event": event_name,
-            "name": name,
-            "data": stat
-        })
+    def on_stat(name, stat, event_name="OperatorStats"):
+        add_event(query_id, {"event": event_name, "name": name, "data": stat})
 
     set_stats_callback(on_stat)
 
     for node in nodes:
         args = {}
         for parent, _, edge in plan.in_edges(node, data=True):
-            key = edge['input_arg']
+            key = edge["input_arg"]
             row_iter = row_iterators[parent].consume()
             if edge.get("list_args"):
                 if key not in args:
@@ -103,23 +102,23 @@ async def run_query(query_id, plan, nodes):
 
     if not leaf_node.is_mutation():
         columns = [f.name for f in output.fields]
-        add_event(query_id, {
-            "event": "ResultSchema",
-            "data": {
-                "id": query_id,
-                "columns": columns,
-            }
-        })
+        add_event(
+            query_id,
+            {
+                "event": "ResultSchema",
+                "data": {
+                    "id": query_id,
+                    "columns": columns,
+                },
+            },
+        )
 
     async for batch in output_consumer.iter_rows_batches(take=100):
         batched_rows = [r.as_tuple() for r in batch]
-        add_event(query_id, {
-            "event": "ResultRows",
-            "data": {
-                "id": query_id,
-                "rows": batched_rows
-            }
-        })
+        add_event(
+            query_id,
+            {"event": "ResultRows", "data": {"id": query_id, "rows": batched_rows}},
+        )
         await asyncio.sleep(0.1)
 
     # await output.display()
@@ -130,37 +129,43 @@ async def run_query(query_id, plan, nodes):
     total_bytes_read = 0
     for node in nodes:
         if node.name() == "Table Scan":
-            total_bytes_read += node.stats.custom_stats['bytes_read']
+            total_bytes_read += node.stats.custom_stats["bytes_read"]
 
     end_time = time.time()
     elapsed = end_time - start_time
 
-    add_event(query_id, {
-        "event": "QueryStats",
-        "data": {
-            "id": query_id,
-            "elapsed": elapsed,
-            "bytes_read": total_bytes_read,
-        }
-    })
+    add_event(
+        query_id,
+        {
+            "event": "QueryStats",
+            "data": {
+                "id": query_id,
+                "elapsed": elapsed,
+                "bytes_read": total_bytes_read,
+            },
+        },
+    )
 
     if leaf_node.is_mutation():
         status = leaf_node.status_line()
 
-        add_event(query_id, {
-            "event": "QueryMutationStatus",
+        add_event(
+            query_id,
+            {
+                "event": "QueryMutationStatus",
+                "data": {"id": query_id, "status": f"{status} in {elapsed:0.2f}s"},
+            },
+        )
+
+    add_event(
+        query_id,
+        {
+            "event": "QueryComplete",
             "data": {
                 "id": query_id,
-                "status": f"{status} in {elapsed:0.2f}s"
-            }
-        })
-
-    add_event(query_id, {
-        "event": "QueryComplete",
-        "data": {
-            "id": query_id,
-        }
-    })
+            },
+        },
+    )
 
     return data
 
@@ -172,13 +177,10 @@ async def safe_dispatch_query(query_id, plan, nodes):
 
     except Exception as e:
         logger.error(f"Error running query: {e}")
-        add_event(query_id, {
-            "event": "QueryError",
-            "data": {
-                "id": query_id,
-                "error": str(e)
-            }
-        })
+        add_event(
+            query_id, {"event": "QueryError", "data": {"id": query_id, "error": str(e)}}
+        )
+
 
 def dispatch_query(loop, query_id, plan, nodes):
     # I don't think i should need to create this task manually, but

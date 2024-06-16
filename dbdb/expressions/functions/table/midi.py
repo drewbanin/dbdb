@@ -6,7 +6,7 @@ from mido import MidiFile
 import itertools
 
 
-NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 OCTAVES = list(range(11))
 NOTES_IN_OCTAVE = len(NOTES)
 NOTE_FREQ = {
@@ -26,22 +26,24 @@ NOTE_FREQ = {
     "G#": 830.61,
 }
 
+
 def note_to_frequency(note: str, octave: int) -> float:
     base_freq = NOTE_FREQ[note]
     transposed = base_freq * (2 ** (octave - 5))
     return transposed
 
+
 def number_to_note(number: int) -> tuple:
     octave = number // NOTES_IN_OCTAVE
-    assert octave in OCTAVES, errors['notes']
-    assert 0 <= number <= 127, errors['notes']
+    assert octave in OCTAVES, errors["notes"]
+    assert 0 <= number <= 127, errors["notes"]
     note = NOTES[number % NOTES_IN_OCTAVE]
 
     return note, octave
 
 
 class MIDITableFunction(TableFunction):
-    NAMES = ['MIDI']
+    NAMES = ["MIDI"]
 
     def __init__(self, args):
         if len(args) != 1:
@@ -50,13 +52,10 @@ class MIDITableFunction(TableFunction):
         self.fname = args[0]
 
     def details(self):
-        return {
-            "table": self.config.fname,
-            "columns": []
-        }
+        return {"table": self.config.fname, "columns": []}
 
     async def fields(self):
-        return ['time', 'note', 'octave', 'freq', 'length', 'amplitude']
+        return ["time", "note", "octave", "freq", "length", "amplitude"]
 
     async def generate(self):
         midi_file = MidiFile(self.fname)
@@ -67,17 +66,19 @@ class MIDITableFunction(TableFunction):
             t = 0
             for msg in track:
                 t += msg.time
-                if msg.type == 'set_tempo':
+                if msg.type == "set_tempo":
                     bpm = mido.tempo2bpm(msg.tempo)
                     tempo = msg.tempo
-                elif msg.type == 'note_on':
+                elif msg.type == "note_on":
                     now_playing[msg.note] = t
-                elif msg.type == 'note_off':
+                elif msg.type == "note_off":
                     if msg.note not in now_playing:
                         continue
 
                     start_tick = now_playing.pop(msg.note)
-                    start_time = mido.tick2second(start_tick, midi_file.ticks_per_beat, tempo)
+                    start_time = mido.tick2second(
+                        start_tick, midi_file.ticks_per_beat, tempo
+                    )
                     end_time = mido.tick2second(t, midi_file.ticks_per_beat, tempo)
                     duration = end_time - start_time
 

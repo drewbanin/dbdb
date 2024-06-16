@@ -3,10 +3,7 @@ import itertools
 
 
 class UnionConfig(OperatorConfig):
-    def __init__(
-        self,
-        distinct = False
-    ):
+    def __init__(self, distinct=False):
         self.distinct = distinct
 
 

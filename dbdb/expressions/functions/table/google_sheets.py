@@ -9,11 +9,11 @@ import json
 import os
 import asyncio
 
-API_KEY = os.getenv('DBDB_GSHEETS_API_KEY')
+API_KEY = os.getenv("DBDB_GSHEETS_API_KEY")
 
 
 class GoogleSheetsTableFunction(TableFunction):
-    NAMES = ['GOOGLE_SHEET']
+    NAMES = ["GOOGLE_SHEET"]
 
     def __init__(self, args):
         if len(args) not in [1, 2]:
@@ -34,11 +34,13 @@ class GoogleSheetsTableFunction(TableFunction):
 
     def check_api_key(self):
         if not API_KEY:
-            raise RuntimeError("dbdb was not initialized with a gsheets API key & can't query google sheets :/")
+            raise RuntimeError(
+                "dbdb was not initialized with a gsheets API key & can't query google sheets :/"
+            )
 
     def col_to_letter(self, col):
-        '''Gets the letter of a column number'''
-        r = ''
+        """Gets the letter of a column number"""
+        r = ""
         while col > 0:
             v = (col - 1) % 26
             r = chr(v + 65) + r
@@ -67,10 +69,10 @@ class GoogleSheetsTableFunction(TableFunction):
             return self.list_fields()
 
         except HttpError as e:
-            err_data = json.loads(e.content).get('error', {})
-            err_code = err_data.get('code', 'Unknown')
-            err_status = err_data.get('status', 'Unknown')
-            err_msg = err_data.get('message', 'Unknown')
+            err_data = json.loads(e.content).get("error", {})
+            err_code = err_data.get("code", "Unknown")
+            err_status = err_data.get("status", "Unknown")
+            err_msg = err_data.get("message", "Unknown")
             raise RuntimeError(f"{err_status} ({err_code}): {err_msg}")
 
     async def generate(self):
@@ -89,5 +91,5 @@ class GoogleSheetsTableFunction(TableFunction):
             .execute()
         )
 
-        for row in result.get('values', []):
+        for row in result.get("values", []):
             yield row

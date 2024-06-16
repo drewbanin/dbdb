@@ -1,20 +1,20 @@
-
 import pyparsing as pp
 from pyparsing import common as ppc
 
-from dbdb.lang.expr_types import (
+from dbdb.expressions.expressions import (
     ColumnIdentifier,
-    TableIdent,
     Literal,
     Null,
     Star,
     ScalarFunctionCall,
     AggregateFunctionCall,
-    TableFunctionCall,
     BinaryOperator,
     NegationOperator,
     CaseWhen,
     CastExpr,
+)
+
+from dbdb.expressions.join import (
     JoinClause,
     JoinConditionOn,
     JoinConditionUsing,
@@ -40,24 +40,20 @@ from dbdb.lang.select import (
 from dbdb.tuples.identifiers import (
     TableIdentifier,
     FieldIdentifier,
-    GlobIdentifier
+    GlobIdentifier,
+    TableFunctionCall,
 )
 
 from dbdb.operators.joins import JoinType
 from dbdb.operators.union import UnionOperator
 from dbdb.operators.distinct import DistinctOperator
+from dbdb.expressions.functions import find_function()
 
 from dbdb.io import file_format
 from dbdb.io.file_wrapper import FileReader
-from dbdb.expressions.functions.base import (
-    list_aggregate_functions,
-    list_scalar_functions,
-    list_table_functions,
-)
 
 
 from dbdb.logger import logger
-
 import math
 
 pp.ParserElement.enable_packrat()
@@ -120,8 +116,11 @@ IS = pp.CaselessKeyword("IS").setParseAction(handle_is)
 IS_NOT = (IS + pp.CaselessKeyword("NOT")).setParseAction(handle_is_not)
 
 WHERE = pp.CaselessKeyword("WHERE")
-GROUP_BY = (pp.CaselessKeyword("GROUP") + pp.CaselessKeyword("BY"))
-ORDER_BY = (pp.CaselessKeyword("ORDER") + pp.CaselessKeyword("BY"))
+BY = pp.CaselessKeyword("BY")
+GROUP = pp.CaselessKeyword("GROUP")
+GROUP_BY = GROUP + BY
+ORDER = pp.CaselessKeyword("ORDER")
+ORDER_BY = ORDER + BY
 LIMIT = pp.CaselessKeyword("LIMIT")
 
 ASC = pp.CaselessKeyword("ASC")
@@ -174,39 +173,47 @@ INLINE_COMMENT = "--" + pp.restOfLine
 BLOCK_COMMENT = pp.c_style_comment
 
 RESERVED = pp.Group(
-    UNION    |
-    ALL      |
-    FROM     |
-    WITH     |
-    SELECT   |
-    AS       |
-    ON       |
-    AND      |
-    OR       |
-    IS       |
-    IS_NOT   |
-    WHERE    |
-    GROUP_BY |
-    ORDER_BY |
-    USING    |
-    LIMIT    |
-    LEFT_OUTER  |
-    RIGHT_OUTER |
-    INNER       |
-    CROSS       |
-    NATURAL     |
-    JOIN |
-    ASC  |
-    DESC |
-    PI   |
-    CASE |
-    WHEN |
-    THEN |
-    ELSE |
-    END |
-    CREATE |
-    DISTINCT |
-    NULL
+    UNION
+    | ALL
+    | FROM
+    | WITH
+    | SELECT
+    | AS
+    | ON
+    | AND
+    | OR
+    | IS
+    | IS_NOT
+    | WHERE
+    | GROUP
+    | ORDER
+    | BY
+    | USING
+    | LIMIT
+    | LEFT_OUTER
+    | RIGHT_OUTER
+    | INNER
+    | CROSS
+    | NATURAL
+    | JOIN
+    | ASC
+    | DESC
+    | PI
+    | CASE
+    | WHEN
+    | THEN
+    | ELSE
+    | END
+    | CREATE
+    | DISTINCT
+    | NULL
+
+    | OVER
+    | ROWS
+    | BETWEEN
+    | UNBOUNDED
+    | PRECEDING
+    | FOLLOWING
 ).set_name("reserved_word")
 
 IDENT = ~RESERVED + (
@@ -227,11 +234,11 @@ def make_col_identifier(string, loc, toks):
 
 def make_table_identifier(string, loc, toks):
     table = toks[0]
-    return TableIdent(table)
+    return TableIdentifier(name=table)
 
 
 def make_qualified_table_identifier(string, loc, toks):
-    table_parts = [t.table_name for t in toks[0]]
+    table_parts = [t.name for t in toks[0]]
 
     database = None
     schema = None
@@ -248,8 +255,8 @@ def make_qualified_table_identifier(string, loc, toks):
         schema = table_parts[1]
         table_name = table_parts[2]
 
-    return TableIdent(
-        table_name=table_name,
+    return TableIdentifier(
+        name=table_name,
         schema=schema,
         database=database
     )
@@ -258,14 +265,14 @@ def make_qualified_table_identifier(string, loc, toks):
 def make_aliased_table_identifier(string, loc, toks):
     table = toks[0]
     if len(toks) > 1:
-        table.alias = toks[-1].table_name
+        table.alias = toks[-1].name
     return table
 
 
 def make_aliased_table_function(string, loc, toks):
     func = toks[0]
     if len(toks) > 1:
-        func.alias = toks[-1].table_name
+        func.alias = toks[-1].name
     else:
         func.alias = toks[0].func_name
     return func
@@ -354,6 +361,22 @@ def call_aggregate_function(string, loc, toks):
     )
 
 
+def call_window_function(string, loc, toks):
+    # <func_name> (<expr>, ... ) [OVER (...)]
+    func_name = toks.func_name[0].upper()
+    func_expr = list(toks.func_expression)
+    func_class = window_func_map[func_name]
+
+    is_distinct = toks.distinct.lower() == 'distinct'
+
+    return AggregateFunctionCall(
+        func_name,
+        func_expr,
+        func_class=func_class,
+        is_distinct=is_distinct,
+    )
+
+
 def call_table_func(string, loc, toks):
     # <func_name> (<expr>, ... )
     func_name = toks.func_name[0].upper()
@@ -367,18 +390,12 @@ def call_table_func(string, loc, toks):
     )
 
 
-def call_window_function(string, loc, toks):
-    raise RuntimeError("Window functions are not currently supported")
-
-
 def call_function(string, loc, toks):
     func_name = toks[0].upper()
     if func_name in scalar_func_map:
         return call_scalar_function(string, loc, toks)
     elif func_name in agg_func_map:
         return call_aggregate_function(string, loc, toks)
-    elif func_name in table_func_map:
-        return call_table_func(string, loc, toks)
     else:
         raise RuntimeError(f"Function {func_name} not found")
 
@@ -415,7 +432,7 @@ WINDOW_CALL = pp.Group(
     RPAR +
     OVER +
     LPAR +
-    FRAME_CLAUSE("frame") +
+    pp.Opt(FRAME_CLAUSE("frame")) +
     RPAR
 ).setParseAction(call_window_function)
 
@@ -474,14 +491,16 @@ def binary_operator(string, loc, toks):
 
     return binop
 
+
 EXPRESSION_OPERANDS = (
-    FUNC_CALL |
-    LITERAL |
-    MATH |
-    CASE_WHEN_EXPR |
-    TYPE |
-    QUALIFIED_IDENT |
-    STAR
+    WINDOW_CALL
+    | FUNC_CALL
+    | LITERAL
+    | MATH
+    | CASE_WHEN_EXPR
+    | TYPE
+    | QUALIFIED_IDENT
+    | STAR
 )
 
 EXPRESSION << pp.infix_notation(
@@ -580,8 +599,10 @@ ALIASED_TABLE_IDENT = (
     NAMESPACED_TABLE_IDENT + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
 ).setParseAction(make_aliased_table_identifier)
 
+TABLE_FUNC_CALL = FUNC_CALL.copy().setParseAction(call_table_func)
+
 ALIASED_TABLE_FUNCTION = (
-    FUNC_CALL + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
+    TABLE_FUNC_CALL + pp.Opt(AS) + pp.Opt(TABLE_IDENT)
 ).setParseAction(make_aliased_table_function)
 
 JOIN_CLAUSE = (
@@ -715,7 +736,7 @@ def make_table_source(table_source):
     table_id = TableIdentifier(
         database=table_source.database,
         schema=table_source.schema,
-        name=table_source.table_name,
+        name=table_source.name,
         alias=table_source.alias
     )
 
@@ -747,7 +768,7 @@ def make_source_function(func_source):
 
 
 def make_reference_source(source):
-    table_id = TableIdentifier.new(source.table_name, source.alias)
+    table_id = TableIdentifier.new(source.name, source.alias)
     return SelectReferenceSource(
         table_identifier=table_id,
     )
@@ -758,7 +779,7 @@ def extract_source(source, scopes):
     if isinstance(source, TableFunctionCall):
         return make_source_function(source)
 
-    scope_name = source.table_name
+    scope_name = source.name
     if scope_name in scopes:
         return make_reference_source(source)
     else:
@@ -781,7 +802,7 @@ def extract_joins(ast, scopes):
 
 def resolve_group_by_expr(group_expr, projections):
     if isinstance(group_expr, Literal):
-        group_idx = group_expr.eval([])
+        group_idx = group_expr.eval(None)
         projection = projections[group_idx - 1]
         agg_fields = projection.get_aggregated_fields()
         if len(agg_fields) > 0:
@@ -928,7 +949,7 @@ def ast_to_select_obj(ast):
         scope_copy = scopes.copy()
         select = make_select_from_scope(cte, scope_copy)
         plan, output_node = select.make_plan(plan)
-        scopes[alias.table_name] = output_node
+        scopes[alias.name] = output_node
 
     select = make_select_from_scope(ast, scopes)
     select.save_plan(plan)
@@ -939,14 +960,14 @@ def ast_to_select_obj(ast):
 def ast_to_create_obj(ast):
     ast = ast.create
 
-    table_source = ast.table_name
+    table_source = ast.name
     table_select_ast = ast.table_select
     table_select_obj = ast_to_select_obj(table_select_ast)
 
     table_id = TableIdentifier(
         database=table_source.database,
         schema=table_source.schema,
-        name=table_source.table_name,
+        name=table_source.name,
         alias=table_source.alias
     )
 

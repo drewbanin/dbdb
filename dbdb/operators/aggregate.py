@@ -1,22 +1,7 @@
 from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import TableIdentifier
-
-from collections import defaultdict
-import enum
-import itertools
-
-
-def lookup(agg, is_distinct):
-    func = _agg_funcs.get(agg)
-    if func is None:
-        raise RuntimeError(f"Aggregate {agg} is not implemented")
-    elif agg == Aggregates.COUNT and is_distinct:
-        return _agg_funcs[Aggregates.COUNTD]
-    return func
-
-
-Identity = object()
+from dbdb.tuples.context import ExecutionContext
 
 
 class AggregateConfig(OperatorConfig):
@@ -58,9 +43,10 @@ class AggregateOperator(Operator):
         group_exprs = dict()
         proj_results = dict()
         async for row in rows:
+            context = ExecutionContext(row=row)
             self.stats.update_row_processed(row)
 
-            grouping = tuple([proj.eval(row) for proj in group_projections])
+            grouping = tuple([proj.eval(context) for proj in group_projections])
 
             # It's a new grouping set
             if grouping not in group_exprs:
@@ -77,7 +63,7 @@ class AggregateOperator(Operator):
             # My guess is that i should partition the execution graph up-front and then calculate
             # all of the aggs independently before computing scalar transformations over the results.
             for proj in group_exprs[grouping]:
-                proj_results[proj] = proj.eval(row)
+                proj_results[proj] = proj.eval(context)
 
         for key, agg_projections in group_exprs.items():
             grouped = list(key)
@@ -114,6 +100,7 @@ class AggregateOperator(Operator):
     async def run(self, rows):
         self.stats.update_start_running()
         from dbdb.lang.lang import Literal
+
         # Check group by fields against aggregate fields
         # and make sure it all tracks
 
@@ -152,8 +139,7 @@ class AggregateOperator(Operator):
             for field in scalar:
                 if field not in grouped_fields:
                     raise RuntimeError(
-                        f"Field {field} is neither grouped"
-                        " nor aggregated"
+                        f"Field {field} is neither grouped" " nor aggregated"
                     )
 
             if len(scalar) > 0:

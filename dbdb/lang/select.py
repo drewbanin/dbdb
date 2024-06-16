@@ -4,22 +4,15 @@ from dbdb.operators.limit import LimitOperator
 from dbdb.operators.filter import FilterOperator
 from dbdb.operators.project import ProjectOperator
 from dbdb.operators.union import UnionOperator
-from dbdb.operators.joins import (
-    NestedLoopJoinOperator,
-    HashJoinOperator,
-    JoinStrategy,
-    JoinType
-)
+from dbdb.operators.joins import JoinStrategy
 
 from dbdb.operators.rename import RenameScopeOperator
 from dbdb.operators.aggregate import AggregateOperator
 from dbdb.operators.distinct import DistinctOperator
 from dbdb.operators.create import CreateTableAsOperator
 from dbdb.operators.table_function import TableFunctionOperator
-from dbdb.tuples.rows import Rows
-from dbdb.tuples.identifiers import TableIdentifier, FieldIdentifier
-from dbdb.expressions import Expression, Equality, EqualityTypes
-from dbdb.lang.expr_types import Star
+from dbdb.tuples.context import ExecutionContext
+from dbdb.expressions.expressions import Star
 
 import networkx as nx
 
@@ -37,7 +30,6 @@ class Select:
         limit=None,
         unions=None,
         ctes=None,
-
         is_distinct=False,
         scopes=None,
     ):
@@ -73,8 +65,7 @@ class Select:
         source_op = None
         if self.source is None:
             source_op = SelectMemorySource(
-                table_identifier="EmptyTable",
-                rows=1
+                table_identifier="EmptyTable", rows=1
             ).as_operator()
         else:
             source_op = resolve_internal_reference(self.source, label="FROM")
@@ -200,9 +191,7 @@ class SelectList(SelectClause):
         self.projections = projections
 
     def as_operator(self):
-        return ProjectOperator(
-            project=self.projections
-        )
+        return ProjectOperator(project=self.projections)
 
 
 class SelectProjection(SelectClause):
@@ -213,8 +202,8 @@ class SelectProjection(SelectClause):
     def copy(self):
         return self.expr.copy()
 
-    def eval(self, row):
-        return self.expr.eval(row)
+    def eval(self, context: ExecutionContext):
+        return self.expr.eval(context)
 
     def make_name(self):
         return self.expr.make_name()
@@ -237,9 +226,7 @@ class SelectFilter(SelectClause):
         self.expr = expr
 
     def as_operator(self):
-        return FilterOperator(
-            predicate=self.expr
-        )
+        return FilterOperator(predicate=self.expr)
 
 
 class SelectReferenceSource(SelectClause):
@@ -250,9 +237,7 @@ class SelectReferenceSource(SelectClause):
         return self.table.name
 
     def as_operator(self):
-        return RenameScopeOperator(
-            scope_name=self.table.name
-        )
+        return RenameScopeOperator(scope_name=self.table.name)
 
 
 class SelectFunctionSource(SelectClause):
@@ -267,10 +252,10 @@ class SelectFunctionSource(SelectClause):
 
     def as_operator(self):
         return TableFunctionOperator(
-            table = self.table,
-            function_name = self.function_name,
-            function_args = self.function_args,
-            function_class = self.function_class,
+            table=self.table,
+            function_name=self.function_name,
+            function_args=self.function_args,
+            function_class=self.function_class,
         )
 
 
@@ -283,10 +268,7 @@ class SelectFileSource(SelectClause):
         return self.table.name
 
     def as_operator(self):
-        return TableScanOperator(
-            table_ref=self.table,
-            columns=self.columns
-        )
+        return TableScanOperator(table_ref=self.table, columns=self.columns)
 
 
 class SelectMemorySource(SelectClause):
@@ -298,10 +280,7 @@ class SelectMemorySource(SelectClause):
         return self.table_identifier.name
 
     def as_operator(self):
-        return TableGenOperator(
-            table=self.table_identifier,
-            rows=self.rows
-        )
+        return TableGenOperator(table=self.table_identifier, rows=self.rows)
 
 
 class SelectJoin(SelectClause):
@@ -313,8 +292,7 @@ class SelectJoin(SelectClause):
 
     def as_operator(self):
         return self.join_strategy.create(
-            join_type=self.join_type,
-            expression=self.expression
+            join_type=self.join_type, expression=self.expression
         )
 
     @classmethod
@@ -343,9 +321,7 @@ class SelectOrder(SelectClause):
     def as_operator(self):
         order = [o.as_tuple() for o in self.order_by_list]
 
-        return SortOperator(
-            order=order
-        )
+        return SortOperator(order=order)
 
     @classmethod
     def parse_tokens(cls, string, loc, tokens):
@@ -369,13 +345,10 @@ class SelectOrderBy(SelectClause):
     def parse_tokens(cls, tokens):
         ascending = True
         if len(tokens) == 2:
-            ascending = tokens[1].upper() == 'ASC'
+            ascending = tokens[1].upper() == "ASC"
 
         # TODO: Do we handle int literals here or elsewhere?
-        return cls(
-            ascending=ascending,
-            expression=tokens[0]
-        )
+        return cls(ascending=ascending, expression=tokens[0])
 
 
 class SelectLimit(SelectClause):

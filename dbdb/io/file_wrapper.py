@@ -1,4 +1,3 @@
-
 # Simple wrapper around opening and reading files
 # Records stats
 
@@ -62,16 +61,14 @@ class FileHandleProxy:
     def stats(self):
         return {
             # Reads
-            'bytes_read': self.bytes_read,
-            'reads': self.reads,
-
+            "bytes_read": self.bytes_read,
+            "reads": self.reads,
             # Writes
-            'bytes_written': self.bytes_written,
-            'writes': self.writes,
-
+            "bytes_written": self.bytes_written,
+            "writes": self.writes,
             # Progress (reads)
-            'bytes_total': self.size,
-            'bytes_read_pct': self.bytes_read / self.size,
+            "bytes_total": self.size,
+            "bytes_read_pct": self.bytes_read / self.size,
         }
 
 
@@ -83,30 +80,30 @@ class FileReader:
 
     @classmethod
     def make_path(cls, table):
-        parts = ['database', 'schema', 'name']
+        parts = ["database", "schema", "name"]
         path = Path(DATA_DIR)
 
         for part in parts:
             value = getattr(table, part)
-            if part == 'name':
+            if part == "name":
                 value = f"{value}.dumb"
             elif value is None:
-                value = 'dbdb'
+                value = "dbdb"
 
             path = path / value
 
         return path
 
     @contextmanager
-    def open(self, mode='rb'):
-        if mode == 'rb' and not self.table_path.exists():
+    def open(self, mode="rb"):
+        if mode == "rb" and not self.table_path.exists():
             dir_path = self.table_path.parent
             dir_path.mkdir(parents=True, exist_ok=True)
 
         try:
             with open(self.table_path, mode) as fh:
                 self.handle = FileHandleProxy(fh)
-                if mode == 'rb':
+                if mode == "rb":
                     self.handle.read_size()
                 yield self.handle
         except FileNotFoundError:
