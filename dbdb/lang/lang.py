@@ -892,7 +892,7 @@ def ast_to_select_obj(ast):
 def ast_to_create_obj(ast):
     ast = ast.create
 
-    table_source = ast.name
+    table_source = ast.table_name
     table_select_ast = ast.table_select
     table_select_obj = ast_to_select_obj(table_select_ast)
 

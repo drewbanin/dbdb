@@ -2,8 +2,6 @@
 # Records stats
 
 from contextlib import contextmanager
-import time
-import asyncio
 import os
 from pathlib import Path
 
@@ -96,7 +94,7 @@ class FileReader:
 
     @contextmanager
     def open(self, mode="rb"):
-        if mode == "rb" and not self.table_path.exists():
+        if mode == "wb" and not self.table_path.exists():
             dir_path = self.table_path.parent
             dir_path.mkdir(parents=True, exist_ok=True)
 

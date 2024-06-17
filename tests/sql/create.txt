@@ -1,0 +1,35 @@
+====================================
+Test creating tables
+====================================
+
+create table my_debug_table as (
+    select
+        1 as int_field,
+        true as bool_field,
+        999.0001 as float_field,
+        'abc' as string_field
+)
+
+---
+
+[{}]
+
+====================================
+Test reading created table
+====================================
+
+create table my_debug_table as (
+    select
+        1 as int_field,
+        true as bool_field,
+        999.0001 as float_field,
+        'abc' as string_field
+);
+
+select * from my_debug_table
+
+---
+
+[
+{int_field: 1, bool_field: true, float_field: 999.0001, string_field: 'abc'}
+]
