@@ -16,7 +16,6 @@ create table my_debug_table as (
 
 ====================================
 Test reading created table
-skip # github actions use wrong path
 ====================================
 
 create table my_debug_table as (
