@@ -86,12 +86,16 @@ def test_sql_statement(test_index):
         pytest.skip("Test is skipped")
         return
 
+    # Run all statements, but only save results of the last one
+    # Splitting on the ; is kind of jank - we should do this using
+    # the grammar - but i think it's fine for the test suite...
     statements = sql.split(";")
-
+    actual = None
     for sql_statement in statements:
-        # Run all statements, but only save results of the last one
-        # Splitting on the ; is kind of jank - we should do this using
-        # the grammar - but i think it's fine for the test suite...
+        sql_statement = sql_statement.strip()
+        if len(sql_statement) == 0:
+            continue
+
         actual = run_query(filename, test_name, sql_statement)
 
     assert actual == expected
