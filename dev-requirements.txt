@@ -3,4 +3,4 @@ pytest-cov
 pyyaml
 flake8
 mypy
-black
+ruff

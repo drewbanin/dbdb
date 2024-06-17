@@ -18,10 +18,12 @@ class ProjectOperator(Operator):
     async def make_iterator(self, tuples):
         projections = self.config.project
 
-        async for row in tuples:
-            context = ExecutionContext(row=row)
+        # TODO : Do not do this unless there are window functions!!
+        rows = await tuples.materialize()
+
+        for row in rows:
+            context = ExecutionContext(row=row, rows=rows)
             self.stats.update_row_processed(row)
-            # self.stats.update_row_processed(row)
             projected = []
             for projection in projections:
                 if projection.is_star():

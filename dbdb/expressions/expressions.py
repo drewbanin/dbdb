@@ -201,6 +201,50 @@ class AggregateFunctionCall(Expression):
         return set()
 
 
+class WindowFunctionCall(Expression):
+    def __init__(
+        self,
+        func_name,
+        func_expr,
+        func_class,
+        partition_cols,
+        order_cols,
+        frame_start,
+        frame_end,
+    ):
+        self.func_name = func_name
+        self.func_expr = func_expr
+        self.func_class = func_class
+
+        if not self.func_class:
+            raise RuntimeError(f"Window function {self.func_name} not found")
+
+        self.processor = func_class(
+            expr=func_expr,
+            partition_cols=partition_cols,
+            order_cols=order_cols,
+            frame_start=frame_start,
+            frame_end=frame_end,
+        )
+
+    def eval(self, context: ExecutionContext):
+        return self.processor.eval(context)
+
+    def result(self):
+        return self.processor.result()
+
+    def get_aggregated_fields(self):
+        return set()
+
+    def get_non_aggregated_fields(self):
+        fields = set()
+        for expr in self.func_expr:
+            fields.update(expr.get_non_aggregated_fields())
+            if len(expr.get_aggregated_fields()) > 0:
+                raise RuntimeError(f"Cannot window an aggregate: {self.func_name}")
+        return fields
+
+
 class NegationOperator(Expression):
     def __init__(self, expr):
         self.expr = expr

@@ -13,6 +13,7 @@ from dbdb.operators.create import CreateTableAsOperator
 from dbdb.operators.table_function import TableFunctionOperator
 from dbdb.tuples.context import ExecutionContext
 from dbdb.expressions.expressions import Star
+from dbdb.expressions.sort import ReverseSort
 
 import networkx as nx
 
@@ -320,8 +321,19 @@ class SelectOrder(SelectClause):
 
     def as_operator(self):
         order = [o.as_tuple() for o in self.order_by_list]
-
         return SortOperator(order=order)
+
+    def as_comparator(self, row):
+        vals = []
+        for sort_field in self.order_by_list:
+            field = sort_field.expression
+            value = row.field(field.column)
+            if sort_field.ascending:
+                vals.append(value)
+            else:
+                vals.append(ReverseSort(value))
+
+        return tuple(vals)
 
     @classmethod
     def parse_tokens(cls, string, loc, tokens):

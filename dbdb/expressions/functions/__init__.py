@@ -3,25 +3,19 @@ from dbdb.expressions.functions.base import (
     AggregateFunction,
     WindowFunction,
     TableFunction,
+    FunctionTypes,
 )
 
-import enum
 import functools
 import inspect
-
-
-class FunctionTypes(enum.Enum):
-    SCALAR = enum.auto()
-    TABLE = enum.auto()
-    AGGREGATE = enum.auto()
-    WINDOW = enum.auto()
 
 
 def is_subclass_of(value, base_class):
     return inspect.isclass(value) and issubclass(value, base_class)
 
 
-def find_function_by_type(func_name: str, module, base_class):
+@functools.cache
+def get_functions_by_type(module, base_class):
     func_map = {}
     for classname in dir(module):
         klass = getattr(module, classname)
@@ -30,6 +24,11 @@ def find_function_by_type(func_name: str, module, base_class):
                 func_map[name.upper()] = klass
 
     return func_map
+
+
+def find_function_by_type(func_name: str, module, base_class):
+    functions = get_functions_by_type(module, base_class)
+    return functions.get(func_name.upper())
 
 
 @functools.cache

@@ -166,8 +166,8 @@ class Rows:
         return Rows(table, fields, iterator)
 
     async def materialize(self):
-        consumer = self.consume()
         if not self.data:
+            consumer = self.consume()
             self.data = tuple([self._make_row(row) async for row in consumer])
 
         return self.data
