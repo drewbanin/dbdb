@@ -1,5 +1,4 @@
 import enum
-import struct
 
 DEFAULT_STRING_SIZE = 255
 
@@ -15,6 +14,7 @@ class DataType(BinEnum):
     INT32 = 3
     STR = 4
     DATE = 5
+    FLOAT64 = 6
 
     @classmethod
     def size(cls, data_type, data_width=None):
@@ -28,6 +28,8 @@ class DataType(BinEnum):
             return data_width
         elif data_type == DataType.DATE:
             return 4
+        elif data_type == DataType.FLOAT64:
+            return 8
 
     @classmethod
     def pack_string(cls, data_type, data_width=None):
@@ -43,6 +45,8 @@ class DataType(BinEnum):
             pack_f = f"{packed_size}s"
         elif data_type == DataType.DATE:
             pack_f = "I"
+        elif data_type == DataType.FLOAT64:
+            pack_f = "d"
 
         return pack_f
 

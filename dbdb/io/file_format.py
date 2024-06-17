@@ -9,7 +9,7 @@ from dbdb.io.types import (
 from dbdb.logger import logger
 
 from dbdb.io import constants
-from dbdb.io import encoder, compressor
+from dbdb.io import encoder
 from typing import Optional
 
 
@@ -164,6 +164,7 @@ class ColumnInfo(object):
             DataType.INT32: "INT_32",
             DataType.STR: "STRING",
             DataType.DATE: "DATE",
+            DataType.FLOAT64: "FLOAT_64",
         }
 
         return {
@@ -465,13 +466,13 @@ def read_pages(reader, columns):
 
 
 def infer_type(value):
-    if type(value) == int:
+    if type(value) is int:
         return DataType.INT32
-    elif type(value) == float:
-        return DataType.FLOAT
-    elif type(value) == str:
+    elif type(value) is float:
+        return DataType.FLOAT64
+    elif type(value) is str:
         return DataType.STR
-    elif type(value) == bool:
+    elif type(value) is bool:
         return DataType.BOOL
     else:
         raise RuntimeError(
