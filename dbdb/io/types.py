@@ -1,4 +1,3 @@
-
 import enum
 import struct
 
@@ -7,7 +6,7 @@ DEFAULT_STRING_SIZE = 255
 
 class BinEnum(enum.Enum):
     def as_byte(self):
-        return self.value.to_bytes(1, 'big')
+        return self.value.to_bytes(1, "big")
 
 
 class DataType(BinEnum):
@@ -35,22 +34,22 @@ class DataType(BinEnum):
         packed_size = cls.size(data_type, data_width)
 
         if data_type == DataType.BOOL:
-            pack_f = '?'
+            pack_f = "?"
         elif data_type == DataType.INT8:
-            pack_f = 'b'
+            pack_f = "b"
         elif data_type == DataType.INT32:
-            pack_f = 'i'
+            pack_f = "i"
         elif data_type == DataType.STR:
-            pack_f = f'{packed_size}s'
+            pack_f = f"{packed_size}s"
         elif data_type == DataType.DATE:
-            pack_f = 'I'
+            pack_f = "I"
 
         return pack_f
 
     @classmethod
     def as_bytes(cls, data_type, value):
         if data_type == DataType.STR:
-            return bytes(value, 'ascii')
+            return bytes(value, "ascii")
         else:
             return value
 

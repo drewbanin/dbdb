@@ -9,6 +9,7 @@ from dbdb.logger import logger
 
 import itertools
 
+
 class CreateTableAsConfig(OperatorConfig):
     def __init__(
         self,
@@ -83,7 +84,7 @@ class CreateTableAsOperator(Operator):
             )
 
         reader = FileReader(self.config.table)
-        with reader.open('wb') as fh:
+        with reader.open("wb") as fh:
             fh.write(table_data)
 
         logger.info(f"Done writing table {self.config.table}")

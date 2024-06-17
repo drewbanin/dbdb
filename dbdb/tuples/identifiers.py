@@ -1,10 +1,17 @@
-
 import itertools
 import functools
 
 
 class Identifier:
     pass
+
+
+# TODO : Do we still need this??
+class TableFunctionCall:
+    def __init__(self, func_name, func_expr, func_class):
+        self.func_name = func_name
+        self.func_expr = func_expr
+        self.func_class = func_class
 
 
 class TableIdentifier(Identifier):
@@ -34,7 +41,7 @@ class TableIdentifier(Identifier):
         ours_reversed = our_parts[::-1]
 
         zipped = itertools.zip_longest(candidate_reversed, ours_reversed)
-        for (candidate, ours) in zipped:
+        for candidate, ours in zipped:
             if candidate == ours:
                 # Match means keep going
                 continue
@@ -119,7 +126,7 @@ class GlobIdentifier(FieldIdentifier):
             parent_qualifier = self.parent.provided_parts()
             qualified = parent_qualifier + [self.name]
         else:
-            qualified = '*'
+            qualified = "*"
 
         return ".".join(qualified)
 

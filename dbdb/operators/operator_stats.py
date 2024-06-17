@@ -1,4 +1,3 @@
-
 import time
 from pympler import asizeof
 
@@ -39,14 +38,14 @@ class OperatorStats:
         if self.start_time is None:
             self.start_time = time.time()
 
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             STAT_CALLBACK("waiting", self.get_stats())
 
     def update_done_running(self):
         self.state = STATE_DONE
         self.end_time = time.time()
 
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             STAT_CALLBACK("done", self.get_stats())
 
     def _get_elapsed_time(self):
@@ -92,24 +91,24 @@ class OperatorStats:
         self.rows_processed += 1
         # self.bytes_processed += self._get_size_of_row(row)
 
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             STAT_CALLBACK("processing", self.get_stats())
 
     def update_row_emitted(self, row):
         self.rows_emitted += 1
         # self.bytes_emmitted += self._get_size_of_row(row)
 
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             STAT_CALLBACK("processing", self.get_stats())
 
     def update_custom_stats(self, stats_dict):
         self.custom_stats.update(stats_dict)
 
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             STAT_CALLBACK("processing", self.get_stats())
 
     def push_event(self, event_name, name, data):
-        if (STAT_CALLBACK):
+        if STAT_CALLBACK:
             # TODO : this third arg sucks
             STAT_CALLBACK(name, data, event_name=event_name)
 
@@ -117,7 +116,6 @@ class OperatorStats:
         return {
             "operator_id": self.operator_id,
             "operator_type": self.operator_type,
-
             "rows_processed": self.rows_processed,
             "rows_emitted": self.rows_emitted,
             "bytes_processed": self.bytes_processed,

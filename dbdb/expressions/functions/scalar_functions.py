@@ -1,29 +1,30 @@
+from dbdb.expressions.functions.base import ScalarFunction
+from dbdb.tuples.context import ExecutionContext
 
 import math
-from dbdb.expressions.functions.base import ScalarFunction
 
 
 class FunctionSin(ScalarFunction):
-    NAMES = ['sin']
+    NAMES = ["sin"]
 
-    def eval(cls, args, row):
-        value = args[0].eval(row)
+    def eval(self, context: ExecutionContext):
+        value = self.expr[0].eval(context)
         return math.sin(value)
 
 
 class FunctionCos(ScalarFunction):
-    NAMES = ['cos']
+    NAMES = ["cos"]
 
-    def eval(cls, args, row):
-        value = args[0].eval(row)
+    def eval(self, context: ExecutionContext):
+        value = self.expr[0].eval(context)
         return math.cos(value)
 
 
 class FunctionSquare(ScalarFunction):
-    NAMES = ['sqr']
+    NAMES = ["sqr"]
 
-    def eval(cls, args, row):
-        value = args[0].eval(row)
+    def eval(self, context: ExecutionContext):
+        value = self.expr[0].eval(context)
         value = math.sin(value)
         if value > 0:
             return 1
@@ -32,27 +33,27 @@ class FunctionSquare(ScalarFunction):
 
 
 class FunctionIff(ScalarFunction):
-    NAMES = ['iff']
+    NAMES = ["iff"]
 
-    def eval(cls, args, row):
-        if len(args) != 3:
+    def eval(self, context: ExecutionContext):
+        if len(self.expr) != 3:
             raise RuntimeError("IFF requires 3 args")
 
-        cond = args[0]
-        if cond.eval(row):
-            return args[1].eval(row)
+        cond = self.expr[0]
+        if cond.eval(context):
+            return self.expr[1].eval(context)
         else:
-            return args[2].eval(row)
+            return self.expr[2].eval(context)
 
 
 class FunctionPow(ScalarFunction):
-    NAMES = ['pow']
+    NAMES = ["pow"]
 
-    def eval(cls, args, row):
-        if len(args) != 2:
+    def eval(self, context: ExecutionContext):
+        if len(self.expr) != 2:
             raise RuntimeError("POW requires 2 args")
 
-        base = args[0].eval(row)
-        exp = args[1].eval(row)
+        base = self.expr[0].eval(context)
+        exp = self.expr[1].eval(context)
 
-        return base ** exp
+        return base**exp

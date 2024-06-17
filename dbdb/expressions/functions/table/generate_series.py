@@ -3,7 +3,7 @@ from dbdb.expressions.functions.base import TableFunction
 
 
 class GenerateSeriesTableFunction(TableFunction):
-    NAMES = ['GENERATE_SERIES']
+    NAMES = ["GENERATE_SERIES"]
 
     def __init__(self, args):
         if len(args) not in [1, 2]:

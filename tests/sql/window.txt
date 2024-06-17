@@ -1,0 +1,236 @@
+====================================
+Test window functions over everything
+====================================
+
+with data as (
+
+    select i from generate_series(10)
+
+)
+
+select
+    count(1) over () as val_count
+
+from data
+
+---
+
+[
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+    {val_count: 10},
+]
+
+
+====================================
+Test window functions over one partition
+====================================
+
+with data as (
+
+    select 1 as id, 'alice' as name union all
+    select 2 as id, 'bob' as name union all
+    select 3 as id, 'alice' as name union all
+    select 4 as id, 'bob' as name union all
+    select 5 as id, 'alice' as name
+
+)
+
+select distinct
+    name,
+    count(1) over (partition by name) as val_count
+
+from data
+
+---
+
+[
+    {name: bob, val_count: 2},
+    {name: alice, val_count: 3},
+]
+
+
+====================================
+Test window functions over multiple partitions
+====================================
+
+with data as (
+
+    select 1 as id, 'alice' as name union all
+    select 1 as id, 'bob' as name union all
+    select 2 as id, 'alice' as name union all
+    select 2 as id, 'bob' as name union all
+    select 2 as id, 'alice' as name
+
+)
+
+select distinct
+    name,
+    id,
+    count(1) over (partition by name, id) as val_count
+
+from data
+order by id, name
+
+---
+
+[
+    {name: alice, id: 1, val_count: 1},
+    {name: bob,   id: 1, val_count: 1},
+    {name: alice, id: 2, val_count: 2},
+    {name: bob,   id: 2, val_count: 1},
+]
+
+
+====================================
+Test window functions with sorting
+====================================
+
+with data as (
+
+    select 1 as id, 'alice' as name union all
+    select 2 as id, 'bob' as name union all
+    select 3 as id, 'alice' as name union all
+    select 4 as id, 'bob' as name union all
+    select 5 as id, 'alice' as name
+
+)
+
+select
+    id,
+    row_number() over (order by id desc) as idx
+
+from data
+order by id
+
+---
+
+[
+    {id: 1, idx: 5},
+    {id: 2, idx: 4},
+    {id: 3, idx: 3},
+    {id: 4, idx: 2},
+    {id: 5, idx: 1},
+]
+
+
+====================================
+Test window functions with sorting and partition
+====================================
+
+with data as (
+
+    select 1 as id, 'alice' as name union all
+    select 1 as id, 'bob' as name union all
+    select 2 as id, 'alice' as name union all
+    select 2 as id, 'bob' as name union all
+    select 2 as id, 'alice' as name
+
+)
+
+select
+    id,
+    name,
+    row_number() over (partition by id order by name) as idx
+
+from data
+order by id, name
+
+---
+
+[
+    {id: 1, name: 'alice', idx: 1},
+    {id: 1, name: 'bob', idx: 2},
+    {id: 2, name: 'alice', idx: 1},
+    {id: 2, name: 'alice', idx: 2},
+    {id: 2, name: 'bob', idx: 3},
+]
+
+
+====================================
+Test ranged window functions
+====================================
+
+with data as (
+
+    select
+        i as id,
+        1 as value
+    from generate_series(5)
+
+)
+
+select
+    id,
+    sum(value) over (
+        order by id
+        rows between 2 preceding and current row
+    ) as total_trailing,
+
+    sum(value) over (
+        order by id
+        rows between unbounded preceding and current row
+    ) as total_preceding,
+
+    sum(value) over (
+        order by id
+        rows between current row and unbounded following
+    ) as total_following,
+
+    sum(value) over (
+        order by id
+        rows between unbounded preceding and unbounded following
+    ) as total
+
+from data
+order by id
+
+---
+
+[
+    {id: 0, total_trailing: 1, total_preceding: 1, total_following: 5, total: 5},
+    {id: 1, total_trailing: 2, total_preceding: 2, total_following: 4, total: 5},
+    {id: 2, total_trailing: 3, total_preceding: 3, total_following: 3, total: 5},
+    {id: 3, total_trailing: 3, total_preceding: 4, total_following: 2, total: 5},
+    {id: 4, total_trailing: 3, total_preceding: 5, total_following: 1, total: 5},
+]
+
+====================================
+Test all window functions
+====================================
+
+with data as (
+
+    select i from generate_series(5)
+
+)
+
+select
+    i,
+    min(i) over () as min_val,
+    max(i) over () as max_val,
+    count(i) over () as count_val,
+    row_number(i) over () as row_val,
+    avg(i) over () as avg_val,
+    lag(i, 1) over () as lag_val,
+    lead(i, 1) over () as lead_val
+
+from data
+order by i
+
+---
+
+[
+    {i: 0, min_val: 0, max_val: 4, count_val: 5, row_val: 1, lag_val: null, lead_val: 1, avg_val: 2.0},
+    {i: 1, min_val: 0, max_val: 4, count_val: 5, row_val: 2, lag_val: 0, lead_val: 2, avg_val: 2.0},
+    {i: 2, min_val: 0, max_val: 4, count_val: 5, row_val: 3, lag_val: 1, lead_val: 3, avg_val: 2.0},
+    {i: 3, min_val: 0, max_val: 4, count_val: 5, row_val: 4, lag_val: 2, lead_val: 4, avg_val: 2.0},
+    {i: 4, min_val: 0, max_val: 4, count_val: 5, row_val: 5, lag_val: 3, lead_val: null, avg_val: 2.0},
+]

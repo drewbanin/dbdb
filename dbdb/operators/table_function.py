@@ -1,17 +1,11 @@
-
 from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows
 
 import asyncio
 
+
 class TableFunctionConfig(OperatorConfig):
-    def __init__(
-        self,
-        table,
-        function_name,
-        function_args,
-        function_class
-    ):
+    def __init__(self, table, function_name, function_args, function_class):
         self.table = table
         self.function_name = function_name
         self.function_args = function_args

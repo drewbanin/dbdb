@@ -1,3 +1,6 @@
 pytest
 pytest-cov
 pyyaml
+flake8
+mypy
+ruff

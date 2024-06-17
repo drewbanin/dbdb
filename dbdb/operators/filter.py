@@ -1,5 +1,5 @@
 from dbdb.operators.base import Operator, OperatorConfig
-import itertools
+from dbdb.tuples.context import ExecutionContext
 
 
 """
@@ -48,8 +48,9 @@ class FilterOperator(Operator):
     async def make_iterator(self, tuples):
         predicate = self.config.predicate
         async for row in tuples:
+            context = ExecutionContext(row=row)
             self.stats.update_row_processed(row)
-            if predicate.eval(row):
+            if predicate.eval(context):
                 yield row
                 self.stats.update_row_emitted(row)
 

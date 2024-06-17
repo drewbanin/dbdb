@@ -54,10 +54,7 @@ class Operator:
         self.operator_id = uuid.uuid4()
         self.cache = {}
         self.config = self.Config(**config)
-        self.stats = OperatorStats(
-            operator_id=id(self),
-            operator_type=self.name()
-        )
+        self.stats = OperatorStats(operator_id=id(self), operator_type=self.name())
 
         self.iterator = None
         self.exit_next_tick = False
@@ -84,11 +81,7 @@ class Operator:
         return {}
 
     def to_dict(self):
-        return {
-            "id": id(self),
-            "name": self.name(),
-            "details": self.details()
-        }
+        return {"id": id(self), "name": self.name(), "details": self.details()}
 
     def print_cache(self):
         rows = []
@@ -97,10 +90,7 @@ class Operator:
             rows.append((key, self.cache[key]))
 
         tbl = tabulate.tabulate(
-            rows,
-            headers=['key', 'value'],
-            tablefmt='presto',
-            floatfmt="0.2f"
+            rows, headers=["key", "value"], tablefmt="presto", floatfmt="0.2f"
         )
         logger.info(tbl)
 

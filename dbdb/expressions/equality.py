@@ -2,14 +2,14 @@ import enum
 
 
 class EqualityTypes(enum.Enum):
-    EQ = '='
-    NEQ = '!='
-    LT = '<'
-    GT = '>'
-    LTE = '<='
-    GTE = '>='
-    IS = 'is'
-    IS_NOT = 'is not'
+    EQ = "="
+    NEQ = "!="
+    LT = "<"
+    GT = ">"
+    LTE = "<="
+    GTE = ">="
+    IS = "is"
+    IS_NOT = "is not"
 
 
 class Equality:
@@ -37,6 +37,6 @@ class Equality:
         elif self.equality == EqualityTypes.IS:
             return lval is rval
         elif self.equality == EqualityTypes.IS_NOT:
-            return not(lval is rval)
+            return not (lval is rval)
         else:
             raise NotImplementedError()

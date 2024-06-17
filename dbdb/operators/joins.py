@@ -1,6 +1,8 @@
 from dbdb.operators.base import Operator, OperatorConfig
 from dbdb.tuples.rows import Rows
-from dbdb.expressions import EqualityTypes
+from dbdb.tuples.context import ExecutionContext
+
+# from dbdb.expressions import EqualityTypes
 
 from enum import Enum
 
@@ -59,9 +61,7 @@ class JoinOperator(Operator):
         return "Join"
 
     def details(self):
-        return {
-            "type": JoinTypeNames[self.config.join_type]
-        }
+        return {"type": JoinTypeNames[self.config.join_type]}
 
     async def run(self, left_rows, right_rows):
         self.stats.update_start_running()
@@ -103,7 +103,8 @@ class NestedLoopJoinOperator(JoinOperator):
             for rval in rvals:
                 self.stats.update_row_processed(rval)
                 merged = lval.merge(rval)
-                if self.config.expression.eval(merged):
+                context = ExecutionContext(row=merged)
+                if self.config.expression.eval(context):
                     matched = True
                     yield merged
                     self.stats.update_row_emitted(merged)
@@ -124,7 +125,10 @@ class NestedLoopJoinOperator(JoinOperator):
         elif self.config.join_type == JoinType.RIGHT_OUTER:
             raise NotImplementedError()
         else:
-            is_outer = self.config.join_type in [JoinType.LEFT_OUTER, JoinType.RIGHT_OUTER]
+            is_outer = self.config.join_type in [
+                JoinType.LEFT_OUTER,
+                JoinType.RIGHT_OUTER,
+            ]
             iterator = self.regular_join(left_rows, right_rows, is_outer)
 
         async for row in iterator:

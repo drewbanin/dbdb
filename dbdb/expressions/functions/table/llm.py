@@ -6,7 +6,7 @@ import os
 from openai import AsyncOpenAI
 
 
-API_KEY = os.getenv('DBDB_OPENAI_API_KEY')
+API_KEY = os.getenv("DBDB_OPENAI_API_KEY")
 PROMPT = """
 You are an operator inside of a columnar database. When you are asked a question, it is because the query planner decided
 that you are the best suited operator to execute the user's query. Respond to the user's query in the most reasonable way
@@ -28,7 +28,7 @@ a header row in your response.
 
 
 class AskGPTTableFunction(TableFunction):
-    NAMES = ['ASK_GPT']
+    NAMES = ["ASK_GPT"]
 
     def __init__(self, args):
         if len(args) != 1:
@@ -44,7 +44,9 @@ class AskGPTTableFunction(TableFunction):
 
     def check_api_key(self):
         if not API_KEY:
-            raise RuntimeError("dbdb was not initialized with an OpenAI API key & can't do llm magic :/")
+            raise RuntimeError(
+                "dbdb was not initialized with an OpenAI API key & can't do llm magic :/"
+            )
 
     async def make_iterator(self):
         stream = await self.client.chat.completions.create(
@@ -58,7 +60,7 @@ class AskGPTTableFunction(TableFunction):
                 {
                     "role": "user",
                     "content": self.prompt,
-                }
+                },
             ],
         )
 
@@ -67,7 +69,7 @@ class AskGPTTableFunction(TableFunction):
             value = chunk.choices[0].delta.content or ""
             accum += value
 
-            if '\n' in accum:
+            if "\n" in accum:
                 lines = accum.split("\n")
 
                 # Omit last element - it might be incomplete...

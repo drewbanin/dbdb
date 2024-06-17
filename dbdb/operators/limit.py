@@ -17,9 +17,7 @@ class LimitOperator(Operator):
         return "Limit"
 
     def details(self):
-        return {
-            "Limit": self.config.limit
-        }
+        return {"Limit": self.config.limit}
 
     async def make_iterator(self, tuples):
         limit = self.config.limit

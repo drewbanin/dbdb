@@ -49,8 +49,4 @@ class RenameScopeOperator(Operator):
         ]
 
         iterator = self.add_exit_check(iterator)
-        return Rows(
-            table=derived_table,
-            fields=mapped_fields,
-            iterator=iterator
-        )
+        return Rows(table=derived_table, fields=mapped_fields, iterator=iterator)

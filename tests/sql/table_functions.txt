@@ -34,6 +34,7 @@ from google_sheet('1FdRv_eVVo5GxtXthiScIyA3L7Z7h21eXWMMDcaFfGMI', 'Example')
 
 ====================================
 Test ask_gpt
+skip
 ====================================
 
 select *

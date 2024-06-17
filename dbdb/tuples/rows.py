@@ -1,12 +1,9 @@
 from dbdb.tuples.identifiers import TableIdentifier
 from dbdb.logger import logger
 
-import tabulate
-from typing import NamedTuple
-import functools
-
 import asyncio
 import collections
+import tabulate
 
 
 class RowTuple:
@@ -45,7 +42,6 @@ class RowTuple:
                 return True
         return False
 
-
     def nulls(self):
         return (None,) * len(self.fields)
 
@@ -55,7 +51,7 @@ class RowTuple:
     def merge(self, other):
         return RowTuple(
             fields=tuple(list(self.fields) + list(other.fields)),
-            data=tuple(list(self.data) + list(other.data))
+            data=tuple(list(self.data) + list(other.data)),
         )
 
     def as_tuple(self):
@@ -77,7 +73,7 @@ class Rows:
 
     async def __anext__(self):
         record = await self.iterator.__anext__()
-        row =  self._make_row(record)
+        row = self._make_row(record)
         self.seen.append(row)
         return row
 
@@ -131,13 +127,18 @@ class Rows:
 
                 status["complete"] = True
             except GeneratorExit:
-                return
+                raise RuntimeError("Generator exited")
 
         task = asyncio.create_task(bg_consume())
-
-        index =  0
+        index = 0
         while not status["complete"]:
-            batch = rows[index:index + take]
+            try:
+                exc = task.exception()
+                raise exc
+            except asyncio.exceptions.InvalidStateError:
+                pass
+
+            batch = rows[index : index + take]
             yield batch
             index += len(batch)
             await asyncio.sleep(0)
@@ -153,9 +154,7 @@ class Rows:
         # suffix with _1 or whatever
 
         if len(row_objs) < 1:
-            raise RuntimeError(
-                "Cannot merge rowsets from an empty list"
-            )
+            raise RuntimeError("Cannot merge rowsets from an empty list")
 
         fields = []
         for row in row_objs:
@@ -167,8 +166,8 @@ class Rows:
         return Rows(table, fields, iterator)
 
     async def materialize(self):
-        consumer = self.consume()
         if not self.data:
+            consumer = self.consume()
             self.data = tuple([self._make_row(row) async for row in consumer])
 
         return self.data
@@ -197,19 +196,11 @@ class Rows:
         else:
             to_print = raw
 
-        tbl = tabulate.tabulate(
-            to_print,
-            headers=self.fields,
-            tablefmt='presto'
-        )
+        tbl = tabulate.tabulate(to_print, headers=self.fields, tablefmt="presto")
         logger.info(f"TABLE\n{tbl}")
 
         return self.new(iter(data))
 
     @classmethod
     def from_literals(cls, table, fields, data):
-        return cls(
-            table=table,
-            fields=fields,
-            iterator=iter(data)
-        )
+        return cls(table=table, fields=fields, iterator=iter(data))

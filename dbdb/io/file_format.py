@@ -44,12 +44,11 @@ class ColumnInfo(object):
         self,
         column_type: DataType,
         column_name: str,
-
         encoding: DataEncoding = None,
         sorting: DataSorting = None,
         compression: DataCompression = None,
         column_width: Optional[int] = None,
-        column_data_size: Optional[int] = None
+        column_data_size: Optional[int] = None,
     ):
         self.column_type = column_type
 
@@ -81,28 +80,24 @@ class ColumnInfo(object):
                 " because column_data_size has not been set!"
             )
 
-        return pack([
-            # data type
-            struct.pack(">B", self.column_type.value),
-
-            # data type width
-            struct.pack(">i", self.column_width),
-
-            # column encoding
-            struct.pack(">B", self.encoding.value),
-
-            # column compression
-            struct.pack(">B", self.compression.value),
-
-            # Column sorting
-            struct.pack(">?", self.sorting.value),
-
-            # column data offset in file
-            struct.pack(">i", self.column_data_size),
-
-            # column name
-            struct.pack(">16s", bytes(self.column_name, 'ascii')),
-        ])
+        return pack(
+            [
+                # data type
+                struct.pack(">B", self.column_type.value),
+                # data type width
+                struct.pack(">i", self.column_width),
+                # column encoding
+                struct.pack(">B", self.encoding.value),
+                # column compression
+                struct.pack(">B", self.compression.value),
+                # Column sorting
+                struct.pack(">?", self.sorting.value),
+                # column data offset in file
+                struct.pack(">i", self.column_data_size),
+                # column name
+                struct.pack(">16s", bytes(self.column_name, "ascii")),
+            ]
+        )
 
     @classmethod
     def deserialize(cls, buffer):
@@ -126,7 +121,7 @@ class ColumnInfo(object):
 
         # column name
         column_name, buffer = chomp(">16s", buffer)
-        column_name = column_name.decode('ascii').strip('\x00')
+        column_name = column_name.decode("ascii").strip("\x00")
 
         column_info = cls(
             column_type=DataType(column_type),
@@ -135,7 +130,7 @@ class ColumnInfo(object):
             compression=DataCompression(compression),
             sorting=DataSorting(sorting),
             column_data_size=column_data_size,
-            column_name=column_name
+            column_name=column_name,
         )
 
         return column_info, buffer
@@ -168,7 +163,7 @@ class ColumnInfo(object):
             DataType.INT8: "INT_8",
             DataType.INT32: "INT_32",
             DataType.STR: "STRING",
-            DataType.DATE: "DATE"
+            DataType.DATE: "DATE",
         }
 
         return {
@@ -274,11 +269,7 @@ class Column(object):
 
     @classmethod
     def deserialize_data(self, column_info, num_records, buffer):
-        return ColumnData.deserialize(
-            column_info,
-            num_records,
-            buffer
-        )
+        return ColumnData.deserialize(column_info, num_records, buffer)
 
     def describe(self):
         self.column_info.describe()
@@ -286,12 +277,9 @@ class Column(object):
 
     @classmethod
     def new(cls, **kwargs):
-        data = kwargs.pop('data', None)
+        data = kwargs.pop("data", None)
 
-        return cls(
-            column_info=ColumnInfo(**kwargs),
-            column_data=ColumnData(data)
-        )
+        return cls(column_info=ColumnInfo(**kwargs), column_data=ColumnData(data))
 
 
 class Table(object):
@@ -360,13 +348,14 @@ class Table(object):
             column.finalize(buflen)
             data_buffer.extend(column_buffer)
 
-        packed_bytes = pack([
-            # magic number
-            self.magic_number(),
-
-            # table header
-            self.serialize_header()
-        ])
+        packed_bytes = pack(
+            [
+                # magic number
+                self.magic_number(),
+                # table header
+                self.serialize_header(),
+            ]
+        )
 
         packed_bytes.extend(data_buffer)
 
@@ -374,13 +363,13 @@ class Table(object):
 
     @classmethod
     def deserialize_header(cls, buffer):
-        magic_number, buffer = chomp('>4s', buffer)
+        magic_number, buffer = chomp(">4s", buffer)
 
         if magic_number != constants.MAGIC_NUMBER:
             raise RuntimeError(f"Bad magic number: {magic_number}")
 
-        num_columns, buffer = chomp('>i', buffer)
-        num_rows, buffer = chomp('>i', buffer)
+        num_columns, buffer = chomp(">i", buffer)
+        num_rows, buffer = chomp(">i", buffer)
         return num_columns, num_rows, buffer
 
     @classmethod
@@ -407,16 +396,9 @@ class Table(object):
 
             data_buffer = buffer[start:end]
 
-            column_data = Column.deserialize_data(
-                column_info,
-                num_rows,
-                data_buffer
-            )
+            column_data = Column.deserialize_data(column_info, num_rows, data_buffer)
 
-            columns.append(Column(
-                column_info=column_info,
-                column_data=column_data
-            ))
+            columns.append(Column(column_info=column_info, column_data=column_data))
 
             start = end
 
@@ -433,10 +415,7 @@ class Table(object):
         bytes_to_read = column_header_size * num_columns
 
         buffer = fh.read(bytes_to_read)
-        column_info_list, buffer = cls.deserialize_column_headers(
-            num_columns,
-            buffer
-        )
+        column_info_list, buffer = cls.deserialize_column_headers(num_columns, buffer)
 
         return column_info_list, num_rows
 
@@ -484,6 +463,7 @@ def read_pages(reader, columns):
 
         yield from zip(*page_iterators)
 
+
 def infer_type(value):
     if type(value) == int:
         return DataType.INT32
@@ -494,4 +474,6 @@ def infer_type(value):
     elif type(value) == bool:
         return DataType.BOOL
     else:
-        raise RuntimeError(f"Cannot infer column type for value: {value} ({type(value)})")
+        raise RuntimeError(
+            f"Cannot infer column type for value: {value} ({type(value)})"
+        )
