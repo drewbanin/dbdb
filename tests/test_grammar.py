@@ -1,4 +1,3 @@
-
 import pytest
 import asyncio
 import pathlib
@@ -27,9 +26,9 @@ def parse_test_file(test_path):
         skip = False
         test_name = lines.pop(0).strip()
 
-        if '\n' in test_name:
+        if "\n" in test_name:
             test_name, opts = test_name.split("\n")
-            if 'skip' in opts:
+            if "skip" in opts:
                 skip = True
 
         test_body = lines.pop(0).strip()
@@ -45,6 +44,7 @@ def parse_test_file(test_path):
             test_expected,
             skip,
         )
+
 
 def find_tests(dir_path):
     print(f"Looking for files in {dir_path}")
@@ -65,11 +65,9 @@ def make_test_name(test_index):
     return f"{filename_s}.{test_name_s}"
 
 
-
 SQL_TESTS = list(find_tests(SQL_DIR))
-SQL_TEST_INDEX = {
-    make_test_name(i): test for i, test in enumerate(SQL_TESTS)
-}
+SQL_TEST_INDEX = {make_test_name(i): test for i, test in enumerate(SQL_TESTS)}
+
 
 def run_query(filename, test_name, sql):
     query_id, plan, nodes, edges = dbdb.engine.plan_query(sql)
@@ -88,5 +86,12 @@ def test_sql_statement(test_index):
         pytest.skip("Test is skipped")
         return
 
-    actual = run_query(filename, test_name, sql)
+    statements = sql.split(";")
+
+    for sql_statement in statements:
+        # Run all statements, but only save results of the last one
+        # Splitting on the ; is kind of jank - we should do this using
+        # the grammar - but i think it's fine for the test suite...
+        actual = run_query(filename, test_name, sql_statement)
+
     assert actual == expected
