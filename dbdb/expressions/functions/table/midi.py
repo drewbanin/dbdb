@@ -1,9 +1,7 @@
 from dbdb.expressions.functions.base import TableFunction
 
-import asyncio
 import mido
 from mido import MidiFile
-import itertools
 
 
 NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -52,16 +50,24 @@ class MIDITableFunction(TableFunction):
         self.fname = args[0]
 
     def details(self):
-        return {"table": self.config.fname, "columns": []}
+        return {"table": self.fname, "columns": []}
 
     async def fields(self):
-        return ["time", "note", "octave", "freq", "length", "amplitude"]
+        return [
+            "time",
+            "note",
+            "octave",
+            "freq",
+            "length",
+            "amplitude",
+            "track",
+        ]
 
     async def generate(self):
-        midi_file = MidiFile(self.fname)
+        midi_file = MidiFile(self.fname, clip=True)
 
         tempo = 0
-        for i, track in enumerate(midi_file.tracks):
+        for track_number, track in enumerate(midi_file.tracks):
             now_playing = {}
             t = 0
             for msg in track:
@@ -70,12 +76,12 @@ class MIDITableFunction(TableFunction):
                     bpm = mido.tempo2bpm(msg.tempo)
                     tempo = msg.tempo
                 elif msg.type == "note_on":
-                    now_playing[msg.note] = t
+                    now_playing[msg.note] = [t, msg.velocity]
                 elif msg.type == "note_off":
                     if msg.note not in now_playing:
                         continue
 
-                    start_tick = now_playing.pop(msg.note)
+                    start_tick, velocity = now_playing.pop(msg.note)
                     start_time = mido.tick2second(
                         start_tick, midi_file.ticks_per_beat, tempo
                     )
@@ -91,5 +97,6 @@ class MIDITableFunction(TableFunction):
                         int(octave),
                         frequency,
                         duration,
-                        1,
+                        velocity / 128.0,
+                        track_number,
                     )
