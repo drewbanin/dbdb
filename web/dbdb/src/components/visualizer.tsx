@@ -17,108 +17,7 @@ import {
     pieArcLabelClasses,
 } from '@mui/x-charts';
 
-const sin = (t, f, a) => {
-    return a * Math.sin(2 * Math.PI * t * f);
-}
-
-const sqr = (t, f, a) => {
-    const val = sin(t, f, a);
-    if (val > 0) {
-        return a;
-    } else {
-        return -a
-    }
-}
-
-const SAMPLE_RATE = 44100;
-
-const createBuffer = (rows) => {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioCtx.suspend();
-
-    const numChannels = 1;
-
-    // this is in seconds
-    const totalTime = Math.max(...rows.map(r => r.time + (r.length || 1)));
-
-    const audioBuffer = audioCtx.createBuffer(
-      numChannels,
-      totalTime * SAMPLE_RATE,
-      SAMPLE_RATE,
-    );
-
-    const freqBuf = new Float32Array(totalTime * SAMPLE_RATE);
-    const countBuf = new Float32Array(totalTime * SAMPLE_RATE);
-
-    rows.forEach(row => {
-        const startTime = row.time;
-        const freq = row.freq;
-        const length = row.length || 1;
-        const amplitude = row.amp || 0.5;
-        const funcName = row.func || 'square';
-
-        // const beatOffset = SAMPLE_RATE * 0.01;
-        const beatOffset = 0;
-
-        const startIndex = Math.floor(startTime * SAMPLE_RATE);
-        const endIndex = Math.floor(startIndex + length * SAMPLE_RATE);
-
-        const offsetStartIndex = startIndex + beatOffset;
-        const offsetEndIndex = endIndex - beatOffset;
-
-        if (offsetEndIndex > freqBuf.length || offsetStartIndex > freqBuf.length) {
-            console.log("End index=", endIndex, "is out of bounds", freqBuf.length);
-            return
-        } else if (offsetStartIndex > offsetEndIndex) {
-            console.log("End time is before start time? how?");
-            return;
-        }
-
-        for (let i=offsetStartIndex; i < offsetEndIndex; i++) {
-            const time = i / SAMPLE_RATE;
-
-            const waveFunc = (funcName === 'sqr') ? sqr : sin;
-            const value = waveFunc(time, freq, amplitude)
-
-            freqBuf[i] += value;
-            countBuf[i] += 1;
-        }
-    })
-
-    const buffer = audioBuffer.getChannelData(0);
-    for (let i=0; i < freqBuf.length; i++) {
-        const count = countBuf[i];
-        const freq = freqBuf[i];
-
-        let normed;
-        if (count === 0) {
-            normed = 0;
-        } else {
-            normed = freq / count;
-        }
-
-        let clipped;
-        if (normed > 1) {
-            clipped = 1;
-        } else if (normed < -1) {
-            clipped = -1;
-        } else {
-            clipped = normed;
-        }
-
-        buffer[i] = clipped;
-    }
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-
-    const gain = audioCtx.createGain();
-
-    source.connect(gain);
-    gain.connect(audioCtx.destination)
-
-    return [source, audioCtx, gain, totalTime];
-}
+import { createBuffer, sqr, sin, SAMPLE_RATE } from "./audio.ts";
 
 function FrequencyDomainViz({ playing, rows, offset }) {
   if (!playing) {
@@ -400,7 +299,12 @@ export function Visualizer() {
             return
         }
 
-        const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
+        const {
+            source: newSource,
+            context: ctx,
+            gain: newGain,
+            totalTime
+        } = createBuffer(mappedRows);
 
         endTime.current = totalTime;
 
@@ -429,7 +333,6 @@ export function Visualizer() {
         }
 
         setPlayTime(audioCtx.current.currentTime);
-
         if (audioCtx.current.currentTime > endTime.current) {
           console.log("done playing", audioCtx.current.currentTime, endTime.current)
           source.current.stop()
@@ -468,6 +371,13 @@ export function Visualizer() {
         volumeRef.current = level;
     }
 
+    /*
+    <button
+        style={{ margin: 0, verticalAlign: 'top' }}
+        onClick={ e => setVizType('pie') }
+        className="light title">BEN</button>
+    */
+
     return (
         <>
             <div className="panelHeader">
@@ -482,10 +392,6 @@ export function Visualizer() {
                                     style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                     onClick={ e => setVizType('time') }
                                     className="light title">TIME</button>
-                                <button
-                                    style={{ margin: 0, verticalAlign: 'top' }}
-                                    onClick={ e => setVizType('pie') }
-                                    className="light title">BEN</button>
 
                                 <div style={{ margin: 0, float: 'right' }}>
                                     { showMediaControls && 
