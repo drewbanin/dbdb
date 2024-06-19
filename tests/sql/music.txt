@@ -1,0 +1,79 @@
+====================================
+Test music: Yoshi
+====================================
+
+with notes as (
+    select
+        note,
+        frequency::float as freq
+
+    from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'Notes')
+
+),
+
+bass as (
+    select
+        note,
+        length::float as  length,
+        octave::int as octave,
+        amplitude::float as amplitude,
+        start_time::float as start_time,
+        start_time::float + length::float as end_time
+
+    from google_sheet('1E0Zp6G_2URi3HiFRUk1PlMlAHeWopiJ7LZy6kugGG1Y', 'Bass')
+),
+
+bass_freq as (
+
+    select
+        bass.start_time as time,
+        bass.length,
+        bass.amplitude,
+        notes.freq * pow(2, bass.octave - 4) as freq
+
+    from bass
+    join notes on notes.note = bass.note
+
+),
+
+melody as (
+    select
+        note,
+        length::float as  length,
+        octave::int as octave,
+        amplitude::float as amplitude,
+        start_time::float as start_time,
+        start_time::float + length::float as end_time
+
+    from google_sheet('1E0Zp6G_2URi3HiFRUk1PlMlAHeWopiJ7LZy6kugGG1Y', 'Melody')
+),
+
+melody_freq as (
+
+    select
+        melody.start_time as time,
+        melody.length,
+        melody.amplitude,
+        notes.freq * pow(2, melody.octave - 4) as freq
+
+    from melody
+    join notes on notes.note = melody.note
+
+),
+
+final as (
+
+select 'sqr' as func, * from bass_freq
+union
+select 'sin' as func, * from melody_freq
+order by time
+
+)
+
+select count(*) as num_notes from final
+
+---
+
+[
+    {num_notes: 583}
+]

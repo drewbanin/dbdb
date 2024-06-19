@@ -3,12 +3,9 @@ from dbdb.logger import logger
 import dbdb.lang.lang
 
 import asyncio
-import threading
 import networkx as nx
 import time
 import json
-import random
-import os
 
 
 # Store events and query results globally
@@ -115,10 +112,14 @@ async def run_query(query_id, plan, nodes):
 
     async for batch in output_consumer.iter_rows_batches(take=100):
         batched_rows = [r.as_tuple() for r in batch]
-        add_event(
-            query_id,
-            {"event": "ResultRows", "data": {"id": query_id, "rows": batched_rows}},
-        )
+        if len(batched_rows) > 0:
+            add_event(
+                query_id,
+                {
+                    "event": "ResultRows",
+                    "data": {"id": query_id, "rows": batched_rows},
+                },
+            )
         await asyncio.sleep(0.1)
 
     # await output.display()
@@ -190,7 +191,9 @@ def dispatch_query(loop, query_id, plan, nodes):
     # Note that the loop is passed in from the request handler, so
     # this background task will run in the main server loop. Better
     # hope i didn't make any mistakes with asyncio in the db :)
-    task = loop.create_task(safe_dispatch_query(query_id, plan, nodes))
+    task = asyncio.run_coroutine_threadsafe(
+        safe_dispatch_query(query_id, plan, nodes), loop
+    )
     RUNNING_QUERIES[query_id] = plan, task
 
 
@@ -209,6 +212,10 @@ def plan_query(sql):
 
 
 def terminate_query(query_id):
+    if query_id not in RUNNING_QUERIES:
+        logger.info(f"Query #{query_id} is not running")
+        return
+
     plan, task = RUNNING_QUERIES[query_id]
     for node in list(plan):
         node.exit()

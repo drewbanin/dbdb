@@ -30,7 +30,7 @@ class SafeIterator:
 
     def check_raise(self):
         if self.exit_next_tick:
-            raise GeneratorExit()
+            raise StopIteration()
 
     def __iter__(self):
         return self.iterator

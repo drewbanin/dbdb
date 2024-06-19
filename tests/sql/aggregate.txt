@@ -114,6 +114,33 @@ order by 1
 ]
 
 ====================================
+Test implicit agg
+====================================
+
+with data as (
+
+    select 1 as id
+    union
+    select 2 as id
+    union
+    select 3 as id
+    union
+    select 4 as id
+
+)
+
+select
+    count(*) as value
+
+from data
+
+---
+
+[
+    {value: 4}
+]
+
+====================================
 Test having clause
 skip
 ====================================
