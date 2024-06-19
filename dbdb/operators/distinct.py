@@ -12,7 +12,7 @@ class DistinctOperator(Operator):
     Config = DistinctConfig
 
     def name(self):
-        return "Order"
+        return "Distinct"
 
     async def make_iterator(self, rows):
         seen = set()

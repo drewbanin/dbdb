@@ -119,12 +119,12 @@ class Rows:
         status = {"complete": False, "error": None}
 
         async def bg_consume():
-            consumer = self.consume()
             try:
+                consumer = self.consume()
                 async for row in consumer:
                     rows.append(row)
                     await asyncio.sleep(0)
-            except RuntimeError as e:
+            except Exception as e:
                 status["error"] = e
 
             status["complete"] = True
@@ -132,15 +132,20 @@ class Rows:
         task = asyncio.create_task(bg_consume())
         index = 0
         while not status["complete"]:
-            try:
-                task.exception()
-            except asyncio.exceptions.InvalidStateError:
-                pass
-
             batch = rows[index : index + take]
             yield batch
             index += len(batch)
             await asyncio.sleep(0)
+
+        if status["error"]:
+            raise status["error"]
+
+        try:
+            # make asyncio happy that we checked...
+            task.exception()
+
+        except asyncio.exceptions.InvalidStateError:
+            pass
 
         # Clean up remaining rows if complete occurs
         # before output is fully consumed

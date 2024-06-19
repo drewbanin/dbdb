@@ -18,6 +18,9 @@ class Expression:
     def make_name(self):
         raise NotImplementedError()
 
+    def walk(self, func):
+        raise NotImplementedError()
+
     def can_derive_name(self):
         return False
 
@@ -48,6 +51,9 @@ class ColumnIdentifier(Expression):
     def copy(self):
         return ColumnIdentifier(table=self.table, column=self.column)
 
+    def walk(self, func):
+        yield func(self)
+
     def qualify(self):
         if self.table:
             name = f"{self.table}.{self.column}"
@@ -76,6 +82,9 @@ class Literal(Expression):
 
     def copy(self):
         return Literal(val=self.val)
+
+    def walk(self, func):
+        yield func(self)
 
     def eval(self, context: ExecutionContext):
         return self.val
@@ -120,11 +129,14 @@ class Star(Expression):
     def eval(self, context: ExecutionContext):
         return self.val
 
+    def walk(self, func):
+        yield func(self)
+
     def get_aggregated_fields(self):
         return set()
 
     def get_non_aggregated_fields(self):
-        return set()
+        return set(["*"])
 
 
 class ScalarFunctionCall(Expression):
@@ -137,6 +149,11 @@ class ScalarFunctionCall(Expression):
 
     def eval(self, context: ExecutionContext):
         return self.processor.eval(context)
+
+    def walk(self, func):
+        for expr in self.func_expr:
+            yield from expr.walk(func)
+        yield func(self)
 
     def copy(self):
         return ScalarFunctionCall(
@@ -177,6 +194,11 @@ class AggregateFunctionCall(Expression):
             func_class=self.func_class,
             is_distinct=self.is_distinct,
         )
+
+    def walk(self, func):
+        for expr in self.func_expr:
+            yield from expr.walk(func)
+        yield func(self)
 
     def eval(self, context: ExecutionContext):
         if not self.is_started:
@@ -227,6 +249,11 @@ class WindowFunctionCall(Expression):
             frame_end=frame_end,
         )
 
+    def walk(self, func):
+        for expr in self.func_expr:
+            yield from expr.walk(func)
+        yield func(self)
+
     def eval(self, context: ExecutionContext):
         return self.processor.eval(context)
 
@@ -252,6 +279,9 @@ class NegationOperator(Expression):
     def copy(self):
         return NegationOperator(expr=self.expr)
 
+    def walk(self, func):
+        yield from self.expr.walk(func)
+
     def eval(self, context: ExecutionContext):
         return -self.expr.eval(context)
 
@@ -275,6 +305,10 @@ class BinaryOperator(Expression):
         return BinaryOperator(
             lhs=self.lhs.copy(), operator=self.operator, rhs=self.rhs.copy()
         )
+
+    def walk(self, func):
+        yield from self.lhs.walk(func)
+        yield from self.rhs.walk(func)
 
     def short_circuit_and(self, context):
         lhs = bool(self.lhs.eval(context))
@@ -317,6 +351,12 @@ class CaseWhen(Expression):
             else_expr=self.else_expr.copy(),
         )
 
+    def walk(self, func):
+        for expr in self.when_exprs:
+            yield from expr.walk(func)
+
+        yield from self.else_expr.walk(func)
+
     def iter_exprs(self):
         for expr in self.when_exprs + [self.else_expr]:
             yield expr
@@ -350,6 +390,9 @@ class CastExpr(Expression):
 
     def eval(self, context: ExecutionContext):
         return self.ttype
+
+    def walk(self, func):
+        yield func(self)
 
     def get_aggregated_fields(self):
         return set()

@@ -782,14 +782,14 @@ def extract_group_by(ast, projections):
         scalars.append(scalar_fields)
         scalar_field_names.update(scalar_fields)
 
-    has_aggs = any(len(agg) > 0 for agg in aggs)
-    has_scalar = any(len(scalar) > 0 for scalar in scalars)
+    no_aggs = any(len(agg) == 0 for agg in aggs)
+    all_aggs = all(len(agg) > 0 for agg in aggs)
 
-    if not has_aggs and "group_by" not in ast:
+    if no_aggs and "group_by" not in ast:
         # Case 1: All fields are scalar and there is no grouping
         return None
 
-    elif not has_scalar and "group_by" not in ast:
+    elif all_aggs and "group_by" not in ast:
         # Case 2: All fields are aggregated and there is no grouping
         return SelectGroupBy([], projections)
 

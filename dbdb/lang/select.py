@@ -15,6 +15,8 @@ from dbdb.tuples.context import ExecutionContext
 from dbdb.expressions.expressions import Star
 from dbdb.expressions.sort import ReverseSort
 
+from dbdb.expressions.expressions import AggregateFunctionCall, WindowFunctionCall
+
 import networkx as nx
 
 
@@ -214,6 +216,14 @@ class SelectProjection(SelectClause):
 
     def can_derive_name(self):
         return self.expr.can_derive_name()
+
+    def is_window(self):
+        is_window = list(self.expr.walk(lambda e: type(e) is WindowFunctionCall))
+        return any(is_window)
+
+    def is_aggregate(self):
+        is_agg = list(self.expr.walk(lambda e: type(e) is AggregateFunctionCall))
+        return any(is_agg)
 
     def get_aggregated_fields(self):
         return self.expr.get_aggregated_fields()

@@ -3,10 +3,34 @@ from dbdb.tuples.rows import Rows
 from dbdb.tuples.identifiers import FieldIdentifier
 from dbdb.tuples.context import ExecutionContext
 
+import asyncio
+
 
 class ProjectConfig(OperatorConfig):
     def __init__(self, project=None):
         self.project = project
+
+
+class WindowIterator:
+    "Fake an async iterator over a tuple - asyncio is bad"
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.iterator = self.make_iter(rows)
+
+    def make_iter(self, rows):
+        for row in rows:
+            yield row
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        await asyncio.sleep(0)
+        try:
+            return next(self.iterator)
+        except StopIteration:
+            raise StopAsyncIteration()
 
 
 class ProjectOperator(Operator):
@@ -18,10 +42,25 @@ class ProjectOperator(Operator):
     async def make_iterator(self, tuples):
         projections = self.config.project
 
-        # TODO : Do not do this unless there are window functions!!
-        rows = await tuples.materialize()
+        has_window = False
+        for projection in projections:
+            is_window = projection.is_window()
+            is_agg = projection.is_aggregate()
 
-        for row in rows:
+            if is_agg:
+                raise RuntimeError(
+                    "Cannot use projection operator with an aggregate expression..."
+                )
+            elif is_window:
+                has_window = True
+
+        if has_window:
+            rows = await tuples.materialize()
+            tuples = WindowIterator(rows)
+        else:
+            rows = tuples
+
+        async for row in tuples:
             context = ExecutionContext(row=row, rows=rows)
             self.stats.update_row_processed(row)
             projected = []
