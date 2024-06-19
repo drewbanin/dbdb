@@ -154,7 +154,13 @@ order by time
 `.trim();
 
 const APHEX = `
-select * from midi('avril_14.mid')
+select
+    freq::float as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func
+
+from google_sheet('1BohUT5DscWO8JLV-o0uzPLWzaBC2NwJkGNelwGVZjEQ')
 `.trim();
 
 const ALTMAN = `
