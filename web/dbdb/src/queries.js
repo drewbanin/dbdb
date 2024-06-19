@@ -163,6 +163,16 @@ select
 from google_sheet('1BohUT5DscWO8JLV-o0uzPLWzaBC2NwJkGNelwGVZjEQ')
 `.trim();
 
+const SATIE = `
+select
+    freq::float as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func
+
+from google_sheet('1_I2qc7jBJhrQBpgtoPjvEQ_nyLob1CruBLJ1UFbmueY')
+`;
+
 const ALTMAN = `
 with music as (
     select * from ask_gpt('Play the song "Happy Birthday"')
@@ -188,6 +198,7 @@ const QUERIES = {
     FAIRY: FAIRY,
     "AVRIL 14": APHEX,
     ALTMAN: ALTMAN,
+    SATIE: SATIE,
 }
 
 
