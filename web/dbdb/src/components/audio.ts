@@ -21,11 +21,6 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const amplitude = row.amp || 0.5;
     const funcName = row.func || 'square';
 
-    const endTime = startTime + length;
-
-    // const beatOffset = SAMPLE_RATE * 0.01;
-    const beatOffset = 0;
-
     const startIndex = Math.floor(startTime * SAMPLE_RATE);
     const endIndex = Math.floor(startIndex + length * SAMPLE_RATE);
 
@@ -43,14 +38,15 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     for (let i=startIndex; i < endIndex; i++) {
         const time = i / SAMPLE_RATE;
 
-        const offsetFromStart = time - startTime;
-        const offsetUntilEnd = endTime - time;
-
         const waveFunc = (funcName === 'sqr') ? sqr : sin;
         let value = waveFunc(time, freq, amplitude)
 
-        // longer notes get longer attacks
         /*
+        // longer notes get longer attacks
+        const endTime = startTime + length;
+        const offsetFromStart = time - startTime;
+        const offsetUntilEnd = endTime - time;
+
         let fadeDelay = 0.25;
         const doFade = false;
         if (doFade && offsetFromStart < fadeDelay) {
