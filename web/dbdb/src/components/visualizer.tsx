@@ -432,75 +432,50 @@ export function Visualizer() {
 }
 
 export function XYViz() {
-    const { schema, result } = useContext(QueryContext);
+    const { schema, result, fullscreen } = useContext(QueryContext);
     const [ dataSchema ] = schema;
     const [ rows ] = result;
+    const [ isFullscreen, setFullscreen ] = fullscreen;
 
-    // collects series into list of {name, x, y}
-    
-    const series = {};
-    (dataSchema || []).forEach((colName, index) => {
-        let col = null;
-        let axis = null;
-        let color = null;
-
-        if (colName.endsWith("_x")) {
-            axis = 'x';
-            col = colName.replace('_x', '');
-        } else if (colName.endsWith("_y")) {
-            axis = 'y';
-            col = colName.replace('_y', '');
-        } else if (colName.endsWith('_color')) {
-            col = colName.replace('_color', '');
-            color = true
-        }
-
-        if (axis && col) {
-            if(!series[col]) {
-                series[col] = {name: col}
-            }
-
+    const series = {x: [], y: [], color: 'black'};
+    (dataSchema || []).forEach((col, index) => {
+        if (col === "x" || col === "y") {
             const data = rows.map(r => r[index]);
-            series[col][axis] = data;
-        } else if (color && col) {
-            if(!series[col]) {
-                series[col] = {name: col}
+            series[col] = data;
+        }
+    })
+
+    const viz = {
+        type: 'scatter',
+        color: 'black',
+        data: series.x.map((x, i) => {
+            return {
+                x: series.x[i],
+                y: series.y[i],
+                id: 'point-' + i
             }
-
-            series[col]['color'] = rows.map(r => r[index]);
-        }
-    })
-
-    const seriesNames = Object.keys(series);
-
-                // <SparkLineChart data={data} height={50} colors={["#000000"]} />
-    const viz = seriesNames.map(name => {
-        const ser = series[name];
-        const color = (ser.color && ser.color.length) ? ser.color[0] : '#000000';
-        return {
-            label: name.toUpperCase(),
-            type: 'scatter',
-            color: color,
-            data: ser.x.map((x, i) => {
-                return {
-                    x: ser.x[i],
-                    y: ser.y[i],
-                    id: 'x-' + ser.x[i] + '-y-' + ser.y[i],
-                }
-            })
-        }
-    })
+        })
+    }
 
     return (<>
             <div className="panelHeader">
                 <div style={{ padding: 5 }}>
-                    <div className="helpText">VIZ
+                    <div className="helpText" style={{ display: "inline-block" }}>VIZ
+                    </div>
+
+                    <div style={{ float: "right" }}>
+                        <button
+                            onClick={e => setFullscreen(!isFullscreen)}
+                            style={{ margin: -2 }}
+                            className="light title">
+                            <FullScreenIcon isFullscreen={isFullscreen} />
+                        </button>
                     </div>
                 </div>
             </div>
             <div className="configBox minFixedHeight">
                 <ResponsiveChartContainer
-                  series={viz}
+                  series={[viz]}
                   margin={{
                     left: 40,
                     right: 35,

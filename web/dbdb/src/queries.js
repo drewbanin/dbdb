@@ -1,9 +1,9 @@
 
 const MATH = `
 select
-    i / 20 as sin_x,
-    sin(i / 20) + sin (1.1 * i / 20) as sin_y,
-    '#000000' as sin_color
+    i / 20 as x,
+    sin(i / 20) + sin (1.1 * i / 20) as y,
+    '#000000' as color
 
 from generate_series(2000, 0.001)
 `.trim();
@@ -161,6 +161,7 @@ select
     'sin' as func
 
 from google_sheet('1BohUT5DscWO8JLV-o0uzPLWzaBC2NwJkGNelwGVZjEQ')
+order by time
 `.trim();
 
 const SATIE = `
@@ -171,6 +172,7 @@ select
     'sin' as func
 
 from google_sheet('1_I2qc7jBJhrQBpgtoPjvEQ_nyLob1CruBLJ1UFbmueY')
+order by time
 `;
 
 const ALTMAN = `
