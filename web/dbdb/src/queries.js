@@ -165,15 +165,41 @@ order by time
 `.trim();
 
 const SATIE = `
+with notes as (
+    select * from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'C-Major')
+)
+
 select
-    freq::float as freq,
+    music.note,
+    octave,
+    notes.frequency::float * pow(2, music.octave::float - 4) as freq,
     time::float as time,
     length::float as length,
     'sin' as func
 
-from google_sheet('1_I2qc7jBJhrQBpgtoPjvEQ_nyLob1CruBLJ1UFbmueY')
+from google_sheet('1_I2qc7jBJhrQBpgtoPjvEQ_nyLob1CruBLJ1UFbmueY') as music
+join notes on music.note = notes.note
 order by time
 `;
+
+const PUNK = `
+with notes as (
+    select * from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'C-Major')
+)
+
+
+select
+    music.note,
+    octave,
+    notes.frequency::float * pow(2, music.octave::float - 4) as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func
+
+from google_sheet('1EKocOJqU0tR0YK2uqUIJk3NwNuywMnWMIFMjx3Hrbek') music
+join notes on music.note = notes.note
+order by time
+`.trim();
 
 const ALTMAN = `
 with music as (
@@ -189,6 +215,8 @@ from music
 order by time
 `.trim();
 
+
+
 const QUERIES = {
 
     DELAY: DELAY,
@@ -200,6 +228,7 @@ const QUERIES = {
     FAIRY: FAIRY,
     "AVRIL 14": APHEX,
     ALTMAN: ALTMAN,
+    PUNK: PUNK,
     SATIE: SATIE,
 }
 

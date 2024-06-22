@@ -145,15 +145,52 @@ function PieViz({ playing, rows, offset }) {
   );
 }
 
+const animateVals = (animationRef, key, values) => {
+    if (!animationRef.current[key]) {
+      // initialize the buffer
+      // Each element has a starting point, ending point, and step
+
+      const y = values.map(val => {
+        return {to: val, current: val, step: 0}
+      })
+
+      animationRef.current[key] = y;
+    } else {
+      // grab existing values and add `from` to step value to get towards `to`
+      // ideally we would spline (?) this, but can go linear for now...
+
+      const maxSteps = 5;
+      const animatedVals = animationRef.current[key].map((existing, i) => {
+          const targetYVal = values[i];
+          const increment = (targetYVal - existing.current) / maxSteps;
+          let newVal = existing.current + increment;
+
+          return {to: targetYVal, current: newVal, step: existing.step + 1, increment: increment}
+      })
+
+      animationRef.current[key] = animatedVals;
+    }
+
+    return animationRef.current[key].map(r => r.current);
+
+
+}
+
+const animate = (animationRef, seriesList) => {
+    return seriesList.map((series, i) => {
+        return animateVals(animationRef, i, series);
+    });
+}
+
 function TimeDomainViz({ playing, rows, offset }) {
-  const yBuffer = useRef();
+  const animation = useRef({});
   const maxY = useRef(1);
 
   if (!playing) {
       return null
   }
 
-  const beatOffset = 0.01;
+  const beatOffset = 0.0;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
       const endT = row.time + (row.length || 1) - beatOffset;
@@ -162,63 +199,55 @@ function TimeDomainViz({ playing, rows, offset }) {
 
   const xDomain = 10000;
   const xVals = [];
-  const yVals = [];
+  const sinVals = [];
+  const sqrVals = [];
 
   for (let i=0; i < xDomain; i++) {
       xVals.push(i);
 
       const scaleFactor = SAMPLE_RATE * 10;
 
-      const freqs = relevantRows.map(row => {
+      const squares = relevantRows.filter(r => r.func === 'sqr');
+      const sines = relevantRows.filter(r => r.func !== 'sqr');
+
+      const sqrFreqs = squares.map(row => {
           const amp = row.amp || 1;
-          const func = row.func === 'sqr' ? sqr : sin;
-          return func(i / scaleFactor, row.freq, amp)
+          return sqr(i / scaleFactor, row.freq, amp)
       })
 
-      const yTotal = freqs.reduce((acc, val) => acc + val, 0);
-      // const yVal = freqs.length === 0 ? 0 : yTotal / freqs.length;
-      const yVal = yTotal;
-      yVals.push(yVal);
+      const sinFreqs = sines.map(row => {
+          const amp = row.amp || 1;
+          return sin(i / scaleFactor, row.freq, amp)
+      })
+
+      const sqrTotal = sqrFreqs.reduce((acc, val) => acc + val, 0) / (squares.length || 1);
+      const sinTotal = sinFreqs.reduce((acc, val) => acc + val, 0) / (sines.length || 1);
+
+      sqrVals.push(sqrTotal);
+      sinVals.push(sinTotal);
   }
 
-  let vizY;
-  if (!yBuffer.current) {
-      // initialize the buffer
-      // Each element has a starting point, ending point, and step
+  // animate sin and sqr separately
+  // const [vizSin, vizSqr] = animate(animation, [sinVals, sqrVals]);
+  // const sinTop = vizSin.map(val => val / 2 + 0.5);
+  // const sqrBot = vizSqr.map(val => val / 2 - 0.5);
+  //  series={[
+  //      { data: sinTop, label: 'sin', type: 'line', color: '#000000' },
+  //      { data: sqrBot, label: 'sqr', type: 'line', color: '#000000' }
+  //  ]}
 
-      const newYBuf = yVals.map(val => {
-        return {to: val, current: val, step: 0}
-      })
-
-      yBuffer.current = newYBuf;
-      vizY = yVals;
-
-  } else {
-      // grab yBuffer and add `from` to step value to get towards `to`
-      // ideally we would spline (?) this, but can go linear for now...
-
-      const maxSteps = 5;
-      const animatedVals = yBuffer.current.map((existing, i) => {
-          const targetYVal = yVals[i];
-          const increment = (targetYVal - existing.current) / maxSteps;
-          let newVal = existing.current + increment;
-
-          if (Math.abs(newVal) > maxY.current) {
-              maxY.current = Math.abs(newVal);
-          }
-
-          return {to: targetYVal, current: newVal, step: existing.step + 1, increment: increment}
-      })
-
-      vizY = animatedVals.map(val => val.current);
-      yBuffer.current = animatedVals;
-  }
+  const combined = sqrVals.map((_, i) => sinVals[i] + sqrVals[i] / 2);
+  const [vizCombined] = animate(animation, [combined]);
+  const minVal = Math.min(...vizCombined);
+  const maxVal = Math.max(...vizCombined);
 
   return (
     <ResponsiveChartContainer
-      series={[{ data: vizY, label: 'v', type: 'line', color: '#000000' }]}
+      series={[
+          { data: vizCombined, label: 'amp', type: 'line', color: '#000000' }
+      ]}
       xAxis={[{ scaleType: 'linear', data: xVals, min: 0, max: xDomain, tickNumber: 5 }]}
-      yAxis={[{ min: -maxY.current - 0.1, max: maxY.current + 0.1, tickNumber: 2 }]}
+      yAxis={[{ min: minVal - 0.1, max: maxVal + 0.1, tickNumber: 2 }]}
       margin={{
         left: 15,
         right: 35,
