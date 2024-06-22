@@ -38,7 +38,6 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const doFade = row.velocity !== undefined;
     const fadeDelayPct = (1 - row.velocity) / 1.0;
     const fadeDelay = fadeDelayPct * length / 2;
-    console.log("Fade delay = ", fadeDelay);
 
     const waveFunc = (funcName === 'sqr') ? sqr : sin;
 

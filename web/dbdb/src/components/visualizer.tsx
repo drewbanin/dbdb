@@ -212,12 +212,18 @@ function TimeDomainViz({ playing, rows, offset }) {
 
       const sqrFreqs = squares.map(row => {
           const amp = row.amp || 1;
-          return sqr(i / scaleFactor, row.freq, amp)
+
+          const relativeOffset = offset - row.time;
+          const pctDone = relativeOffset / row.length;
+          return sqr(i / scaleFactor, row.freq, 1 - pctDone)
       })
 
       const sinFreqs = sines.map(row => {
           const amp = row.amp || 1;
-          return sin(i / scaleFactor, row.freq, amp)
+
+          const relativeOffset = offset - row.time;
+          const pctDone = relativeOffset / row.length;
+          return sin(i / scaleFactor, row.freq, 1 - pctDone)
       })
 
       const sqrTotal = sqrFreqs.reduce((acc, val) => acc + val, 0) / (squares.length || 1);
