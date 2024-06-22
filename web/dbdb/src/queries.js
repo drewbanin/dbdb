@@ -142,7 +142,8 @@ melody_freq as (
         melody.start_time as time,
         melody.length,
         melody.amplitude,
-        notes.freq * pow(2, melody.octave - 5) as freq
+        notes.freq * pow(2, melody.octave - 5) as freq,
+        0.9 as velocity
 
     from melody
     join notes on notes.note = melody.note
@@ -158,7 +159,8 @@ select
     freq::float as freq,
     time::float as time,
     length::float as length,
-    'sin' as func
+    'sin' as func,
+    0.95 as velocity
 
 from google_sheet('1BohUT5DscWO8JLV-o0uzPLWzaBC2NwJkGNelwGVZjEQ')
 order by time
@@ -172,10 +174,14 @@ with notes as (
 select
     music.note,
     octave,
-    notes.frequency::float * pow(2, music.octave::float - 4) as freq,
+    notes.frequency::float * pow(2, music.octave::float - 5) as freq,
     time::float as time,
     length::float as length,
-    'sin' as func
+    'sin' as func,
+    case
+        when length::float < 1 then 0.95
+        else velocity::float * 2
+    end as velocity
 
 from google_sheet('1_I2qc7jBJhrQBpgtoPjvEQ_nyLob1CruBLJ1UFbmueY') as music
 join notes on music.note = notes.note
@@ -192,9 +198,10 @@ select
     music.note,
     octave,
     notes.frequency::float * pow(2, music.octave::float - 4) as freq,
-    time::float as time,
-    length::float as length,
-    'sin' as func
+    time::float + 0.06 as time,
+    length::float - 0.03 as length,
+    'sin' as func,
+    velocity::float as velocity
 
 from google_sheet('1EKocOJqU0tR0YK2uqUIJk3NwNuywMnWMIFMjx3Hrbek') music
 join notes on music.note = notes.note

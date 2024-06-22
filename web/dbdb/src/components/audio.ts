@@ -35,31 +35,48 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
         return;
     }
 
+    const doFade = row.velocity !== undefined;
+    const fadeDelayPct = (1 - row.velocity) / 1.0;
+    const fadeDelay = fadeDelayPct * length / 2;
+    console.log("Fade delay = ", fadeDelay);
+
+    const waveFunc = (funcName === 'sqr') ? sqr : sin;
+
+    let xPos = 0;
+    const SAMPLE_LENGTH = 1.0 / SAMPLE_RATE;
     for (let i=startIndex; i < endIndex; i++) {
         const time = i / SAMPLE_RATE;
 
-        const waveFunc = (funcName === 'sqr') ? sqr : sin;
-        let value = waveFunc(time, freq, amplitude)
-
         /*
-        // longer notes get longer attacks
+         * If we start calculating the value of the wave at t=time, then sin waves
+         * could start playing from some value other than zero. Instead, we want to
+         * use our own x domain that starts at zero while tracking the samples in
+         * our actual note.
+         */
+        let value = waveFunc(xPos, freq, amplitude)
+
         const endTime = startTime + length;
         const offsetFromStart = time - startTime;
         const offsetUntilEnd = endTime - time;
 
-        let fadeDelay = 0.25;
-        const doFade = false;
+        // Fade in only if velocity is set...
         if (doFade && offsetFromStart < fadeDelay) {
             const amp = offsetFromStart / fadeDelay;
             value = value * amp;
-        } else if (doFade && offsetUntilEnd < fadeDelay) {
-            const amp = offsetUntilEnd / fadeDelay;
-            value = value * amp;
         }
-        */
 
-        freqBuffer[i] += value;
+        // always fade out to avoid clipping
+        const fadeOutDelay = length / 2;
+        if (offsetUntilEnd < fadeOutDelay) {
+            const fadeOutAmp = offsetUntilEnd / fadeOutDelay;
+            value = value * fadeOutAmp;
+        }
+
+        const clipped = Math.min(Math.max(-1, value), 1);
+        freqBuffer[i] += clipped;
         countBuffer[i] += 1;
+
+        xPos += SAMPLE_LENGTH;
     }
 }
 
