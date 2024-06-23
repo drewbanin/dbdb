@@ -12,24 +12,22 @@ const sqr = (t, f, a) => {
     }
 }
 
-const kick = (t, f, a) => {
-    const kickLength = 0.2;
-    const sustainLength = 0.8;
+const synth = (t, f, a) => {
+    const sinVal = sin(t, f, 1);
+    return Math.abs(sinVal) * a;
+}
 
-    const attackPct = Math.min(t, kickLength) / kickLength;
-    const sustainPct = Math.min(t, sustainLength) / sustainLength;
-
-    const kickFreq = sin(t, f, 1 - attackPct);
-    const kickSustain = sin(t, f / 2, 1 - sustainPct);
-
-    return kickFreq + kickSustain;
+const tri = (t, f, a) => {
+    const y = Math.abs((t % f) - f / 2) / (f / 2);
+    return y * a;
 }
 
 const getWaveFunc = (funcName) => {
     const funcMap = {
         'sin': sin,
         'sqr': sqr,
-        'kick': kick,
+        'synth': synth,
+        'tri': tri,
     }
 
     return funcMap[funcName] || sin;
@@ -38,7 +36,7 @@ const getWaveFunc = (funcName) => {
 
 const SAMPLE_RATE = 44100;
 
-const updateBuffer = (freqBuffer, countBuffer, row) => {
+const updateBuffer = (freqBuffer, countBuffer, notesBuffer, row) => {
     const startTime = row.time;
     const freq = row.freq;
     const length = row.length || 1;
@@ -46,7 +44,7 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const funcName = row.func || 'sin';
 
     const startIndex = Math.floor(startTime * SAMPLE_RATE);
-    const endIndex = Math.floor(startIndex + length * SAMPLE_RATE);
+    const endIndex = Math.ceil(startIndex + length * SAMPLE_RATE) + 1;
 
     if (freqBuffer.length !== countBuffer.length) {
         console.log("Freq and count buffers have different sizes");
@@ -63,18 +61,18 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const fadeDelayPct = (1 - row.velocity) / 1.0;
     const fadeDelay = fadeDelayPct * length / 2;
 
-    const SAMPLE_LENGTH = 1.0 / SAMPLE_RATE;
+    const SAMPLE_SIZE = 1 / SAMPLE_RATE;
+    let tick = 0;
     for (let i=startIndex; i < endIndex; i++) {
         const time = i / SAMPLE_RATE;
 
         /*
-         * If we start calculating the value of the wave at t=time, then sin waves
-         * could start playing from some value other than zero. Instead, we want to
-         * use our own x domain that starts at zero while tracking the samples in
-         * our actual note.
+         * Increment by `tick` (which starts at zero) so that
+         * the sin wave starts and ends at 0 amplitude. This
+         * helps avoid clicking sounds....
          */
         const waveFunc = getWaveFunc(funcName);
-        let value = waveFunc(time, freq, amplitude)
+        let value = waveFunc(tick, freq, amplitude)
 
         const endTime = startTime + length;
         const offsetFromStart = time - startTime;
@@ -87,14 +85,31 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
         }
 
         // always fade out to avoid clipping
-        const fadeOutDelay = length / 2;
+        const fadeOutDelay = Math.max(length / 10, 0.05);
         if (offsetUntilEnd < fadeOutDelay) {
             const fadeOutAmp = offsetUntilEnd / fadeOutDelay;
+            // const fadeOutAmp = Math.pow(2, (offsetUntilEnd - fadeOutDelay));
             value = value * fadeOutAmp;
+        }
+
+        if (i > 99020 && i < 99430 && Math.abs(value) > 0.1) {
+            //if (i > 99120 && i < 99320 && row.note === 'C') {
+            //console.log(row.row, "tick=", i, "note=", row.note, "time=", time.toFixed(3), "value=", value.toFixed(3));
         }
 
         freqBuffer[i] += value;
         countBuffer[i] += 1;
+        if (!notesBuffer[i]) {
+            notesBuffer[i] = [value]
+        } else {
+            notesBuffer[i].push(value)
+        }
+
+        //if (row.row === '22') {
+        //    console.log("time=", time, "tick=", tick, "value=", value);
+        //}
+
+        tick += SAMPLE_SIZE;
     }
 }
 
@@ -112,14 +127,28 @@ const createBuffer = (rows) => {
 
     const freqBuffer = new Float32Array(bufSize);
     const countBuffer = new Float32Array(bufSize);
+    const notesBuffer = {}
 
     rows.forEach(row => {
-        updateBuffer(freqBuffer, countBuffer, row);
+        updateBuffer(freqBuffer, countBuffer, notesBuffer, row);
     })
 
+
+    let maxNotesPlayed = 0;
     for (let i=0; i < freqBuffer.length; i++) {
-        const value = freqBuffer[i] / (countBuffer[i] || 1);
+        if (countBuffer[i] > maxNotesPlayed) {
+            maxNotesPlayed = countBuffer[i];
+        }
+    }
+
+    for (let i=0; i < freqBuffer.length; i++) {
+        const value = freqBuffer[i] / (maxNotesPlayed || 1);
         buffer[i] =  Math.max(Math.min(value, 1), -1);
+
+        if (i > 429964 && i < 429984) {
+            console.log("tick=", i, "value=", buffer[i], "freqTotal=", freqBuffer[i], "count=", countBuffer[i]);
+            console.log(notesBuffer[i]);
+        }
     }
 
     const source = audioCtx.createBufferSource();
@@ -130,6 +159,17 @@ const createBuffer = (rows) => {
 
     gain.connect(audioCtx.destination)
 
+    function saveByteArray(reportName, byte) {
+        var blob = new Blob([byte], {type: "audio"});
+        var link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        var fileName = reportName;
+        link.download = fileName;
+        link.click();
+    };
+
+    // saveByteArray("track.raw", buffer);
+
     return {
         source,
         gain,
@@ -137,6 +177,5 @@ const createBuffer = (rows) => {
         context: audioCtx,
     }
 }
-
 
 export {createBuffer, SAMPLE_RATE, getWaveFunc}

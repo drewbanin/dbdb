@@ -62,7 +62,6 @@ bass as (
         note,
         length::float as  length,
         octave::int as octave,
-        amplitude::float as amplitude,
         start_time::float as start_time,
         start_time::float + length::float as end_time
 
@@ -74,7 +73,6 @@ bass_freq as (
     select
         bass.start_time as time,
         bass.length,
-        bass.amplitude,
         notes.freq * pow(2, bass.octave - 4) as freq
 
     from bass
@@ -87,7 +85,6 @@ melody as (
         note,
         length::float as  length,
         octave::int as octave,
-        amplitude::float as amplitude,
         start_time::float as start_time,
         start_time::float + length::float as end_time
 
@@ -99,7 +96,6 @@ melody_freq as (
     select
         melody.start_time as time,
         melody.length,
-        melody.amplitude,
         notes.freq * pow(2, melody.octave - 4) as freq
 
     from melody
@@ -197,9 +193,9 @@ with notes as (
 select
     music.note,
     octave,
-    notes.frequency::float * pow(2, music.octave::float - 4) as freq,
-    time::float + 0.06 as time,
-    length::float - 0.03 as length,
+    notes.frequency::float * pow(2, music.octave::float - 5) as freq,
+    time::float as time,
+    length::float as length,
     'sin' as func,
     velocity::float as velocity
 
