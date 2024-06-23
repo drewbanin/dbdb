@@ -12,6 +12,30 @@ const sqr = (t, f, a) => {
     }
 }
 
+const kick = (t, f, a) => {
+    const kickLength = 0.2;
+    const sustainLength = 0.8;
+
+    const attackPct = Math.min(t, kickLength) / kickLength;
+    const sustainPct = Math.min(t, sustainLength) / sustainLength;
+
+    const kickFreq = sin(t, f, 1 - attackPct);
+    const kickSustain = sin(t, f / 2, 1 - sustainPct);
+
+    return kickFreq + kickSustain;
+}
+
+const getWaveFunc = (funcName) => {
+    const funcMap = {
+        'sin': sin,
+        'sqr': sqr,
+        'kick': kick,
+    }
+
+    return funcMap[funcName] || sin;
+}
+
+
 const SAMPLE_RATE = 44100;
 
 const updateBuffer = (freqBuffer, countBuffer, row) => {
@@ -19,7 +43,7 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const freq = row.freq;
     const length = row.length || 1;
     const amplitude = row.amp || 0.5;
-    const funcName = row.func || 'square';
+    const funcName = row.func || 'sin';
 
     const startIndex = Math.floor(startTime * SAMPLE_RATE);
     const endIndex = Math.floor(startIndex + length * SAMPLE_RATE);
@@ -39,9 +63,6 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
     const fadeDelayPct = (1 - row.velocity) / 1.0;
     const fadeDelay = fadeDelayPct * length / 2;
 
-    const waveFunc = (funcName === 'sqr') ? sqr : sin;
-
-    let xPos = 0;
     const SAMPLE_LENGTH = 1.0 / SAMPLE_RATE;
     for (let i=startIndex; i < endIndex; i++) {
         const time = i / SAMPLE_RATE;
@@ -52,7 +73,8 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
          * use our own x domain that starts at zero while tracking the samples in
          * our actual note.
          */
-        let value = waveFunc(xPos, freq, amplitude)
+        const waveFunc = getWaveFunc(funcName);
+        let value = waveFunc(time, freq, amplitude)
 
         const endTime = startTime + length;
         const offsetFromStart = time - startTime;
@@ -71,11 +93,8 @@ const updateBuffer = (freqBuffer, countBuffer, row) => {
             value = value * fadeOutAmp;
         }
 
-        const clipped = Math.min(Math.max(-1, value), 1);
-        freqBuffer[i] += clipped;
+        freqBuffer[i] += value;
         countBuffer[i] += 1;
-
-        xPos += SAMPLE_LENGTH;
     }
 }
 
@@ -99,7 +118,8 @@ const createBuffer = (rows) => {
     })
 
     for (let i=0; i < freqBuffer.length; i++) {
-        buffer[i] = freqBuffer[i] / (countBuffer[i] || 1);
+        const value = freqBuffer[i] / (countBuffer[i] || 1);
+        buffer[i] =  Math.max(Math.min(value, 1), -1);
     }
 
     const source = audioCtx.createBufferSource();
@@ -119,4 +139,4 @@ const createBuffer = (rows) => {
 }
 
 
-export {createBuffer, SAMPLE_RATE, sqr, sin}
+export {createBuffer, SAMPLE_RATE, getWaveFunc}

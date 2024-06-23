@@ -17,7 +17,7 @@ import {
     pieArcLabelClasses,
 } from '@mui/x-charts';
 
-import { createBuffer, sqr, sin, SAMPLE_RATE } from "./audio.ts";
+import { createBuffer, getWaveFunc, SAMPLE_RATE } from "./audio.ts";
 
 function FrequencyDomainViz({ playing, rows, offset }) {
   if (!playing) {
@@ -25,7 +25,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   }
 
   // find tones that are playing at t=offset
-  const beatOffset = 0.00;
+  const beatOffset = 0.01;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
       const endT = row.time + (row.length || 1) - beatOffset;
@@ -58,6 +58,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
       const activeNotes = relevantRows.filter(row => {
           return row.freq >= xStart && row.freq < xEnd;
       });
+
       // todo : account for amplitude?
       const numActiveNotes = activeNotes.length;
       const yVal = numActiveNotes;
@@ -199,51 +200,26 @@ function TimeDomainViz({ playing, rows, offset }) {
 
   const xDomain = 10000;
   const xVals = [];
-  const sinVals = [];
-  const sqrVals = [];
+  const yVals = [];
 
   for (let i=0; i < xDomain; i++) {
       xVals.push(i);
 
       const scaleFactor = SAMPLE_RATE * 10;
 
-      const squares = relevantRows.filter(r => r.func === 'sqr');
-      const sines = relevantRows.filter(r => r.func !== 'sqr');
-
-      const sqrFreqs = squares.map(row => {
-          const amp = row.amp || 1;
-
+      const freqs = relevantRows.map(row => {
+          const func = getWaveFunc(row.func || 'sin');
           const relativeOffset = offset - row.time;
           const pctDone = relativeOffset / row.length;
-          return sqr(i / scaleFactor, row.freq, 1 - pctDone)
+          return func(i / scaleFactor, row.freq, 1 - pctDone)
       })
 
-      const sinFreqs = sines.map(row => {
-          const amp = row.amp || 1;
+      const total = freqs.reduce((acc, val) => acc + val, 0) / (freqs.length || 1);
 
-          const relativeOffset = offset - row.time;
-          const pctDone = relativeOffset / row.length;
-          return sin(i / scaleFactor, row.freq, 1 - pctDone)
-      })
-
-      const sqrTotal = sqrFreqs.reduce((acc, val) => acc + val, 0) / (squares.length || 1);
-      const sinTotal = sinFreqs.reduce((acc, val) => acc + val, 0) / (sines.length || 1);
-
-      sqrVals.push(sqrTotal);
-      sinVals.push(sinTotal);
+      yVals.push(total);
   }
 
-  // animate sin and sqr separately
-  // const [vizSin, vizSqr] = animate(animation, [sinVals, sqrVals]);
-  // const sinTop = vizSin.map(val => val / 2 + 0.5);
-  // const sqrBot = vizSqr.map(val => val / 2 - 0.5);
-  //  series={[
-  //      { data: sinTop, label: 'sin', type: 'line', color: '#000000' },
-  //      { data: sqrBot, label: 'sqr', type: 'line', color: '#000000' }
-  //  ]}
-
-  const combined = sqrVals.map((_, i) => sinVals[i] + sqrVals[i] / 2);
-  const [vizCombined] = animate(animation, [combined]);
+  const [vizCombined] = animate(animation, [yVals]);
   const minVal = Math.min(...vizCombined);
   const maxVal = Math.max(...vizCombined);
 

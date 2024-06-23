@@ -208,6 +208,68 @@ join notes on music.note = notes.note
 order by time
 `.trim();
 
+const HOWL = `
+with notes as (
+    select * from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'C-Major')
+)
+
+select
+    music.note,
+    octave,
+    notes.frequency::float * pow(2, music.octave::float - 5) as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func,
+    case
+        when length::float < 1 then 0.95
+        else velocity::float * 2
+    end as velocity
+
+from google_sheet('18dxRrnZfyVnILz_y2cjf1FHxc6jiUp_T7SxOROMWUUw') as music
+join notes on music.note = notes.note
+order by time
+`;
+
+const LA_DA_DEE = `
+with notes as (
+    select * from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'C-Major')
+)
+
+select
+    music.note,
+    octave,
+    notes.frequency::float * pow(2, music.octave::float - 5) as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func,
+    case
+        when length::float < 1 then 0.95
+        else velocity::float * 2
+    end as velocity
+
+from google_sheet('1ZZyhmM4Pk91s8jh17ErhQ_s_FRfvneGJtKQCJCKeZ9E') as music
+join notes on music.note = notes.note
+order by time
+`;
+
+const WII = `
+with notes as (
+    select * from google_sheet('1Jb9K3yDyNVPIAP_i7AELDLBzm5bmQR3f3RuUwGAzWuc', 'C-Major')
+)
+
+select
+    music.note,
+    octave,
+    notes.frequency::float * pow(2, music.octave::float - 5) as freq,
+    time::float as time,
+    length::float as length,
+    'sin' as func,
+    0.9 as velocity
+
+from google_sheet('1kmbkXsrSiqH11bH7uOpo1tbbJRHqwFxNxYDxEf5sJ9g') as music
+join notes on music.note = notes.note
+`;
+
 const ALTMAN = `
 with music as (
     select * from ask_gpt('Play the song "Happy Birthday"')
@@ -234,9 +296,12 @@ const QUERIES = {
     YOSHI: YOSHI,
     FAIRY: FAIRY,
     "AVRIL 14": APHEX,
-    ALTMAN: ALTMAN,
     PUNK: PUNK,
     SATIE: SATIE,
+    HOWL: HOWL,
+    "LA DA DEE": LA_DA_DEE,
+    "WHO ME?": WII,
+    ALTMAN: ALTMAN,
 }
 
 
