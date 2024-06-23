@@ -24,7 +24,7 @@ function Database() {
     const fields = dataSchema || [];
 
     const isMusic = fields.indexOf('time') >= 0 && fields.indexOf('freq') >= 0;
-    const isXY = fields.filter(f => f.endsWith('_x')).length > 0;
+    const isXY = fields.filter(f => f.endsWith('x')).length > 0;
 
     function formatRowCount(count) {
         if (!count) {

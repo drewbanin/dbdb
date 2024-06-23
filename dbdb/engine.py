@@ -177,6 +177,10 @@ async def safe_dispatch_query(query_id, plan, nodes):
         logger.info(f"Query {query_id} completed successfully")
 
     except Exception as e:
+        import traceback
+
+        print(traceback.format_exc())
+
         logger.error(f"Error running query: {e}")
         add_event(
             query_id, {"event": "QueryError", "data": {"id": query_id, "error": str(e)}}

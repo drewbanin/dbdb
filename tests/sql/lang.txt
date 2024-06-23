@@ -80,3 +80,23 @@ order by 1
     {id: 2},
     {id: 3}
 ]
+
+====================================
+Test case when
+====================================
+
+select
+    i,
+    case when i < 2 then 'a' else 'b' end as value
+from generate_series(4)
+order by i
+
+
+---
+
+[
+    {i: 0, value: 'a'},
+    {i: 1, value: 'a'},
+    {i: 2, value: 'b'},
+    {i: 3, value: 'b'},
+]
