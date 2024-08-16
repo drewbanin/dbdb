@@ -185,7 +185,6 @@ const animate = (animationRef, seriesList) => {
 
 function TimeDomainViz({ playing, rows, offset }) {
   const animation = useRef({});
-  const maxY = useRef(1);
 
   if (!playing) {
       return null

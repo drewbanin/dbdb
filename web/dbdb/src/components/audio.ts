@@ -159,17 +159,6 @@ const createBuffer = (rows) => {
 
     gain.connect(audioCtx.destination)
 
-    function saveByteArray(reportName, byte) {
-        var blob = new Blob([byte], {type: "audio"});
-        var link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        var fileName = reportName;
-        link.download = fileName;
-        link.click();
-    };
-
-    // saveByteArray("track.raw", buffer);
-
     return {
         source,
         gain,
