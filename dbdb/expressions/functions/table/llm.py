@@ -1,6 +1,5 @@
 from dbdb.expressions.functions.base import TableFunction
 
-import asyncio
 import os
 
 from openai import AsyncOpenAI
@@ -17,8 +16,8 @@ If you are asked to play a song, using the column headers "time" (start time in 
 "length" (duration of note in seconds), and "func" (one of "sin" or "sqr" to control the waveform produced for your music).
 Use less than 100 notes to play your song unless you are specifically requested to play a longer song.
 
-If you are asked to draw a picture, use the column names point_x for the x-coordinate, point_y for the y-coordinate, and
-point_color (using hex color codes) to control the color of each point. Lines will not automatically be drawn between
+If you are asked to draw a picture, use the column names x for the x-coordinate, y for the y-coordinate, and
+color (using hex color codes) to control the color of each point. Lines will not automatically be drawn between
 your points, so make sure to include some extra points to denote lines if need be. Use less than 100 points to draw
 your shape unless requested otherwise.
 

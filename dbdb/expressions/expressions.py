@@ -280,6 +280,7 @@ class NegationOperator(Expression):
         return NegationOperator(expr=self.expr)
 
     def walk(self, func):
+        yield func(self)
         yield from self.expr.walk(func)
 
     def eval(self, context: ExecutionContext):
@@ -307,6 +308,7 @@ class BinaryOperator(Expression):
         )
 
     def walk(self, func):
+        yield func(self)
         yield from self.lhs.walk(func)
         yield from self.rhs.walk(func)
 
@@ -352,17 +354,20 @@ class CaseWhen(Expression):
         )
 
     def walk(self, func):
-        for expr in self.when_exprs:
+        yield func(self)
+        for expr in self.iter_exprs():
             yield from expr.walk(func)
 
-        yield from self.else_expr.walk(func)
-
     def iter_exprs(self):
-        for expr in self.when_exprs + [self.else_expr]:
-            yield expr
+        for when_val, then_val in self.when_exprs:
+            yield when_val
+            yield then_val
+
+        yield self.else_expr
 
     def get_aggregated_fields(self):
         fields = set()
+
         for expr in self.iter_exprs():
             fields.update(expr.get_aggregated_fields())
         return fields

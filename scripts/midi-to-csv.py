@@ -42,10 +42,10 @@ for row in res:
     track = float(row.pop(0))
 
     freq = note_to_frequency(note, octave)
-    rows.append([freq, start_time, duration, amplitude, track])
+    rows.append([freq, note, octave, start_time, duration, amplitude, track])
 
 
-fields = ["freq", "time", "length", "amp", "track"]
+fields = ["freq", "note", "octave", "time", "length", "amp", "track"]
 with open("out.csv", "w") as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(fields)

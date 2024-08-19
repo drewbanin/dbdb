@@ -17,108 +17,7 @@ import {
     pieArcLabelClasses,
 } from '@mui/x-charts';
 
-const sin = (t, f, a) => {
-    return a * Math.sin(2 * Math.PI * t * f);
-}
-
-const sqr = (t, f, a) => {
-    const val = sin(t, f, a);
-    if (val > 0) {
-        return a;
-    } else {
-        return -a
-    }
-}
-
-const SAMPLE_RATE = 44100;
-
-const createBuffer = (rows) => {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioCtx.suspend();
-
-    const numChannels = 1;
-
-    // this is in seconds
-    const totalTime = Math.max(...rows.map(r => r.time + (r.length || 1)));
-
-    const audioBuffer = audioCtx.createBuffer(
-      numChannels,
-      totalTime * SAMPLE_RATE,
-      SAMPLE_RATE,
-    );
-
-    const freqBuf = new Float32Array(totalTime * SAMPLE_RATE);
-    const countBuf = new Float32Array(totalTime * SAMPLE_RATE);
-
-    rows.forEach(row => {
-        const startTime = row.time;
-        const freq = row.freq;
-        const length = row.length || 1;
-        const amplitude = row.amp || 0.5;
-        const funcName = row.func || 'square';
-
-        // const beatOffset = SAMPLE_RATE * 0.01;
-        const beatOffset = 0;
-
-        const startIndex = Math.floor(startTime * SAMPLE_RATE);
-        const endIndex = Math.floor(startIndex + length * SAMPLE_RATE);
-
-        const offsetStartIndex = startIndex + beatOffset;
-        const offsetEndIndex = endIndex - beatOffset;
-
-        if (offsetEndIndex > freqBuf.length || offsetStartIndex > freqBuf.length) {
-            console.log("End index=", endIndex, "is out of bounds", freqBuf.length);
-            return
-        } else if (offsetStartIndex > offsetEndIndex) {
-            console.log("End time is before start time? how?");
-            return;
-        }
-
-        for (let i=offsetStartIndex; i < offsetEndIndex; i++) {
-            const time = i / SAMPLE_RATE;
-
-            const waveFunc = (funcName === 'sqr') ? sqr : sin;
-            const value = waveFunc(time, freq, amplitude)
-
-            freqBuf[i] += value;
-            countBuf[i] += 1;
-        }
-    })
-
-    const buffer = audioBuffer.getChannelData(0);
-    for (let i=0; i < freqBuf.length; i++) {
-        const count = countBuf[i];
-        const freq = freqBuf[i];
-
-        let normed;
-        if (count === 0) {
-            normed = 0;
-        } else {
-            normed = freq / count;
-        }
-
-        let clipped;
-        if (normed > 1) {
-            clipped = 1;
-        } else if (normed < -1) {
-            clipped = -1;
-        } else {
-            clipped = normed;
-        }
-
-        buffer[i] = clipped;
-    }
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-
-    const gain = audioCtx.createGain();
-
-    source.connect(gain);
-    gain.connect(audioCtx.destination)
-
-    return [source, audioCtx, gain, totalTime];
-}
+import { createBuffer, getWaveFunc, SAMPLE_RATE } from "./audio.ts";
 
 function FrequencyDomainViz({ playing, rows, offset }) {
   if (!playing) {
@@ -126,7 +25,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
   }
 
   // find tones that are playing at t=offset
-  const beatOffset = 0.00;
+  const beatOffset = 0.01;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
       const endT = row.time + (row.length || 1) - beatOffset;
@@ -159,6 +58,7 @@ function FrequencyDomainViz({ playing, rows, offset }) {
       const activeNotes = relevantRows.filter(row => {
           return row.freq >= xStart && row.freq < xEnd;
       });
+
       // todo : account for amplitude?
       const numActiveNotes = activeNotes.length;
       const yVal = numActiveNotes;
@@ -246,15 +146,51 @@ function PieViz({ playing, rows, offset }) {
   );
 }
 
+const animateVals = (animationRef, key, values) => {
+    if (!animationRef.current[key]) {
+      // initialize the buffer
+      // Each element has a starting point, ending point, and step
+
+      const y = values.map(val => {
+        return {to: val, current: val, step: 0}
+      })
+
+      animationRef.current[key] = y;
+    } else {
+      // grab existing values and add `from` to step value to get towards `to`
+      // ideally we would spline (?) this, but can go linear for now...
+
+      const maxSteps = 5;
+      const animatedVals = animationRef.current[key].map((existing, i) => {
+          const targetYVal = values[i];
+          const increment = (targetYVal - existing.current) / maxSteps;
+          let newVal = existing.current + increment;
+
+          return {to: targetYVal, current: newVal, step: existing.step + 1, increment: increment}
+      })
+
+      animationRef.current[key] = animatedVals;
+    }
+
+    return animationRef.current[key].map(r => r.current);
+
+
+}
+
+const animate = (animationRef, seriesList) => {
+    return seriesList.map((series, i) => {
+        return animateVals(animationRef, i, series);
+    });
+}
+
 function TimeDomainViz({ playing, rows, offset }) {
-  const yBuffer = useRef();
-  const maxY = useRef(1);
+  const animation = useRef({});
 
   if (!playing) {
       return null
   }
 
-  const beatOffset = 0.01;
+  const beatOffset = 0.0;
   const relevantRows = rows.filter(row => {
       const startT = row.time + beatOffset;
       const endT = row.time + (row.length || 1) - beatOffset;
@@ -271,55 +207,28 @@ function TimeDomainViz({ playing, rows, offset }) {
       const scaleFactor = SAMPLE_RATE * 10;
 
       const freqs = relevantRows.map(row => {
-          const amp = row.amp || 1;
-          const func = row.func === 'sqr' ? sqr : sin;
-          return func(i / scaleFactor, row.freq, amp)
+          const func = getWaveFunc(row.func || 'sin');
+          const relativeOffset = offset - row.time;
+          const pctDone = relativeOffset / row.length;
+          return func(i / scaleFactor, row.freq, 1 - pctDone)
       })
 
-      const yTotal = freqs.reduce((acc, val) => acc + val, 0);
-      // const yVal = freqs.length === 0 ? 0 : yTotal / freqs.length;
-      const yVal = yTotal;
-      yVals.push(yVal);
+      const total = freqs.reduce((acc, val) => acc + val, 0) / (freqs.length || 1);
+
+      yVals.push(total);
   }
 
-  let vizY;
-  if (!yBuffer.current) {
-      // initialize the buffer
-      // Each element has a starting point, ending point, and step
-
-      const newYBuf = yVals.map(val => {
-        return {to: val, current: val, step: 0}
-      })
-
-      yBuffer.current = newYBuf;
-      vizY = yVals;
-
-  } else {
-      // grab yBuffer and add `from` to step value to get towards `to`
-      // ideally we would spline (?) this, but can go linear for now...
-
-      const maxSteps = 5;
-      const animatedVals = yBuffer.current.map((existing, i) => {
-          const targetYVal = yVals[i];
-          const increment = (targetYVal - existing.current) / maxSteps;
-          let newVal = existing.current + increment;
-
-          if (Math.abs(newVal) > maxY.current) {
-              maxY.current = Math.abs(newVal);
-          }
-
-          return {to: targetYVal, current: newVal, step: existing.step + 1, increment: increment}
-      })
-
-      vizY = animatedVals.map(val => val.current);
-      yBuffer.current = animatedVals;
-  }
+  const [vizCombined] = animate(animation, [yVals]);
+  const minVal = Math.min(...vizCombined);
+  const maxVal = Math.max(...vizCombined);
 
   return (
     <ResponsiveChartContainer
-      series={[{ data: vizY, label: 'v', type: 'line', color: '#000000' }]}
+      series={[
+          { data: vizCombined, label: 'amp', type: 'line', color: '#000000' }
+      ]}
       xAxis={[{ scaleType: 'linear', data: xVals, min: 0, max: xDomain, tickNumber: 5 }]}
-      yAxis={[{ min: -maxY.current - 0.1, max: maxY.current + 0.1, tickNumber: 2 }]}
+      yAxis={[{ min: minVal - 0.1, max: maxVal + 0.1, tickNumber: 2 }]}
       margin={{
         left: 15,
         right: 35,
@@ -400,7 +309,12 @@ export function Visualizer() {
             return
         }
 
-        const [ newSource, ctx, newGain, totalTime ] = createBuffer(mappedRows);
+        const {
+            source: newSource,
+            context: ctx,
+            gain: newGain,
+            totalTime
+        } = createBuffer(mappedRows);
 
         endTime.current = totalTime;
 
@@ -429,7 +343,6 @@ export function Visualizer() {
         }
 
         setPlayTime(audioCtx.current.currentTime);
-
         if (audioCtx.current.currentTime > endTime.current) {
           console.log("done playing", audioCtx.current.currentTime, endTime.current)
           source.current.stop()
@@ -468,6 +381,13 @@ export function Visualizer() {
         volumeRef.current = level;
     }
 
+    /*
+    <button
+        style={{ margin: 0, verticalAlign: 'top' }}
+        onClick={ e => setVizType('pie') }
+        className="light title">BEN</button>
+    */
+
     return (
         <>
             <div className="panelHeader">
@@ -482,10 +402,6 @@ export function Visualizer() {
                                     style={{ margin: 0, marginRight: 5, verticalAlign: 'top' }}
                                     onClick={ e => setVizType('time') }
                                     className="light title">TIME</button>
-                                <button
-                                    style={{ margin: 0, verticalAlign: 'top' }}
-                                    onClick={ e => setVizType('pie') }
-                                    className="light title">BEN</button>
 
                                 <div style={{ margin: 0, float: 'right' }}>
                                     { showMediaControls && 
@@ -526,75 +442,50 @@ export function Visualizer() {
 }
 
 export function XYViz() {
-    const { schema, result } = useContext(QueryContext);
+    const { schema, result, fullscreen } = useContext(QueryContext);
     const [ dataSchema ] = schema;
     const [ rows ] = result;
+    const [ isFullscreen, setFullscreen ] = fullscreen;
 
-    // collects series into list of {name, x, y}
-    
-    const series = {};
-    (dataSchema || []).forEach((colName, index) => {
-        let col = null;
-        let axis = null;
-        let color = null;
-
-        if (colName.endsWith("_x")) {
-            axis = 'x';
-            col = colName.replace('_x', '');
-        } else if (colName.endsWith("_y")) {
-            axis = 'y';
-            col = colName.replace('_y', '');
-        } else if (colName.endsWith('_color')) {
-            col = colName.replace('_color', '');
-            color = true
-        }
-
-        if (axis && col) {
-            if(!series[col]) {
-                series[col] = {name: col}
-            }
-
+    const series = {x: [], y: [], color: 'black'};
+    (dataSchema || []).forEach((col, index) => {
+        if (col === "x" || col === "y") {
             const data = rows.map(r => r[index]);
-            series[col][axis] = data;
-        } else if (color && col) {
-            if(!series[col]) {
-                series[col] = {name: col}
+            series[col] = data;
+        }
+    })
+
+    const viz = {
+        type: 'scatter',
+        color: 'black',
+        data: series.x.map((x, i) => {
+            return {
+                x: series.x[i],
+                y: series.y[i],
+                id: 'point-' + i
             }
-
-            series[col]['color'] = rows.map(r => r[index]);
-        }
-    })
-
-    const seriesNames = Object.keys(series);
-
-                // <SparkLineChart data={data} height={50} colors={["#000000"]} />
-    const viz = seriesNames.map(name => {
-        const ser = series[name];
-        const color = (ser.color && ser.color.length) ? ser.color[0] : '#000000';
-        return {
-            label: name.toUpperCase(),
-            type: 'scatter',
-            color: color,
-            data: ser.x.map((x, i) => {
-                return {
-                    x: ser.x[i],
-                    y: ser.y[i],
-                    id: 'x-' + ser.x[i] + '-y-' + ser.y[i],
-                }
-            })
-        }
-    })
+        })
+    }
 
     return (<>
             <div className="panelHeader">
                 <div style={{ padding: 5 }}>
-                    <div className="helpText">VIZ
+                    <div className="helpText" style={{ display: "inline-block" }}>VIZ
+                    </div>
+
+                    <div style={{ float: "right" }}>
+                        <button
+                            onClick={e => setFullscreen(!isFullscreen)}
+                            style={{ margin: -2 }}
+                            className="light title">
+                            <FullScreenIcon isFullscreen={isFullscreen} />
+                        </button>
                     </div>
                 </div>
             </div>
             <div className="configBox minFixedHeight">
                 <ResponsiveChartContainer
-                  series={viz}
+                  series={[viz]}
                   margin={{
                     left: 40,
                     right: 35,
