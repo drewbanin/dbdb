@@ -1,13 +1,12 @@
 import { React, useState, createContext } from "react";
 
-const DEFAULT_QUERY =`
-`.trim();
+import QUERIES  from './queries.js';
 
 
 const QueryContext = createContext();
 
 const QueryContextProvider = ({ children }) => {
-    const [query, setQuery] = useState(DEFAULT_QUERY);
+    const [query, setQuery] = useState(QUERIES[0].value);
     const [result, setResult] = useState([]);
     const [nodes, setNodes] = useState(null);
     const [error, setError] = useState(null);
