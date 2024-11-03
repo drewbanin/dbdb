@@ -12,7 +12,7 @@ import ResultTable from './components/resultTable.js';
 import { QueryContext } from './Store.js';
 
 function Database() {
-    const [activeTab, setActiveTab] = useState('plan');
+    const [activeTab, setActiveTab] = useState('table');
 
     const { schema, result, running, fullscreen } = useContext(QueryContext);
     const [ dataSchema ] = schema;

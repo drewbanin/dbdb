@@ -43,12 +43,30 @@ function ResultTable() {
     }
 
     const columns = useMemo(() => {
-        return (resultSchema || []).map((col, i) => {
+        const renderedColumns = (resultSchema || []).map((col, i) => {
+            const linkField = (col + ":link");
+            const linkFieldIndex = resultSchema.findIndex(r => r === linkField);
+
+            if (col.endsWith(':link')) {
+                return null;
+            }
+
             return {
                 name: col.toUpperCase(),
                 selector: row => row[i],
+                cell: (d) => {
+                    if (linkFieldIndex >= 0) {
+                      return (<a href={d[linkFieldIndex]}>
+                        {d[i]}
+                      </a>)
+                    } else {
+                        return d[i];
+                    }
+                },
             }
         });
+
+        return renderedColumns.filter(r => r !== null);
 
     }, [resultSchema]);
 
