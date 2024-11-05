@@ -2,7 +2,6 @@ import { React, useState, createContext } from "react";
 
 import QUERIES  from './queries.js';
 
-
 const QueryContext = createContext();
 
 const QueryContextProvider = ({ children }) => {

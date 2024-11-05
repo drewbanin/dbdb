@@ -14,7 +14,7 @@ import { QueryContext } from './Store.js';
 function Database() {
     const [activeTab, setActiveTab] = useState('table');
 
-    const { schema, result, running, fullscreen } = useContext(QueryContext);
+    const { schema, result, running, fullscreen, isMobileSized } = useContext(QueryContext);
     const [ dataSchema ] = schema;
     const [ resultData ] = result;
     const [ queryRunning ] = running;
@@ -45,7 +45,7 @@ function Database() {
                             <QueryComponent />
                         </div>
                     </div>
-                    <div className="statsPanel" style={{ marginLeft: 40, flexGrow: 0, minWidth: 500, maxWith: 500, width: 500}}>
+                    { !isMobileSized && (<div className="statsPanel" style={{ marginLeft: 40, flexGrow: 0, minWidth: 500, maxWith: 500, width: 500}}>
                         <div className="boxWrapper">
                             {isFullscreen && <div className="flexColumn regularViz">
                                 <PlaceholderViz text="RUNNING IN FULL SCREEN" />
@@ -56,7 +56,7 @@ function Database() {
                                 {(!isXY && !isMusic) &&  <PlaceholderViz />}
                             </div>
                         </div>
-                    </div>
+                    </div>)}
                 </div>
             </div>
             <div className="flexColumnBox" style={{ marginTop: 90 }}>
