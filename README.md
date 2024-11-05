@@ -53,8 +53,8 @@ dbdb supports:
  - `LEFT OUTER` and `INNER` joins
  - grouping & aggregations (see below)
  - window functions (with support for ordering, partitioning, and frame clauses)
+ - creating tables using `create table ... as ( ... )` syntax
  - all the other stuff you'd expect, like case-when exprs, type casting, etc
- - creating and dropping tables
 
 ### Function reference
 
